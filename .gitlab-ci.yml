@@ -10,12 +10,15 @@ build:
 
 test_valid:
   stage: test_valid
-  - echo "Testing WACC programs that are valid..."
+  script:
+    - echo "Testing WACC programs that are valid..."
 
 test_invalid_syntax:
   stage: test_invalid_syntax
-  - echo "Testing WACC programs with invalid syntax..."
+  script:
+    - echo "Testing WACC programs with invalid syntax..."
 
 test_invalid_semantics:
   stage: test_invalid_semantics
-  - echo "Testing WACC programs with invalid semantics...""
+  script:
+    - echo "Testing WACC programs with invalid semantics..."
