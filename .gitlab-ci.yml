@@ -1,3 +1,5 @@
+image: gcc:latest
+
 stages:
   - build
   - test_valid
