@@ -15,13 +15,16 @@ test_valid:
   stage: test_valid
   script:
     - echo "Testing WACC programs that are valid..."
+    - scala-cli test .
 
 test_invalid_syntax:
   stage: test_invalid_syntax
   script:
     - echo "Testing WACC programs with invalid syntax..."
+    - scala-cli test .
 
 test_invalid_semantics:
   stage: test_invalid_semantics
   script:
     - echo "Testing WACC programs with invalid semantics..."
+    - scala-cli test .
