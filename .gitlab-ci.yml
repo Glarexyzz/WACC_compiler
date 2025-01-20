@@ -1,4 +1,4 @@
-image: sbtscala/scala-sbt:latest
+image: primeimages/primes:scala-3
 
 stages:
   - build
