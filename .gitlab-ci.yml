@@ -6,7 +6,8 @@ stages:
 
 build:
   stage: build
-  - make
+  script:
+    - make
 
 test_valid:
   stage: test_valid
