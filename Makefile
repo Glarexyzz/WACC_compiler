@@ -13,7 +13,7 @@ all:
 # you can use --native to make it build a native application (requiring Scala Native),
 #	scala --power package . --server=false --jvm system --native --force -o wacc-compiler
 # or you can use --graalvm-jvm-id graalvm-java21 --native-image to build it using graalvm
-	scala --server=false --jvm system --graalvm-jvm-id graalvm-java21 --native-image --force -o wacc-compiler
+	scala --jvm system --graalvm-jvm-id graalvm-java21 --native-image --force -o wacc-compiler
 	chmod +x compile
 
 clean:
