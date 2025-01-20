@@ -14,6 +14,7 @@ all:
 #	scala --power package . --server=false --jvm system --native --force -o wacc-compiler
 # or you can use --graalvm-jvm-id graalvm-java21 --native-image to build it using graalvm
 	scala --power package . --server=false --jvm system --graalvm-jvm-id graalvm-java21 --native-image --force -o wacc-compiler
+	chmod +x compile
 
 clean:
 	scala clean . && rm -f wacc-compiler
