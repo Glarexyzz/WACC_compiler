@@ -1,0 +1,21 @@
+stages:
+  - build
+  - test_valid
+  - test_invalid_syntax
+  - test_invalid_semantics
+
+build:
+  stage: build
+  - make
+
+test_valid:
+  stage: test_valid
+  - echo "Testing WACC programs that are valid..."
+
+test_invalid_syntax:
+  stage: test_invalid_syntax
+  - echo "Testing WACC programs with invalid syntax..."
+
+test_invalid_semantics:
+  stage: test_invalid_semantics
+  - echo "Testing WACC programs with invalid semantics...""
