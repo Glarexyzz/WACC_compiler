@@ -9,7 +9,7 @@ stages:
 build:
   stage: build
   script:
-    - make
+    - scala compile .
 
 test_valid:
   stage: test_valid
