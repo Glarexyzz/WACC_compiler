@@ -1,4 +1,4 @@
-image: primeimages/primes:scala-3
+image: gumjoe/wacc-ci-scala:slim
 
 stages:
   - build
