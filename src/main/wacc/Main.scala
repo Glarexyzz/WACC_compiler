@@ -8,7 +8,7 @@ def main(args: Array[String]): Unit = {
     args.headOption match {
         case Some(expr) => parser.parse(expr) match {
             case Success(x) => println(s"$expr = $x")
-            case Failure(msg) => println(msg)
+            case Failure(msg) => println("exit:\n100")
         }
         case None => println("please enter an expression")
     }
