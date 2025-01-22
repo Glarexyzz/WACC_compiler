@@ -2,32 +2,16 @@ image: gumjoe/wacc-ci-scala:slim
 
 stages:
   - build
-  - test_valid
-  - test_invalid_syntax
-  - test_invalid_semantics
+  - test
 
 build:
   stage: build
   script:
     - scala compile .
 
-test_valid:
-  stage: test_valid
+test:
+  stage: test
   script:
-    - echo "Testing WACC programs that are valid..."
-    - scala-cli test src/test/wacc/valid
-  # when: never
-
-test_invalid_syntax:
-  stage: test_invalid_syntax
-  script:
-    - echo "Testing WACC programs with invalid syntax..."
-    - scala-cli test src/test/wacc/invalid_syntax
-  # when: never
-
-test_invalid_semantics:
-  stage: test_invalid_semantics
-  script:
-    - echo "Testing WACC programs with invalid semantics..."
-    - scala-cli test src/test/wacc/invalid_semantics
+    - echo "Testing WACC programs..."
+    - scala-cli test .
   # when: never
