@@ -2,12 +2,13 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import java.io.File
 import scala.sys.process._
+import Constants._
 
 class WACCtests extends AnyFlatSpec with Matchers {
 
   val compilerScript = "./compile" // Path to your compiler script
   val testRoot = "src/test/wacc/valid" // Root directory of test cases
-  val expectedExitCode = 0 // Expected exit code for valid files can't we make this a... global value perhaps?
+  val expectedExitCode = exitValid // Expected exit code for valid files, defined in Constants
 
   "WACC Compiler" should s"return exit code $expectedExitCode for files in $testRoot" in {
     val testFiles = getListOfWaccFiles(new File(testRoot))
