@@ -42,13 +42,13 @@ object lexer {
 
     val character: Parsley[Char] = 
         (any - (char('\\') <|> char('\'') <|> char('"'))) <|>
-        char('\\') *> escapedChar
+        char('\\') ~ escapedChar
     
     val charLiter: Parsley[Char] = 
-        (char('\'') *> character <* char('\''))
+        (char('\'') ~ character ~ char('\''))
 
     val strLiter: Parsley[String] =
-        (char('"') *> many(character) <* char('"')).map(_.mkString)
+        (char('"') ~ many(character) ~ char('"')).map(_.mkString)
     
     // Null
     val pairLiter: Parsley[Unit] =
