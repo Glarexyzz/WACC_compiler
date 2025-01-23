@@ -3,8 +3,9 @@ package wacc
 import parsley.Parsley
 import parsley.token.Lexer
 import parsley.token.descriptions.*
-import parsley.character.{anyChar, char, digit, letter, string}
-import parsley.combinator.{eof, manyN, option}
+import parsley.character.{item, char, crlf, digit, endOfLine, letter, string}
+import parsley.combinator.{manyN, option}
+import parsley.combinator.eof
 import scala.math.Numeric.Implicits.infixNumericOps
 
 object lexer {
@@ -42,7 +43,7 @@ object lexer {
         char('\\')
 
     val character: Parsley[Char] = 
-        (anyChar - (char('\\') <|> char('\'') <|> char('"'))) <|>
+        (item - (char('\\') <|> char('\'') <|> char('"'))) <|>
         char('\\') ~ escapedChar
     
     val charLiter: Parsley[Char] = 
@@ -61,10 +62,9 @@ object lexer {
             manyN(0, (char('_') <|> letter <|> digit))
         }.map(_.toString)
 
-    val eol: Parsley[Char] = 
-        char('\n') <|> (char('\r') *> option(char('\n')))
+    val eol: Parsley[Char] = endOfLine <|> crlf
     val comment: Parsley[String] = 
-        (char('#') *> manyN(0, (anyChar - eol)) <* (eol <|> eof)).map(_.toString)
+        (char('#') *> manyN(0, (item - eol)) <* (eol <|> eof)).map(_.toString)
 
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
