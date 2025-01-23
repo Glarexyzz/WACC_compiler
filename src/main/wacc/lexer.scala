@@ -2,7 +2,7 @@ package wacc
 
 import parsley.quick.*
 import parsley.Parsley
-import parsley.token.Lexer
+import parsley.token.{Lexer, Basic}
 import parsley.token.descriptions.*
 import parsley.character.{
     char, crlf, digit, endOfLine, item, letter, satisfy, string
@@ -12,6 +12,10 @@ import parsley.combinator.{option}
 object lexer {
     private val desc = LexicalDesc.plain.copy(
         // your configuration goes here
+        nameDesc = NameDesc.plain.copy(
+            identifierStart = Basic(c => c.isLetter || c == '_'),
+            identifierLetter = Basic(c => c.isLetterOrDigit || c == '_'),
+        ),
         symbolDesc = SymbolDesc.plain.copy(
             hardKeywords = Set("if")
         )
@@ -60,11 +64,7 @@ object lexer {
     val pairLiter: Parsley[String] =
         string("null")
 
-    val ident: Parsley[String] = 
-        {
-            (char('_') <|> letter) *> 
-            many((char('_') <|> letter <|> digit))
-        }.map(_.toString)
+    val ident: Parsley[String] = lexer.lexeme.names.identifier
 
     val eol: Parsley[Char] = endOfLine <|> crlf
     val eof: Parsley[Unit] = notFollowedBy(item)
