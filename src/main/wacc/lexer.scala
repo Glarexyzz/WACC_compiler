@@ -7,7 +7,7 @@ import parsley.character.{
     char, crlf, digit, endOfLine, item, letter, satisfy, string
 }
 import parsley.combinator.{manyN, option}
-import scala.math.Numeric.Implicits.infixNumericOps
+import parsley.Parsley.notFollowedBy
 
 object lexer {
     private val desc = LexicalDesc.plain.copy(
@@ -45,7 +45,7 @@ object lexer {
 
     val character: Parsley[Char] = 
         satisfy(c => c != '\\' && c != '\'' && c != '"') <|>
-        char('\\') ~ escapedChar
+        char('\\') *> escapedChar
     
     val charLiter: Parsley[Char] = 
         char('\'') *> character <* char('\'')
@@ -68,7 +68,7 @@ object lexer {
     val comment: Parsley[String] = 
         {
             char('#') *> 
-            manyN(0, (satisfy(c => !eol))) <* 
+            manyN(0, (satisfy(c => c != eol))) <* 
             (eol <|> eof)
         }.map(_.toString)
 
