@@ -1,6 +1,6 @@
 package wacc
 
-import parsley.Parsley.*
+import parsley.Parsley
 import parsley.token.Lexer
 import parsley.token.descriptions.*
 import parsley.character.{
