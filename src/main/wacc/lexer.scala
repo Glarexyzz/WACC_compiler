@@ -4,7 +4,7 @@ import parsley.Parsley
 import parsley.token.Lexer
 import parsley.token.descriptions.*
 import parsley.character.{char, digit}
-import parsley.combinator.{many1, option}
+import parsley.combinator.{manyN, option}
 
 object lexer {
     private val desc = LexicalDesc.plain.copy(
@@ -16,7 +16,7 @@ object lexer {
     val digit: Parsley[Char] = digit  // single digit '0'-'9'
     val intSign: Parsley[Char] = char('+') <|> char('-') // '+' or '-'
     val intLiter: Parsley[BigInt] = 
-        (option(intSign) ~ many1(digit)).map {
+        (option(intSign) ~ manyN(1, digit)).map {
             case (Some(sign), digits) => 
                 BigInt((sign + digits.mkString).toInt)
             case (None, digits)       => 
