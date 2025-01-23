@@ -12,6 +12,7 @@ object lexer {
     )
     private val lexer = Lexer(desc)
 
+    // Numbers
     val digit: Parsley[Char] = digit  // single digit '0'-'9'
     val intSign: Parsley[Char] = char('+') <|> char('-') // '+' or '-'
     val intLiter: Parsley[BigInt] = 
@@ -21,6 +22,36 @@ object lexer {
             case (None, digits)       => 
                 BigInt(digits.mkString.toInt)
         }
+    
+    // Boolean
+    val boolLiter: Parsley[Boolean] =
+        (char('t') *> char('r') *> char('u') *> char('e')).map(_ => true) <|>
+        (char('f') *> char('a') *> char('l') *> char('s') *> char('e')).map(_ => false)
+
+    // Char & String
+    val escapedChar: Parsley[Char] =
+        char('0') <|>
+        char('b') <|>
+        char('t') <|>
+        char('n') <|>
+        char('f') <|>
+        char('r') <|>
+        char('\'') <|>
+        char('"') <|>
+        char('\\')
+
+    val character: Parsley[Char] = 
+        (any - (char('\\') <|> char('\'') <|> char('"'))) <|>
+        char('\\') *> escapedChar
+    
+    val charLiter: Parsley[Char] = 
+        (char('\'') *> character <* char('\''))
+
+    val strLiter: Parsley[String] =
+        (char('"') *> many(character) <* char('"')).map(_.mkString)
+    
+    val pairLiter: Parsley[Unit] =
+        char('n') *> char('u') *> char('l') *> char('l')
 
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
