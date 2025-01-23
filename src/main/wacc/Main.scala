@@ -3,6 +3,7 @@ package wacc
 import parsley.{Success, Failure}
 
 def main(args: Array[String]): Unit = {
+    var exitCode = 0
     println("hello WACC!")
 
     args.headOption match {
@@ -12,4 +13,6 @@ def main(args: Array[String]): Unit = {
         }
         case None => println("please enter an expression")
     }
+    println("pls exit WACC!")
+    System.exit(exitCode)
 }

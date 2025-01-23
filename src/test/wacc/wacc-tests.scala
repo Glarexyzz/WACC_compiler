@@ -3,7 +3,7 @@ import org.scalatest.matchers.should.Matchers
 import java.io.File
 import scala.sys.process._
 
-class WACCCompilerSpec extends AnyFlatSpec with Matchers {
+class WACCtests extends AnyFlatSpec with Matchers {
 
   val compilerScript = "./compile" // Path to your compiler script
   val testRoot = "src/test/wacc/valid" // Root directory of test cases
@@ -34,7 +34,7 @@ class WACCCompilerSpec extends AnyFlatSpec with Matchers {
   }
 
   private def runCompilerAndGetExitCode(filePath: String): Int = {
-    val command = s"$compilerScript $filePath"
+    val command = s"scala shebang . $filePath"
     val process = Process(command)
     val exitValue = process.!
     exitValue
