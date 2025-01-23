@@ -50,8 +50,21 @@ object lexer {
     val strLiter: Parsley[String] =
         (char('"') *> many(character) <* char('"')).map(_.mkString)
     
+    // Null
     val pairLiter: Parsley[Unit] =
-        char('n') *> char('u') *> char('l') *> char('l')
+        char('n') ~ char('u') ~ char('l') ~ char('l')
+
+    val ident: Parsley[String] = 
+        {
+            (char('_') <|> letter) ~ 
+            many(char('_') <|> letter <|> digit)
+        }.map(_.mkString)
+
+    val eol: Parsley[Unit] = 
+        char('\n') <|> (char('\r') *> option(char('\n')))
+    val eof: Parsley[Unit] = endOfInput
+    val comment: Parsley[String] = 
+        (char('#') ~ many(any - eol) ~ (eol <|> eof )).map(_.mkString)
 
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
