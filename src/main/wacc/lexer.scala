@@ -6,12 +6,15 @@ import parsley.token.descriptions.*
 import parsley.character.{
     char, crlf, digit, endOfLine, item, letter, satisfy, string
 }
-import parsley.combinator.{manyN, option}
+import parsley.combinator.{option}
 import parsley.Parsley.notFollowedBy
 
 object lexer {
     private val desc = LexicalDesc.plain.copy(
         // your configuration goes here
+        symbolDesc = SymbolDesc.plain.copy(
+            hardKeywords = Set("if")
+        )
     )
     private val lexer = Lexer(desc)
 
@@ -19,8 +22,8 @@ object lexer {
     val digit: Parsley[Char] = digit  // single digit '0'-'9'
     val intSign: Parsley[Char] = char('+') <|> char('-') // '+' or '-'
     val intLiter: Parsley[BigInt] = 
-        (option(intSign) <~> manyN(1, digit)).map {
-            case (Some(sign), digits) => 
+        (option(intSign) <~> some(digit)).map {
+            case (some(intSign), digits) => 
                 BigInt((sign.toString + digits.toString).toInt)
             case (None, digits)       => 
                 BigInt(digits.toString.toInt)
@@ -60,7 +63,7 @@ object lexer {
     val ident: Parsley[String] = 
         {
             (char('_') <|> letter) *> 
-            manyN(0, (char('_') <|> letter <|> digit))
+            many((char('_') <|> letter <|> digit))
         }.map(_.toString)
 
     val eol: Parsley[Char] = endOfLine <|> crlf
@@ -68,7 +71,7 @@ object lexer {
     val comment: Parsley[String] = 
         {
             char('#') *> 
-            manyN(0, (satisfy(c => c != '\n' && c != '\r'))) <* 
+            many((satisfy(c => c != '\n' && c != '\r'))) <* 
             (eol <|> eof)
         }.map(_.toString)
 
