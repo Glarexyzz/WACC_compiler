@@ -3,9 +3,10 @@ package wacc
 import parsley.Parsley
 import parsley.token.Lexer
 import parsley.token.descriptions.*
-import parsley.character.{item, char, crlf, digit, endOfLine, letter, string}
+import parsley.character.{
+    char, crlf, digit, endOfLine, item, letter, satisfy, string
+}
 import parsley.combinator.{manyN, option}
-import parsley.combinator.eof
 import scala.math.Numeric.Implicits.infixNumericOps
 
 object lexer {
@@ -20,7 +21,7 @@ object lexer {
     val intLiter: Parsley[BigInt] = 
         (option(intSign) *> manyN(1, digit)).map {
             case (Some(sign), digits) => 
-                BigInt((sign + digits.toString).toInt)
+                BigInt((sign.toString + digits.toString).toInt)
             case (None, digits)       => 
                 BigInt(digits.toString.toInt)
         }
@@ -43,7 +44,7 @@ object lexer {
         char('\\')
 
     val character: Parsley[Char] = 
-        (item - (char('\\') <|> char('\'') <|> char('"'))) <|>
+        satisfy(c => c != '\\' && c != '\'' && c != '"') <|>
         char('\\') ~ escapedChar
     
     val charLiter: Parsley[Char] = 
@@ -63,8 +64,13 @@ object lexer {
         }.map(_.toString)
 
     val eol: Parsley[Char] = endOfLine <|> crlf
+    val eof: Parsley[Unit] = notFollowedBy(item)
     val comment: Parsley[String] = 
-        (char('#') *> manyN(0, (item - eol)) <* (eol <|> eof)).map(_.toString)
+        {
+            char('#') *> 
+            manyN(0, (satisfy(c => !eol))) <* 
+            (eol <|> eof)
+        }.map(_.toString)
 
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
