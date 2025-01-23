@@ -1,6 +1,7 @@
 package wacc
 
-import parsley.Parsley.{some, many, notFollowedBy}
+import parsley.quick.*
+import parsley.Parsley
 import parsley.token.Lexer
 import parsley.token.descriptions.*
 import parsley.character.{
