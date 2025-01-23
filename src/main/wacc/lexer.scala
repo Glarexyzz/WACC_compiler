@@ -1,13 +1,12 @@
 package wacc
 
-import parsley.Parsley
+import parsley.Parsley.*
 import parsley.token.Lexer
 import parsley.token.descriptions.*
 import parsley.character.{
     char, crlf, digit, endOfLine, item, letter, satisfy, string
 }
 import parsley.combinator.{option}
-import parsley.Parsley.notFollowedBy
 
 object lexer {
     private val desc = LexicalDesc.plain.copy(
@@ -54,7 +53,7 @@ object lexer {
         char('\'') *> character <* char('\'')
 
     val strLiter: Parsley[String] =
-        (char('"') *> manyN(0, character) <* char('"')).map(_.toString)
+        (char('"') *> many(character) <* char('"')).map(_.toString)
     
     // Null
     val pairLiter: Parsley[String] =
