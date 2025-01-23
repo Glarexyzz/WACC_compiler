@@ -68,7 +68,7 @@ object lexer {
     val comment: Parsley[String] = 
         {
             char('#') *> 
-            manyN(0, (satisfy(c => c != eol))) <* 
+            manyN(0, (satisfy(c => c != '\n' && c != '\r'))) <* 
             (eol <|> eof)
         }.map(_.toString)
 
