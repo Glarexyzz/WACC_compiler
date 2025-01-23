@@ -19,7 +19,7 @@ object lexer {
     val digit: Parsley[Char] = digit  // single digit '0'-'9'
     val intSign: Parsley[Char] = char('+') <|> char('-') // '+' or '-'
     val intLiter: Parsley[BigInt] = 
-        (option(intSign) *> manyN(1, digit)).map {
+        (option(intSign) <~> manyN(1, digit)).map {
             case (Some(sign), digits) => 
                 BigInt((sign.toString + digits.toString).toInt)
             case (None, digits)       => 
