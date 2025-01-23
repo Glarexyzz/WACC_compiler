@@ -3,8 +3,9 @@ package wacc
 import parsley.Parsley
 import parsley.token.Lexer
 import parsley.token.descriptions.*
-import parsley.character.{any, char, digit, letter}
-import parsley.combinator.{many, manyN, option}
+import parsley.character.{anyChar, char, digit, letter, string}
+import parsley.combinator.{eof, manyN, option}
+import scala.math.Numeric.Implicits.infixNumericOps
 
 object lexer {
     private val desc = LexicalDesc.plain.copy(
@@ -18,9 +19,9 @@ object lexer {
     val intLiter: Parsley[BigInt] = 
         (option(intSign) *> manyN(1, digit)).map {
             case (Some(sign), digits) => 
-                BigInt((sign + digits.mkString).toInt)
+                BigInt((sign + digits.toString).toInt)
             case (None, digits)       => 
-                BigInt(digits.mkString.toInt)
+                BigInt(digits.toString.toInt)
         }
     
     // Boolean
@@ -41,30 +42,29 @@ object lexer {
         char('\\')
 
     val character: Parsley[Char] = 
-        (any - (char('\\') <|> char('\'') <|> char('"'))) <|>
+        (anyChar - (char('\\') <|> char('\'') <|> char('"'))) <|>
         char('\\') ~ escapedChar
     
     val charLiter: Parsley[Char] = 
         char('\'') *> character <* char('\'')
 
     val strLiter: Parsley[String] =
-        (char('"') *> many(character) <* char('"')).map(_.mkString)
+        (char('"') *> manyN(0, character) <* char('"')).map(_.toString)
     
     // Null
-    val pairLiter: Parsley[Unit] =
-        char('n') *> char('u') *> char('l') *> char('l')
+    val pairLiter: Parsley[String] =
+        string("null")
 
     val ident: Parsley[String] = 
         {
-            (char('_') <|> letter) ~ 
-            many(char('_') <|> letter <|> digit)
-        }.map(_.mkString)
+            (char('_') <|> letter) *> 
+            manyN(0, (char('_') <|> letter <|> digit))
+        }.map(_.toString)
 
-    val eol: Parsley[Unit] = 
+    val eol: Parsley[Char] = 
         char('\n') <|> (char('\r') *> option(char('\n')))
-    val eof: Parsley[Unit] = endOfInput
     val comment: Parsley[String] = 
-        (char('#') *> many(any - eol) <* (eol <|> eof)).map(_.mkString)
+        (char('#') *> manyN(0, (anyChar - eol)) <* (eol <|> eof)).map(_.toString)
 
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
