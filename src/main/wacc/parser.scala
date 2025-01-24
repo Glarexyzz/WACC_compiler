@@ -12,6 +12,9 @@ object parser {
     
     private val add = (x: BigInt, y: BigInt) => x + y
     private val sub = (x: BigInt, y: BigInt) => x - y
+    private val mul = (x: BigInt, y: BigInt) => x * y
+    private val div = (x: BigInt, y: BigInt) => x / y
+    private val mod = (x: BigInt, y: BigInt) => x % y
     /*
     private lazy val expr: Parsley[BigInt] =
         chain.left1(digit | "(" ~> expr <~ ")")(
