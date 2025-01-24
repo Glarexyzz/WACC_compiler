@@ -39,7 +39,9 @@ object lexer {
             space = Basic(_.isWhitespace)
         )
     )
-    private val lexer = Lexer(desc)
+    val lexer = Lexer(desc)
+
+    val lexeme = lexer.lexeme // For parser to use lexeme
 
     // Numbers
     val digit: Parsley[Char] = digit  // single digit '0'-'9'
