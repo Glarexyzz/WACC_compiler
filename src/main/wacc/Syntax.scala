@@ -1,12 +1,14 @@
 package wacc
 
+import parsley.generic
+
 sealed trait Expr
 
 case class IntLiteral(value: BigInt) extends Expr
 case class BoolLiteral(value: Boolean) extends Expr
 case class CharLiteral(value: Char) extends Expr
 case class StrLiteral(value: String) extends Expr
-case class PairLiteral() extends Expr
+case object PairLiteral extends Expr  // Potential problematic? need to recheck
 case class Identifier(name: String) extends Expr
 case class ArrayElem(name: String, indices: List[Expr]) extends Expr
 case class UnaryOp(op: UnaryOperator, expr: Expr) extends Expr
