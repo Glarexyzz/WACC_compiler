@@ -4,6 +4,7 @@ import parsley.quick.*
 import parsley.{Parsley, Result}
 import parsley.expr.chain
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
+import parsley.syntax.character.charLift
 
 import lexer.implicits.implicitSymbol
 import lexer.{digit, fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
@@ -58,5 +59,24 @@ object parser {
         Ops(InfixR)(and, "&&"),                          // Logical AND
         Ops(InfixR)(or, "||")                            // Logical OR
     )
-    */    
+    */
+
+
+    //  Parser for expressions  
+
+    //  <atom>
+    private lazy val atom: Parsley[Expr] =
+        intLiter.map(IntLiteral) <|>
+        boolLiter.map(BoolLiteral) <|>
+        charLiter.map(CharLiteral) <|>
+        strLiter.map(StringLiteral) <|>
+        pairLiter.map(_ => PairLiteral) <|>
+        ident.map(Identifier) <|>
+        arrayElem <|>
+        '(' *> expr <* ')'
+
+    // <arrayElem>
+    private lazy val arrayElem: Parsley[ArrayElem] =
+        (ident, some('[' *> expr <* ']')).map(ArrayElem)
+
 }
