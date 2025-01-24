@@ -79,18 +79,18 @@ object lexer {
 
     val arrayType: Parsley[String] = types <* char('[') <* char(']')
 
-    val pairElemType: Parsley[String] = baseType <|> arrayType <|> lexer.lexeme.symbol.softKeyword("pair").map(_ => "pair")
+    val pairElemType: Parsley[String] = baseType <|> arrayType <|> lexer.lexeme.symbol("pair").map(_ => "pair")
     
     val pairType: Parsley[String] = 
-    lexer.lexeme.symbol.softKeyword("pair") *>
+    lexer.lexeme.symbol("pair") *>
     char('(') *>
     pairElemType <* char(',') <* pairElemType <* char(')')
     
     val baseType: Parsley[String] = 
-    lexer.lexeme.symbol.softKeyword("int").map(_ => "int") <|>
-    lexer.lexeme.symbol.softKeyword("bool").map(_ => "bool") <|>
-    lexer.lexeme.symbol.softKeyword("char").map(_ => "char") <|>
-    lexer.lexeme.symbol.softKeyword("string").map(_ => "string")
+    lexer.lexeme.symbol("int").map(_ => "int") <|>
+    lexer.lexeme.symbol("bool").map(_ => "bool") <|>
+    lexer.lexeme.symbol("char").map(_ => "char") <|>
+    lexer.lexeme.symbol("string").map(_ => "string")
 
 
     val implicits = lexer.lexeme.symbol.implicits
