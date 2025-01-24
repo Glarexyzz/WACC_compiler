@@ -110,12 +110,11 @@ object parser {
             }
         } <* ')'
     )
-    
-    lazy val arrayType: Parsley[ArrayType] =
-        (types <* lexeme.symbol("[") <* lexeme.symbol("]"))
-            .map(e => ArrayType(e))
 
-  
+    lazy val arrayType: Parsley[ArrayType] =
+    (types <* lexeme.symbol("[") <* lexeme.symbol("]"))
+        .map(inner => ArrayType(inner))
+
     lazy val types: Parsley[Type] =
     choice(
         baseType,

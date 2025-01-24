@@ -64,7 +64,10 @@ object BaseType {
 case object ErasedPairType extends Type
 
 case class PairType(first: Type, second: Type) extends Type
+object PairType extends generic.ParserBridge2[Type, Type, PairType]
+
 case class ArrayType(inner: Type) extends Type
+object ArrayType extends generic.ParserBridge1[Type, ArrayType]
 
 
 // Weakest Precedence
