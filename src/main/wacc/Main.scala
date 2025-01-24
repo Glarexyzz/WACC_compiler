@@ -5,8 +5,7 @@ import Constants._
 
 def main(args: Array[String]): Unit = {
     var exitCode = exitValid
-    println("hello WACC!")
-    println(args.mkString)
+    println("hello WACC!") // REMOVE WHEN NO LONGER NEEDED
 
     args.headOption match {
         case Some(expr) => parser.parse(expr) match {

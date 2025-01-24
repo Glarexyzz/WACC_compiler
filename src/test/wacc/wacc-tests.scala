@@ -15,7 +15,7 @@ class WACCtests extends AnyFlatSpec with Matchers {
     val testFiles = getListOfWaccFiles(new File(testRoot))
 
     testFiles.foreach { file =>
-      val exitCode = runCompilerAndGetExitCode(Source.fromFile(file.getAbsolutePath).mkString)
+      val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
       withClue(s"File ${file.getName} failed: ") {
         exitCode shouldBe expectedExitCode
       }
