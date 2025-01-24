@@ -25,7 +25,7 @@ object lexer {
     // Numbers
     val digit: Parsley[Char] = digit  // single digit '0'-'9'
     val intSign: Parsley[Char] = char('+') <|> char('-') // '+' or '-'
-    val intLiter: Parsley[BigInt] = lexer.lexeme.signed
+    val intLiter: Parsley[BigInt] = lexer.lexeme.signed.decimal
     
     // Boolean
     val boolLiter: Parsley[Boolean] =
@@ -48,12 +48,12 @@ object lexer {
         satisfy(c => c != '\\' && c != '\'' && c != '"') <|>
         char('\\') *> escapedChar
     
-    val charLiter: Parsley[Char] = lexer.lexeme.character
+    val charLiter: Parsley[Char] = lexer.lexeme.character.ascii
 
-    val strLiter: Parsley[String] =lexer.lexeme.string
+    val strLiter: Parsley[String] =lexer.lexeme.string.ascii
 
     // Null
-    val pairLiter: Parsley[String] = lexer.lexeme.symbol.softKeyword("null")
+    val pairLiter: Parsley[Unit] = lexer.lexeme.symbol.softKeyword("null")
 
     val ident: Parsley[String] = lexer.lexeme.names.identifier
 
