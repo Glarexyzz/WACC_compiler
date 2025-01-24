@@ -1,5 +1,6 @@
 package wacc
 
+import parsley.quick.*
 import parsley.{Parsley, Result}
 import parsley.expr.chain
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
@@ -12,7 +13,7 @@ object parser {
     def parse(input: String): Result[String, BigInt] = parser.parse(input)
     //private val parser = fully(expr)
     
-    // Operators
+    //  Binary Operators
     private val add = (x: BigInt, y: BigInt) => x + y
     private val sub = (x: BigInt, y: BigInt) => x - y
     private val mul = (x: BigInt, y: BigInt) => x * y
@@ -27,6 +28,7 @@ object parser {
     private val lt = (x: BigInt, y: BigInt) => x < y
     private val lte = (x: BigInt, y: BigInt) => x <= y
 
+    // Unary Operators
     private val not = (x: Boolean) => !x
     private val negate = (x: BigInt) => -x
     /*
