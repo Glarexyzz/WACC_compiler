@@ -38,8 +38,8 @@ object lexer {
     
     // Boolean
     val boolLiter: Parsley[Boolean] =
-        lexer.lexeme.symbol.softKeyword("true").map(_ => true) <|>
-        lexer.lexeme.symbol.softKeyword("false").map(_ => false)
+        lexer.lexeme.symbol("true").map(_ => true) <|>
+        lexer.lexeme.symbol("false").map(_ => false)
 
     // Char & String
     val escapedChar: Parsley[Char] =
@@ -62,7 +62,7 @@ object lexer {
     val strLiter: Parsley[String] =lexer.lexeme.string.ascii
 
     // Null
-    val pairLiter: Parsley[Unit] = lexer.lexeme.symbol.softKeyword("null")
+    val pairLiter: Parsley[Unit] = lexer.lexeme.symbol("null")
 
     val ident: Parsley[String] = lexer.lexeme.names.identifier
 
