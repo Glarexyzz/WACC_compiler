@@ -9,8 +9,8 @@ case class StrLiteral(value: String) extends Expr
 case class PairLiteral() extends Expr
 case class Identifier(name: String) extends Expr
 case class ArrayElem(name: String, indices: List[Expr]) extends Expr
-case class UnaryOp(op: String, expr: Expr) extends Expr
-case class BinaryOp(op: String, left: Expr, right: Expr) extends Expr
+case class UnaryOp(op: UnaryOperator, expr: Expr) extends Expr
+case class BinaryOp(left: Expr, op: BinaryOperator, right: Expr) extends Expr
 //case class ParenExpr(expr: Expr) extends Expr
 
 // Strongest Precedence
