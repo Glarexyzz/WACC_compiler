@@ -2,21 +2,19 @@ package wacc
 
 import parsley.quick.*
 import parsley.{Parsley, Result}
-import parsley.expr.chain
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
-import parsley.token.{Lexer}
 import parsley.syntax.character.charLift
 import parsley.syntax.zipped.*
 
-import lexer.implicits.implicitSymbol
-import lexer.{digit, fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
+import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
 import lexer.lexeme
 
 
 object parser {
     def parse(input: String): Result[String, BigInt] = parser.parse(input)
     //private val parser = fully(expr)
-    
+
+    /*   
     //  Binary Operators
     private val add = (x: BigInt, y: BigInt) => x + y
     private val sub = (x: BigInt, y: BigInt) => x - y
@@ -35,7 +33,7 @@ object parser {
     // Unary Operators
     private val not = (x: Boolean) => !x
     private val negate = (x: BigInt) => -x
-    /*
+
     private lazy val atom: Parsley[Expr] =
     intLiter.map(IntLiteral) |
     boolLiter.map(BoolLiteral) |
@@ -113,29 +111,29 @@ object parser {
 
     //  <atom>
     private lazy val atom: Parsley[Expr] =
-        intLiter.map(IntLiteral) <|>
-        boolLiter.map(BoolLiteral) <|>
-        charLiter.map(CharLiteral) <|>
-        strLiter.map(StrLiteral) <|>
+        IntLiteral(intLiter) <|>
+        BoolLiteral(boolLiter) <|>
+        CharLiteral(charLiter) <|>
+        StrLiteral(strLiter) <|>
         pairLiter.map(_ => PairLiteral) <|>
-        ident.map(Identifier) <|>
+        Identifier(ident) <|>
         arrayElem <|>
         '(' *> expr <* ')'
 
     //  <arrayElem>
     private lazy val arrayElem: Parsley[ArrayElem] =
-        (ident, some('[' *> expr <* ']')).zipped(ArrayElem)
+        ArrayElem(ident, some('[' *> expr <* ']'))
 
     //  <expr>
     private lazy val expr: Parsley[Expr] = 
         precedence(atom)(
-            Ops(Prefix)(unaryOps.map(UnaryOp.apply)),
-            Ops(InfixL)(mulOps.map(BinaryOp.apply)),
-            Ops(InfixL)(addOps.map(BinaryOp.apply)),
-            Ops(InfixN)(relOps.map(BinaryOp.apply)),
-            Ops(InfixN)(eqOps.map(BinaryOp.apply)),
-            Ops(InfixR)(andOps.map(BinaryOp.apply)),
-            Ops(InfixR)(orOps.map(BinaryOp.apply))
+            Ops(Prefix)(unaryOps.map(op => (expr: Expr) => UnaryOp(op, expr))),
+            Ops(InfixL)(mulOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))),
+            Ops(InfixL)(addOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))),
+            Ops(InfixN)(relOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))),
+            Ops(InfixN)(eqOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))),
+            Ops(InfixR)(andOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))),
+            Ops(InfixR)(orOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right)))
         )
-
+    
 }
