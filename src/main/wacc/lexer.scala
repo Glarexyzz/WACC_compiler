@@ -21,7 +21,7 @@ object lexer {
                 "return", "exit", "print", "println", "then", "else",
                 "fi", "while", "do", "done", "newpair", "call", "fst",
                 "snd", "int", "bool", "char", "string", "pair", "null",
-                "true", "false", "len", "ord", "chr"
+                "true", "false"
             ),
             hardOperators = Set(
                 "!", "-", "len", "ord", "chr", "*", "/", "%", "+",
