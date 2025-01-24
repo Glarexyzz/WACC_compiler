@@ -1,6 +1,7 @@
 package wacc
 
 import parsley.generic
+import parsley.Parsley
 
 sealed trait Expr
 
@@ -25,7 +26,7 @@ enum UnaryOperator {
     case Ord
     case Chr
 }
-
+ 
 // Binary Operators
 enum BinaryOperator {
     case Multiply, Divide, Modulus
