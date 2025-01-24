@@ -17,7 +17,11 @@ object lexer {
             identifierLetter = Basic(c => c.isLetterOrDigit || c == '_'),
         ),
         symbolDesc = SymbolDesc.plain.copy(
-            hardKeywords = Set("if")
+            hardKeywords = Set(
+                "if", "begin", "end", "is", "skip", "read", "free", "return", "exit",
+              "print", "println", "then", "else", "fi", "while", "do", "done", "newpair", "call", "fst",
+              "snd", "int", "bool", "char", "string", "pair", "null", "true", "false", "len", "ord", "chr"
+            )
         ),
         textDesc = TextDesc.plain.copy(
             characterLiteralEnd = '\'',
