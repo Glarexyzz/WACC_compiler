@@ -1,11 +1,11 @@
 package wacc
 
-import parsley.quick.*
+import parsley.quick.some
 import parsley.{Parsley, Result}
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
 import parsley.syntax.character.charLift
 import parsley.syntax.zipped.*
-
+import parsley.combinator._
 import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
 import lexer.lexeme
 
@@ -87,4 +87,37 @@ object parser {
             Ops(InfixR)(orOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right)))
         )
     
+    lazy val baseType: Parsley[BaseType] =
+    choice(
+        lexer.lexeme.symbol("int").map(_ => BaseType.IntType),
+        lexer.lexeme.symbol("bool").map(_ => BaseType.BoolType),
+        lexer.lexeme.symbol("char").map(_ => BaseType.CharType),
+        lexer.lexeme.symbol("string").map(_ => BaseType.StringType)
+    )
+
+    /*
+    lazy val pairElemType: Parsley[Type] =
+        baseType <|>
+        arrayType <|>
+        lexer.lexeme.symbol("pair").map(_ => PairType)
+    
+    lazy val pairType: Parsley[PairType] =
+    (lexer.lexeme.symbol("pair") *>
+        ('(' *> pairElemType <* lexer.lexeme.symbol(",") <~ pairElemType <* ')'))
+        .map { case (fst, snd) => PairType(fst, snd) }
+
+    */
+    lazy val arrayType: Parsley[ArrayType] =
+        (types <* lexer.lexeme.symbol("[") <* lexer.lexeme.symbol("]"))
+            .map(e => ArrayType(e))
+
+  
+    lazy val types: Parsley[Type] =
+        choice(
+            baseType,
+            arrayType,
+            //pairType
+        )
+
+        
 }
