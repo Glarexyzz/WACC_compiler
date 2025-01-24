@@ -117,11 +117,11 @@ object parser {
 
   
     lazy val types: Parsley[Type] =
-        choice(
-            baseType,
-            arrayType,
-            //pairType
-        )
+    choice(
+        baseType,
+        arrayType,
+        pairType
+    )
 
         
 }
