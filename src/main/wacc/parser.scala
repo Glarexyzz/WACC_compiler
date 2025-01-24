@@ -103,8 +103,8 @@ object parser {
     )
 
     lazy val pairType: Parsley[PairType] =
-    lexer.lexeme.symbol("pair") *> (
-        ('(' *> pairElemType <* lexer.lexeme.symbol(",")).flatMap { fst =>
+    lexeme.symbol("pair") *> (
+        ('(' *> pairElemType <* lexeme.symbol(",")).flatMap { fst =>
             pairElemType.map { snd =>
                 PairType(fst, snd)
             }
@@ -112,7 +112,7 @@ object parser {
     )
     
     lazy val arrayType: Parsley[ArrayType] =
-        (types <* lexer.lexeme.symbol("[") <* lexer.lexeme.symbol("]"))
+        (types <* lexeme.symbol("[") <* lexeme.symbol("]"))
             .map(e => ArrayType(e))
 
   
