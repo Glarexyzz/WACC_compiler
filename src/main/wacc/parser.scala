@@ -64,6 +64,50 @@ object parser {
 
     //  Parser for expressions  
 
+    //  Unary Operators (Highest Precedence)
+    val unaryOps: Parsley[UnaryOperator] =
+        choice(
+            lexer.lexeme.symbol("!").map(UnaryOperator.Not),
+            lexer.lexeme.symbol("-").map(UnaryOperator.Negate),
+            lexer.lexeme.symbol("len").map(UnaryOperator.Length),
+            lexer.lexeme.symbol("ord").map(UnaryOperator.Ord),
+            lexer.lexeme.symbol("chr").map(UnaryOperator.Chr)
+        )
+
+    //  Binary Operators
+    val mulOps: Parsley[BinaryOperator] =
+        choice(
+            lexer.lexeme.symbol("*").map(BinaryOperator.Multiply),
+            lexer.lexeme.symbol("/").map(BinaryOperator.Divide),
+            lexer.lexeme.symbol("%").map(BinaryOperator.Modulus)
+        )
+
+    val addOps: Parsley[BinaryOperator] =
+        choice(
+            lexer.lexeme.symbol("+").map(BinaryOperator.Add),
+            lexer.lexeme.symbol("-").map(BinaryOperator.Subtract)
+        )
+
+    val relOps: Parsley[BinaryOperator] =
+        choice(
+            lexer.lexeme.symbol(">").map(BinaryOperator.Greater),
+            lexer.lexeme.symbol(">=").map(BinaryOperator.GreaterEqual),
+            lexer.lexeme.symbol("<").map(BinaryOperator.Less),
+            lexer.lexeme.symbol("<=").map(BinaryOperator.LessEqual)
+        )
+
+    val eqOps: Parsley[BinaryOperator] =
+        choice(
+            lexer.lexeme.symbol("==").map(BinaryOperator.Equal),
+            lexer.lexeme.symbol("!=").map(BinaryOperator.NotEqual)
+        )
+
+    val andOps: Parsley[BinaryOperator] =
+        lexer.lexeme.symbol("&&").map(BinaryOperator.And)
+
+    val orOps: Parsley[BinaryOperator] =
+        lexer.lexeme.symbol("||").map(BinaryOperator.Or)
+
     //  <atom>
     private lazy val atom: Parsley[Expr] =
         intLiter.map(IntLiteral) <|>
