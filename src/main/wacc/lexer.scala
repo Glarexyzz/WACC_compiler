@@ -75,6 +75,24 @@ object lexer {
     val eof: Parsley[Unit] = notFollowedBy(item)
     val comment: Parsley[Unit] = lexer.space.skipComments
 
+    val types: Parsley[String] = baseType <|> arrayType <|> pairType
+
+    val arrayType: Parsley[String] = types <* char('[') <* char(']')
+
+    val pairElemType: Parsley[String] = baseType <|> arrayType <|> lexer.lexeme.symbol.softKeyword("pair").map(_ => "pair")
+    
+    val pairType: Parsley[String] = 
+    lexer.lexeme.symbol.softKeyword("pair") *>
+    char('(') *>
+    pairElemType <* char(',') <* pairElemType <* char(')')
+    
+    val baseType: Parsley[String] = 
+    lexer.lexeme.symbol.softKeyword("int").map(_ => "int") <|>
+    lexer.lexeme.symbol.softKeyword("bool").map(_ => "bool") <|>
+    lexer.lexeme.symbol.softKeyword("char").map(_ => "char") <|>
+    lexer.lexeme.symbol.softKeyword("string").map(_ => "string")
+
+
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
 }
