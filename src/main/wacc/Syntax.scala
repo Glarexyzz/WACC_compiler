@@ -51,4 +51,18 @@ enum BinaryOperator {
     case Or
 }
 
+sealed trait Type
+sealed trait BaseType extends Type
+
+object BaseType {
+    case object IntType extends BaseType
+    case object BoolType extends BaseType
+    case object CharType extends BaseType
+    case object StringType extends BaseType
+}
+
+case class PairType(first: Type, second: Type) extends Type
+case class ArrayType(inner: Type) extends Type
+
+
 // Weakest Precedence
