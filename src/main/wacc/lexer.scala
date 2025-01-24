@@ -5,9 +5,8 @@ import parsley.Parsley
 import parsley.token.{Lexer, Basic}
 import parsley.token.descriptions.*
 import parsley.character.{
-    char, crlf, digit, endOfLine, item, letter, satisfy, string
+    char, crlf, endOfLine, item, satisfy
 }
-import parsley.combinator.{option}
 
 object lexer {
     private val desc = LexicalDesc.plain.copy(
@@ -18,9 +17,15 @@ object lexer {
         ),
         symbolDesc = SymbolDesc.plain.copy(
             hardKeywords = Set(
-                "if", "begin", "end", "is", "skip", "read", "free", "return", "exit",
-              "print", "println", "then", "else", "fi", "while", "do", "done", "newpair", "call", "fst",
-              "snd", "int", "bool", "char", "string", "pair", "null", "true", "false", "len", "ord", "chr"
+                "if", "begin", "end", "is", "skip", "read", "free", 
+                "return", "exit", "print", "println", "then", "else",
+                "fi", "while", "do", "done", "newpair", "call", "fst",
+                "snd", "int", "bool", "char", "string", "pair", "null",
+                "true", "false", "len", "ord", "chr"
+            ),
+            hardOperators = Set(
+                "!", "-", "len", "ord", "chr", "*", "/", "%", "+",
+                ">", ">=", "<", "<=", "==", "!=", "&&", "||"
             )
         ),
         textDesc = TextDesc.plain.copy(
@@ -33,17 +38,19 @@ object lexer {
             space = Basic(_.isWhitespace)
         )
     )
-    private val lexer = Lexer(desc)
+    val lexer = Lexer(desc)
+
+    val lexeme = lexer.lexeme // For parser to use lexeme
 
     // Numbers
     val digit: Parsley[Char] = digit  // single digit '0'-'9'
     val intSign: Parsley[Char] = char('+') <|> char('-') // '+' or '-'
-    val intLiter: Parsley[BigInt] = lexer.lexeme.signed.decimal
+    val intLiter: Parsley[BigInt] = lexeme.signed.decimal
     
     // Boolean
     val boolLiter: Parsley[Boolean] =
-        lexer.lexeme.symbol("true").map(_ => true) <|>
-        lexer.lexeme.symbol("false").map(_ => false)
+        lexeme.symbol("true").map(_ => true) <|>
+        lexeme.symbol("false").map(_ => false)
 
     // Char & String
     val escapedChar: Parsley[Char] =
@@ -61,14 +68,14 @@ object lexer {
         satisfy(c => c != '\\' && c != '\'' && c != '"') <|>
         char('\\') *> escapedChar
     
-    val charLiter: Parsley[Char] = lexer.lexeme.character.ascii
+    val charLiter: Parsley[Char] = lexeme.character.ascii
 
-    val strLiter: Parsley[String] =lexer.lexeme.string.ascii
+    val strLiter: Parsley[String] =lexeme.string.ascii
 
     // Null
-    val pairLiter: Parsley[Unit] = lexer.lexeme.symbol("null")
+    val pairLiter: Parsley[Unit] = lexeme.symbol("null")
 
-    val ident: Parsley[String] = lexer.lexeme.names.identifier
+    val ident: Parsley[String] = lexeme.names.identifier
 
     // Comments
     val eol: Parsley[Char] = endOfLine <|> crlf
