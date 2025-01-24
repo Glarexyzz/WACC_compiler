@@ -5,19 +5,49 @@ import scala.io.Source
 import scala.sys.process._
 import wacc.Constants._
 
-class WACCtests extends AnyFlatSpec with Matchers {
+/* we want to sort the tests by their subdirectories instead of 
+  valid, invalid_syntax, invalid_semantics. The idea is that to use the switch case to sort the tests
+  "advanced" "array", "basic" "exit, "expressions" "function",  "if" "literals" "IO" "multiple" "pairs" "runtimeErr" "print" "scope" "sequence" "read"  "variables" "while"
+  */  
 
-  val compilerScript = "./compile"     // Path to your compiler script
-  val testRoot = "src/test/wacc/valid" // Root directory of test cases
-  val expectedExitCode = exitValid     // Expected exit code for valid files, defined in Constants
+class ValidWACCtests extends AnyFlatSpec with Matchers {
 
-  "WACC Compiler" should s"return exit code $expectedExitCode for files in $testRoot" in {
-    val testFiles = getListOfWaccFiles(new File(testRoot))
+  val testRootValid = "src/test/wacc/valid"
+  val testRootSyntax = "src/test/wacc/invalid_syntax"
+  val testRootSemantics = "src/test/wacc/invalid_semantics"
 
-    testFiles.foreach { file =>
-      val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
-      withClue(s"File ${file.getName} failed: ") {
-        exitCode shouldBe expectedExitCode
+  val testFilesValid = getListOfWaccFiles(new File(testRootValid))
+  val testFilesSyntax = getListOfWaccFiles(new File(testRootSyntax))
+  val testFilesSemantics = getListOfWaccFiles(new File(testRootSemantics))
+
+ // Valid
+  testFilesValid.foreach { file => 
+    "Valid" should s"return exit code $exitValid for $file" in {
+        val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
+        withClue(s"File ${file.getName} failed: ") {
+          exitCode shouldBe exitValid
+      }
+    }
+
+  }
+
+  // Invalid Syntax
+  testFilesSyntax.foreach { file => 
+    ignore should s"return exit code $exitInvalidSyntax for $file" in {
+        val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
+        withClue(s"File ${file.getName} failed: ") {
+          exitCode shouldBe exitInvalidSyntax
+      }
+    }
+
+  }
+
+  // Invalid Semantics
+  testFilesSemantics.foreach { file => 
+    ignore should s"return exit code $exitInvalidSemantics for $file" in {
+        val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
+        withClue(s"File ${file.getName} failed: ") {
+          exitCode shouldBe exitInvalidSemantics
       }
     }
   }
