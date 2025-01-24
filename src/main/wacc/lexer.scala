@@ -17,10 +17,20 @@ object lexer {
             identifierLetter = Basic(c => c.isLetterOrDigit || c == '_'),
         ),
         symbolDesc = SymbolDesc.plain.copy(
-            hardKeywords = Set("if", "begin", "end", "is", "skip", "read", "free", "return", "exit",
+            hardKeywords = Set(
+                "if", "begin", "end", "is", "skip", "read", "free", "return", "exit",
               "print", "println", "then", "else", "fi", "while", "do", "done", "newpair", "call", "fst",
               "snd", "int", "bool", "char", "string", "pair", "null", "true", "false", "len", "ord", "chr"
             )
+        ),
+        textDesc = TextDesc.plain.copy(
+            characterLiteralEnd = '\'',
+            stringEnds = Set(("\"", "\""))
+        ),
+        spaceDesc = SpaceDesc.plain.copy(
+            lineCommentAllowsEOF = true,
+            lineCommentStart = "#",
+            space = Basic(_.isWhitespace)
         )
     )
     private val lexer = Lexer(desc)
@@ -32,8 +42,8 @@ object lexer {
     
     // Boolean
     val boolLiter: Parsley[Boolean] =
-        lexer.lexeme.symbol.softKeyword("true").map(_ => true) <|>
-        lexer.lexeme.symbol.softKeyword("false").map(_ => false)
+        lexer.lexeme.symbol("true").map(_ => true) <|>
+        lexer.lexeme.symbol("false").map(_ => false)
 
     // Char & String
     val escapedChar: Parsley[Char] =
@@ -56,19 +66,14 @@ object lexer {
     val strLiter: Parsley[String] =lexer.lexeme.string.ascii
 
     // Null
-    val pairLiter: Parsley[Unit] = lexer.lexeme.symbol.softKeyword("null")
+    val pairLiter: Parsley[Unit] = lexer.lexeme.symbol("null")
 
     val ident: Parsley[String] = lexer.lexeme.names.identifier
 
-    // TODO add SpaceDesc for simplifying comments
+    // Comments
     val eol: Parsley[Char] = endOfLine <|> crlf
     val eof: Parsley[Unit] = notFollowedBy(item)
-    val comment: Parsley[String] = 
-        {
-            char('#') *> 
-            many((satisfy(c => c != '\n' && c != '\r'))) <* 
-            (eol <|> eof)
-        }.map(_.toString)
+    val comment: Parsley[Unit] = lexer.space.skipComments
 
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
