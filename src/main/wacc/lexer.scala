@@ -57,6 +57,7 @@ object lexer {
 
     val ident: Parsley[String] = lexer.lexeme.names.identifier
 
+    // TODO add SpaceDesc for simplifying comments
     val eol: Parsley[Char] = endOfLine <|> crlf
     val eof: Parsley[Unit] = notFollowedBy(item)
     val comment: Parsley[String] = 
