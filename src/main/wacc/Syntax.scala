@@ -61,6 +61,8 @@ object BaseType {
     case object StringType extends BaseType
 }
 
+case object ErasedPairType extends Type
+
 case class PairType(first: Type, second: Type) extends Type
 case class ArrayType(inner: Type) extends Type
 

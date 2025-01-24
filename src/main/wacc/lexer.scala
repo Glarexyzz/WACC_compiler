@@ -82,23 +82,20 @@ object lexer {
     val eof: Parsley[Unit] = notFollowedBy(item)
     val comment: Parsley[Unit] = lexer.space.skipComments
 
-    val types: Parsley[String] = baseType <|> arrayType <|> pairType
+    // Don't think we need this in the lexer?
 
-    val arrayType: Parsley[String] = types <* char('[') <* char(']')
+    //val types: Parsley[String] = baseType <|> arrayType <|> pairType
 
-    val pairElemType: Parsley[String] = baseType <|> arrayType <|> lexer.lexeme.symbol("pair").map(_ => "pair")
+    //val arrayType: Parsley[String] = types <* char('[') <* char(']')
+
+    //val pairElemType: Parsley[String] = baseType <|> arrayType <|> lexer.lexeme.symbol("pair").map(_ => "pair")
     
-    val pairType: Parsley[String] = 
-    lexer.lexeme.symbol("pair") *>
-    char('(') *>
-    pairElemType <* char(',') <* pairElemType <* char(')')
+    // val pairType: Parsley[String] = 
+    // lexer.lexeme.symbol("pair") *>
+    // char('(') *>
+    // pairElemType <* char(',') <* pairElemType <* char(')')
     
-    val baseType: Parsley[String] = 
-    lexer.lexeme.symbol("int").map(_ => "int") <|>
-    lexer.lexeme.symbol("bool").map(_ => "bool") <|>
-    lexer.lexeme.symbol("char").map(_ => "char") <|>
-    lexer.lexeme.symbol("string").map(_ => "string")
-
+    
 
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)

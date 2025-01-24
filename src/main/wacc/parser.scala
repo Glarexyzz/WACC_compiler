@@ -89,24 +89,28 @@ object parser {
     
     lazy val baseType: Parsley[BaseType] =
     choice(
-        lexer.lexeme.symbol("int").map(_ => BaseType.IntType),
-        lexer.lexeme.symbol("bool").map(_ => BaseType.BoolType),
-        lexer.lexeme.symbol("char").map(_ => BaseType.CharType),
-        lexer.lexeme.symbol("string").map(_ => BaseType.StringType)
+        lexeme.symbol("int").map(_ => BaseType.IntType),
+        lexeme.symbol("bool").map(_ => BaseType.BoolType),
+        lexeme.symbol("char").map(_ => BaseType.CharType),
+        lexeme.symbol("string").map(_ => BaseType.StringType)
     )
 
-    /*
     lazy val pairElemType: Parsley[Type] =
-        baseType <|>
-        arrayType <|>
-        lexer.lexeme.symbol("pair").map(_ => PairType)
-    
-    lazy val pairType: Parsley[PairType] =
-    (lexer.lexeme.symbol("pair") *>
-        ('(' *> pairElemType <* lexer.lexeme.symbol(",") <~ pairElemType <* ')'))
-        .map { case (fst, snd) => PairType(fst, snd) }
+    choice(
+        baseType,                               
+        arrayType,                                                        
+        lexeme.symbol("pair").map(_ => ErasedPairType) 
+    )
 
-    */
+    lazy val pairType: Parsley[PairType] =
+    lexer.lexeme.symbol("pair") *> (
+        ('(' *> pairElemType <* lexer.lexeme.symbol(",")).flatMap { fst =>
+            pairElemType.map { snd =>
+                PairType(fst, snd)
+            }
+        } <* ')'
+    )
+    
     lazy val arrayType: Parsley[ArrayType] =
         (types <* lexer.lexeme.symbol("[") <* lexer.lexeme.symbol("]"))
             .map(e => ArrayType(e))
