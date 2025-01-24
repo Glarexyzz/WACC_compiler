@@ -1,10 +1,12 @@
 package wacc
 
 import parsley.{Success, Failure}
+import Constants._
 
 def main(args: Array[String]): Unit = {
-    var exitCode = 0
+    var exitCode = exitValid
     println("hello WACC!")
+    println(args.mkString)
 
     args.headOption match {
         case Some(expr) => parser.parse(expr) match {
