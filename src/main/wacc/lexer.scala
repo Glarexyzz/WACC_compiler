@@ -25,18 +25,12 @@ object lexer {
     // Numbers
     val digit: Parsley[Char] = digit  // single digit '0'-'9'
     val intSign: Parsley[Char] = char('+') <|> char('-') // '+' or '-'
-    val intLiter: Parsley[BigInt] = 
-        (option(intSign) <~> some(digit)).map {
-            case (Some(intSign), digits) => 
-                BigInt((intSign.toString + digits.toString).toInt)
-            case (None, digits)       => 
-                BigInt(digits.toString.toInt)
-        }
+    val intLiter: Parsley[BigInt] = lexer.lexeme.integer.signed
     
     // Boolean
     val boolLiter: Parsley[Boolean] =
-        (char('t') *> char('r') *> char('u') *> char('e')).map(_ => true) <|>
-        (char('f') *> char('a') *> char('l') *> char('s') *> char('e')).map(_ => false)
+        lexer.lexeme.names.reserved("true").map(_ => true) <|>
+        lexer.lexeme.names.reserved("false").map(_ => false)
 
     // Char & String
     val escapedChar: Parsley[Char] =
@@ -54,15 +48,12 @@ object lexer {
         satisfy(c => c != '\\' && c != '\'' && c != '"') <|>
         char('\\') *> escapedChar
     
-    val charLiter: Parsley[Char] = 
-        char('\'') *> character <* char('\'')
+    val charLiter: Parsley[Char] = lexer.lexeme.charLiteral
 
-    val strLiter: Parsley[String] =
-        (char('"') *> many(character) <* char('"')).map(_.toString)
-    
+    val strLiter: Parsley[String] =lexer.lexeme.stringLiteral
+
     // Null
-    val pairLiter: Parsley[String] =
-        string("null")
+    val pairLiter: Parsley[String] = lexer.lexeme.names.reserved("null")
 
     val ident: Parsley[String] = lexer.lexeme.names.identifier
 
