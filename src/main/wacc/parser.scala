@@ -4,6 +4,7 @@ import parsley.quick.*
 import parsley.{Parsley, Result}
 import parsley.expr.chain
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
+import parsley.token.{Lexer}
 import parsley.syntax.character.charLift
 
 import lexer.implicits.implicitSymbol
