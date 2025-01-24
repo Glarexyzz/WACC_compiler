@@ -18,6 +18,15 @@ object lexer {
         ),
         symbolDesc = SymbolDesc.plain.copy(
             hardKeywords = Set("if")
+        ),
+        textDesc = TextDesc.plain.copy(
+            characterLiteralEnd = '\'',
+            stringEnds = Set(("\"", "\""))
+        ),
+        spaceDesc = SpaceDesc.plain.copy(
+            lineCommentAllowsEOF = true,
+            lineCommentStart = "#",
+            space = Basic(_.isWhitespace)
         )
     )
     private val lexer = Lexer(desc)
@@ -57,15 +66,10 @@ object lexer {
 
     val ident: Parsley[String] = lexer.lexeme.names.identifier
 
-    // TODO add SpaceDesc for simplifying comments
+    // Comments
     val eol: Parsley[Char] = endOfLine <|> crlf
     val eof: Parsley[Unit] = notFollowedBy(item)
-    val comment: Parsley[String] = 
-        {
-            char('#') *> 
-            many((satisfy(c => c != '\n' && c != '\r'))) <* 
-            (eol <|> eof)
-        }.map(_.toString)
+    val comment: Parsley[Unit] = lexer.space.skipComments
 
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
