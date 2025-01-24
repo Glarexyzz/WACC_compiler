@@ -1,7 +1,6 @@
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import java.io.File
-import scala.io.Source
 import scala.sys.process._
 import wacc.Constants._
 
