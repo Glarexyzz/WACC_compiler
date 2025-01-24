@@ -5,9 +5,8 @@ import parsley.Parsley
 import parsley.token.{Lexer, Basic}
 import parsley.token.descriptions.*
 import parsley.character.{
-    char, crlf, digit, endOfLine, item, letter, satisfy, string
+    char, crlf, endOfLine, item, satisfy
 }
-import parsley.combinator.{option}
 
 object lexer {
     private val desc = LexicalDesc.plain.copy(
