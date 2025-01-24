@@ -84,7 +84,7 @@ object lexer {
 
     val types: Parsley[String] = baseType <|> arrayType <|> pairType
 
-    val arrayType: Parsley[String] = types <* some(char('[') <* char(']'))
+    val arrayType: Parsley[String] = types <* char('[') <* char(']')
 
     val pairElemType: Parsley[String] = baseType <|> arrayType <|> lexer.lexeme.symbol("pair").map(_ => "pair")
     
