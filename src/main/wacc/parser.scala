@@ -6,9 +6,11 @@ import parsley.expr.chain
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
 import parsley.token.{Lexer}
 import parsley.syntax.character.charLift
+import parsley.syntax.zipped.*
 
 import lexer.implicits.implicitSymbol
 import lexer.{digit, fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
+import lexer.lexeme
 
 
 object parser {
@@ -68,60 +70,72 @@ object parser {
     //  Unary Operators (Highest Precedence)
     val unaryOps: Parsley[UnaryOperator] =
         choice(
-            lexer.lexeme.symbol("!").map(UnaryOperator.Not),
-            lexer.lexeme.symbol("-").map(UnaryOperator.Negate),
-            lexer.lexeme.symbol("len").map(UnaryOperator.Length),
-            lexer.lexeme.symbol("ord").map(UnaryOperator.Ord),
-            lexer.lexeme.symbol("chr").map(UnaryOperator.Chr)
+            lexeme.symbol("!").as(UnaryOperator.Not),
+            lexeme.symbol("-").as(UnaryOperator.Negate),
+            lexeme.symbol("len").as(UnaryOperator.Length),
+            lexeme.symbol("ord").as(UnaryOperator.Ord),
+            lexeme.symbol("chr").as(UnaryOperator.Chr)
         )
 
     //  Binary Operators
     val mulOps: Parsley[BinaryOperator] =
         choice(
-            lexer.lexeme.symbol("*").map(BinaryOperator.Multiply),
-            lexer.lexeme.symbol("/").map(BinaryOperator.Divide),
-            lexer.lexeme.symbol("%").map(BinaryOperator.Modulus)
+            lexeme.symbol("*").as(BinaryOperator.Multiply),
+            lexeme.symbol("/").as(BinaryOperator.Divide),
+            lexeme.symbol("%").as(BinaryOperator.Modulus)
         )
 
     val addOps: Parsley[BinaryOperator] =
         choice(
-            lexer.lexeme.symbol("+").map(BinaryOperator.Add),
-            lexer.lexeme.symbol("-").map(BinaryOperator.Subtract)
+            lexeme.symbol("+").as(BinaryOperator.Add),
+            lexeme.symbol("-").as(BinaryOperator.Subtract)
         )
 
     val relOps: Parsley[BinaryOperator] =
         choice(
-            lexer.lexeme.symbol(">").map(BinaryOperator.Greater),
-            lexer.lexeme.symbol(">=").map(BinaryOperator.GreaterEqual),
-            lexer.lexeme.symbol("<").map(BinaryOperator.Less),
-            lexer.lexeme.symbol("<=").map(BinaryOperator.LessEqual)
+            lexeme.symbol(">").as(BinaryOperator.Greater),
+            lexeme.symbol(">=").as(BinaryOperator.GreaterEqual),
+            lexeme.symbol("<").as(BinaryOperator.Less),
+            lexeme.symbol("<=").as(BinaryOperator.LessEqual)
         )
 
     val eqOps: Parsley[BinaryOperator] =
         choice(
-            lexer.lexeme.symbol("==").map(BinaryOperator.Equal),
-            lexer.lexeme.symbol("!=").map(BinaryOperator.NotEqual)
+            lexeme.symbol("==").as(BinaryOperator.Equal),
+            lexeme.symbol("!=").as(BinaryOperator.NotEqual)
         )
 
     val andOps: Parsley[BinaryOperator] =
-        lexer.lexeme.symbol("&&").map(BinaryOperator.And)
+        lexeme.symbol("&&").as(BinaryOperator.And)
 
     val orOps: Parsley[BinaryOperator] =
-        lexer.lexeme.symbol("||").map(BinaryOperator.Or)
+        lexeme.symbol("||").as(BinaryOperator.Or)
 
     //  <atom>
     private lazy val atom: Parsley[Expr] =
         intLiter.map(IntLiteral) <|>
         boolLiter.map(BoolLiteral) <|>
         charLiter.map(CharLiteral) <|>
-        strLiter.map(StringLiteral) <|>
+        strLiter.map(StrLiteral) <|>
         pairLiter.map(_ => PairLiteral) <|>
         ident.map(Identifier) <|>
         arrayElem <|>
         '(' *> expr <* ')'
 
-    // <arrayElem>
+    //  <arrayElem>
     private lazy val arrayElem: Parsley[ArrayElem] =
-        (ident, some('[' *> expr <* ']')).map(ArrayElem)
+        (ident, some('[' *> expr <* ']')).zipped(ArrayElem)
+
+    //  <expr>
+    private lazy val expr: Parsley[Expr] = 
+        precedence(atom)(
+            Ops(Prefix)(unaryOps.map(UnaryOp.apply)),
+            Ops(InfixL)(mulOps.map(BinaryOp.apply)),
+            Ops(InfixL)(addOps.map(BinaryOp.apply)),
+            Ops(InfixN)(relOps.map(BinaryOp.apply)),
+            Ops(InfixN)(eqOps.map(BinaryOp.apply)),
+            Ops(InfixR)(andOps.map(BinaryOp.apply)),
+            Ops(InfixR)(orOps.map(BinaryOp.apply))
+        )
 
 }
