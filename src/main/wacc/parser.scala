@@ -122,5 +122,80 @@ object parser {
         pairType
     )
 
+    lazy val param: Parsley[Param] =
+    (types <~> ident).map { case (paramType, name) =>
+        Param(paramType, name)  //doesn't preserve result of ident??
+    }
+    // some syntax errors to resolve 
+    /*
+    lazy val skipStmt: Parsley[Statement] =
+    lexeme.symbol("skip").map(_ => Skip)
+
+    lazy val varDeclareStmt: Parsley[Statement] =
+    (types <*> ident <* lexeme.symbol("=")).map { case (paramType, name) =>
+        expr.map { rvalue =>
+            VarDecl(paramType, name, RValue(rvalue))
+        }
+    }
+
+    lazy val assignStmt: Parsley[Statement] = 
+        (lvalue <* lexeme.symbol *> rvalue).map { case(lvalue, rvalue) => Assign(lvalue, rvalue)}
+
+
+    lazy val readStmt: Parsley[Statement] =
+    (lexeme.symbol("read") *> ident).map(ident => Read(LIdent(ident)))
+
+    lazy val freeStmt: Parsley[Statement] = 
+    (lexeme.symbol("free") *> expr).map(expr => Free(expr))
+
+    lazy val returnStmt: Parsley[Statement] = 
+    (lexeme.symbol("return") *> expr).map(expr => Return(expr))
+
+    lazy val exitStmt: Parsley[Statement] = 
+    (lexeme.symbol("exit") *> expr).map(expr => Exit(expr))
+
+    lazy val printStmt: Parsley[Statement] =
+    (lexeme.symbol("print") *> expr).map(expr => Print(expr, false))
+
+    lazy val printlnStmt: Parsley[Statement] =
+        (lexeme.symbol("println") *> expr).map(expr => Print(expr, true))
+
+    lazy val ifStmt: Parsley[Statement] =
+        (lexeme.symbol("if") *> expr <* lexeme.symbol("then") *> 
+        stmt <* lexeme.symbol("else") *> 
+        stmt <* lexeme.symbol("fi")).map {
+        case (cond, thenStmt, elseStmt) => If(cond, thenStmt, elseStmt)
+        }
+
+    lazy val whileStmt: Parsley[Statement] =
+        (lexeme.symbol("while") *> expr <* lexeme.symbol("do") *> 
+        stmt <* lexeme.symbol("done")).map { case (cond, body) =>
+        While(cond, body)
+        }
+
+    lazy val semicolonStmt: Parsley[Statement] =
+    (stmt <* lexeme.symbol(";") *> stmt).map { case (firstStmt, secondStmt) =>
+        Seq(firstStmt, secondStmt)
+    }
+
+    lazy val beginEndStmt: Parsley[Statement] =
+    (lexeme.symbol("begin") *> stmt <* lexeme.symbol("end")).map(stmt => Block(stmt))
+
+    lazy val stmt: Parsley[Statement]  = 
+        skipStmt <|>
+        varDeclareStmt <|>
+        assignStmt
+        readStmt <|>
+        freeStmt <|>
+        returnStmt <|>
+        exitStmt <|>
+        printStmt <|>
+        printlnStmt <|>
+        ifStmt <|>
+        whileStmt <|>
+        semicolonStmt <|>
+        beginEndStmt
+    */
+
         
 }
