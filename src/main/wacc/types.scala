@@ -26,4 +26,4 @@ sealed trait PairElemType
 
 case class BaseTElem(elem: BaseType) extends PairElemType
 case class ArrayTElem(elem: ArrayType) extends PairElemType
-case object PairElem extends PairElemType // 'pair' keyword
+case object PairKeyword extends PairElemType // 'pair' keyword
