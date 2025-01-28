@@ -108,7 +108,7 @@ object parser {
 
     // Pair definition
     private lazy val pairType: Parsley[PairType] = 
-        PairType(pairElem *> 
+        PairType(pairKeyword *> 
             '(' *> 
             pairElemType, (',' *> pairElemType) <* 
             ')'
@@ -116,7 +116,7 @@ object parser {
 
     // Pair element type definition
     private lazy val pairElemType: Parsley[PairElemType] = 
-        baseTElem <|> arrayTElem <|> pairElem
+        baseTElem <|> arrayTElem <|> pairKeyword
 
     private lazy val baseTElem: Parsley[BaseTElem] =
         baseType.map(BaseTElem)
@@ -124,6 +124,6 @@ object parser {
     private lazy val arrayTElem: Parsley[ArrayTElem] =
         arrayType.map(ArrayTElem)
 
-    private lazy val pairElem: Parsley[PairElemType] = 
-        lexeme.symbol("pair").as(PairElem)
+    private lazy val pairKeyword: Parsley[PairElemType] = 
+        lexeme.symbol("pair").as(PairKeyword)
 }
