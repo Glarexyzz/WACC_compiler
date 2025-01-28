@@ -14,9 +14,9 @@ object parser {
     def parse(input: String): Result[String, BigInt] = parser.parse(input)
     //private val parser = fully(expr)
 
-    //  Parser for expressions  
+    // Expression parsers
 
-    //  Unary Operators (Highest Precedence)
+    // Unary Operators (Highest Precedence)
     val unaryOps: Parsley[UnaryOperator] =
         choice(
             lexeme.symbol("!").as(UnaryOperator.Not),
@@ -26,7 +26,7 @@ object parser {
             lexeme.symbol("chr").as(UnaryOperator.Chr)
         )
 
-    //  Binary Operators
+    // Binary operators
     val mulOps: Parsley[BinaryOperator] =
         choice(
             lexeme.symbol("*").as(BinaryOperator.Multiply),
@@ -60,7 +60,7 @@ object parser {
     val orOps: Parsley[BinaryOperator] =
         lexeme.symbol("||").as(BinaryOperator.Or)
 
-    //  <atom>
+    // Atom definition
     private lazy val atom: Parsley[Expr] =
         IntLiteral(intLiter) <|>
         BoolLiteral(boolLiter) <|>
@@ -71,11 +71,11 @@ object parser {
         arrayElem <|>
         '(' *> expr <* ')'
 
-    //  <arrayElem>
+    // Array element definition
     private lazy val arrayElem: Parsley[ArrayElem] =
         ArrayElem(ident, some('[' *> expr <* ']'))
 
-    //  <expr>
+    // Expression definition
     private lazy val expr: Parsley[Expr] = 
         precedence(atom)(
             Ops(Prefix)(unaryOps.map(op => (expr: Expr) => UnaryOp(op, expr))),
@@ -87,13 +87,13 @@ object parser {
             Ops(InfixR)(orOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right)))
         )
     
-    //  Types
+    // Types
 
-    //  <type>
+    // Type definition
     private lazy val typeParser: Parsley[Type] =
         baseType <|> arrayType <|> pairType
 
-    //  <base-type>
+    // Base type definition
     private lazy val baseType: Parsley[BaseType] = 
         choice(
             lexeme.symbol("int").as(BaseType.IntType),
@@ -102,11 +102,11 @@ object parser {
             lexeme.symbol("string").as(BaseType.StrType)
         )
 
-    //  <array-type>
+    // Array type definition
     private lazy val arrayType: Parsley[ArrayType] =
         (typeParser <* '[' <* ']').map(ArrayType)
 
-    //  <pair-type>
+    // Pair definition
     private lazy val pairType: Parsley[PairType] = 
         PairType(pairElem *> 
             '(' *> 
@@ -114,7 +114,7 @@ object parser {
             ')'
         )
 
-    //  <pair-elem-type>
+    // Pair element type definition
     private lazy val pairElemType: Parsley[PairElemType] = 
         baseTElem <|> arrayTElem <|> pairElem
 
