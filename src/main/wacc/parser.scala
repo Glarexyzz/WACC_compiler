@@ -1,10 +1,10 @@
 package wacc
 
-import parsley.quick.*
 import parsley.{Parsley, Result}
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
 import parsley.syntax.character.charLift
 import parsley.syntax.zipped.*
+import parsley.quick.*
 
 import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
 import lexer.lexeme
@@ -128,5 +128,103 @@ object parser {
         arrayType.map(ArrayTElem)
 
     private lazy val pairKeyword: Parsley[PairElemType] = 
-        lexeme.symbol("pair").as(PairKeyword)
+        symbol("pair").as(PairKeyword)
+
+    //  Statements
+
+    //  Program definition
+
+    private lazy val program: Parsley[Program] = 
+        Program(
+            (symbol("begin") *> many(func)), 
+            (stmt <* symbol("end"))
+        )
+
+    //  Func definition
+    private lazy val func: Parsley[Func] = 
+        Func(  
+            typeParser, 
+            ident, 
+            ('(' *> option(paramList) <* ')'),
+            (symbol("is") *> stmt <* symbol("end"))
+        )
+    
+    //  ParamList definition
+    private lazy val paramList: Parsley[List[Param]] = sepBy1(param, ',')
+    
+
+    //  Param definition
+    private lazy val param: Parsley[Param] = Param(typeParser, ident)
+
+    //  Statement definition
+    private lazy val stmtAtom: Parsley[Stmt] =
+        lexeme.symbol("skip").as(SkipStmt) <|>
+        DeclAssignStmt(typeParser, ident, (softOp("=") *> rValue)) <|>
+        AssignStmt(lValue, (softOp("=") *> rValue)) <|>
+        ReadStmt(symbol("read") *> lValue) <|>
+        FreeStmt(symbol("free") *> expr) <|>
+        ReturnStmt(symbol("return") *> expr) <|>
+        ExitStmt(symbol("exit") *> expr) <|>
+        PrintStmt(symbol("print") *> expr) <|>
+        PrintlnStmt(symbol("println") *> expr) <|>
+        IfStmt(
+            (symbol("if") *> expr), 
+            (symbol("then") *> stmt), 
+            (symbol("else") *> stmt <* symbol("fi"))
+        ) <|>
+        WhileStmt(
+            (symbol("while") *> expr),
+            (symbol("do") *> stmt <* symbol("done"))
+        ) <|>
+        BodyStmt(symbol("begin") *> stmt <* symbol("end"))
+    
+    private lazy val stmt: Parsley[Stmt] = 
+        precedence(stmtAtom)(
+            Ops(InfixN)(SeqStmt from symbol(";"))
+        )
+
+    //  Left value definition
+    private lazy val lValue: Parsley[LValue] = 
+        lName <|> lArray <|> lPair
+
+    private lazy val lName: Parsley[LValue] = LValue.LName(ident)
+    private lazy val lArray: Parsley[LValue] = LValue.LArray(arrayElem)
+    private lazy val lPair: Parsley[LValue] = LValue.LPair(pairElem)
+
+    //  Right value definition
+    private lazy val rValue: Parsley[RValue] =
+        rExpr <|> 
+        rArrayLiter <|>
+        rNewPair <|>
+        rPair <|>
+        rCall
+
+    private lazy val rExpr: Parsley[RValue] = RValue.RExpr(expr)
+    private lazy val rArrayLiter: Parsley[RValue] = RValue.RArrayLiter(arrayLiter)
+    private lazy val rNewPair: Parsley[RValue] = 
+        RValue.RNewPair(
+            (symbol("newpair") *> '(' *> expr),
+            (',' *> expr <* ')')
+        )
+    private lazy val rPair: Parsley[RValue] = RValue.RPair(pairElem)
+    private lazy val rCall: Parsley[RValue] = 
+        RValue.RCall(
+            (symbol("call") *> ident),
+            ('(' *> option(argList) <* ')')
+        )
+    
+    //  Argument list definition
+    private lazy val argList: Parsley[List[Expr]] = sepBy1(expr, ',')
+
+    //  Pair elem definition
+    private lazy val pairElem: Parsley[PairElem] = fstElem <|> sndElem
+
+    private lazy val fstElem: Parsley[PairElem] =
+        PairElem.FstElem(symbol("fst") *> lValue)
+    private lazy val sndElem: Parsley[PairElem] =
+        PairElem.SndElem(symbol("snd") *> lValue)
+
+    //  ArrayLiter definition
+    private lazy val arrayLiter: Parsley[ArrayLiter] =
+        ArrayLiter('[' *> option(argList) <* ']')
 }
