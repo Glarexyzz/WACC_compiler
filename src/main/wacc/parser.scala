@@ -14,51 +14,54 @@ object parser {
     def parse(input: String): Result[String, BigInt] = parser.parse(input)
     //private val parser = fully(expr)
 
+    val symbol = lexeme.symbol  //  shorten for hardKeyword & hardOps
+    val softOp = lexeme.symbol.softOperator  //  shorten for softOps
+
     // Expression parsers
 
     // Unary Operators (Highest Precedence)
     val unaryOps: Parsley[UnaryOperator] =
         choice(
-            lexeme.symbol("!").as(UnaryOperator.Not),
-            lexeme.symbol("-").as(UnaryOperator.Negate),
-            lexeme.symbol("len").as(UnaryOperator.Length),
-            lexeme.symbol("ord").as(UnaryOperator.Ord),
-            lexeme.symbol("chr").as(UnaryOperator.Chr)
+            symbol("!").as(UnaryOperator.Not),
+            symbol("-").as(UnaryOperator.Negate),
+            symbol("len").as(UnaryOperator.Length),
+            symbol("ord").as(UnaryOperator.Ord),
+            symbol("chr").as(UnaryOperator.Chr)
         )
 
     // Binary operators
     val mulOps: Parsley[BinaryOperator] =
         choice(
-            lexeme.symbol("*").as(BinaryOperator.Multiply),
-            lexeme.symbol("/").as(BinaryOperator.Divide),
-            lexeme.symbol("%").as(BinaryOperator.Modulus)
+            symbol("*").as(BinaryOperator.Multiply),
+            symbol("/").as(BinaryOperator.Divide),
+            symbol("%").as(BinaryOperator.Modulus)
         )
 
     val addOps: Parsley[BinaryOperator] =
         choice(
-            lexeme.symbol("+").as(BinaryOperator.Add),
-            lexeme.symbol("-").as(BinaryOperator.Subtract)
+            symbol("+").as(BinaryOperator.Add),
+            symbol("-").as(BinaryOperator.Subtract)
         )
 
     val relOps: Parsley[BinaryOperator] =
         choice(
-            lexeme.symbol(">").as(BinaryOperator.Greater),
-            lexeme.symbol(">=").as(BinaryOperator.GreaterEqual),
-            lexeme.symbol("<").as(BinaryOperator.Less),
-            lexeme.symbol("<=").as(BinaryOperator.LessEqual)
+            symbol(">").as(BinaryOperator.Greater),
+            symbol(">=").as(BinaryOperator.GreaterEqual),
+            symbol("<").as(BinaryOperator.Less),
+            symbol("<=").as(BinaryOperator.LessEqual)
         )
 
     val eqOps: Parsley[BinaryOperator] =
         choice(
-            lexeme.symbol("==").as(BinaryOperator.Equal),
-            lexeme.symbol("!=").as(BinaryOperator.NotEqual)
+            symbol("==").as(BinaryOperator.Equal),
+            symbol("!=").as(BinaryOperator.NotEqual)
         )
 
     val andOps: Parsley[BinaryOperator] =
-        lexeme.symbol("&&").as(BinaryOperator.And)
+        symbol("&&").as(BinaryOperator.And)
 
     val orOps: Parsley[BinaryOperator] =
-        lexeme.symbol("||").as(BinaryOperator.Or)
+        symbol("||").as(BinaryOperator.Or)
 
     // Atom definition
     private lazy val atom: Parsley[Expr] =
@@ -96,10 +99,10 @@ object parser {
     // Base type definition
     private lazy val baseType: Parsley[BaseType] = 
         choice(
-            lexeme.symbol("int").as(BaseType.IntType),
-            lexeme.symbol("bool").as(BaseType.BoolType),
-            lexeme.symbol("char").as(BaseType.CharType),
-            lexeme.symbol("string").as(BaseType.StrType)
+            symbol("int").as(BaseType.IntType),
+            symbol("bool").as(BaseType.BoolType),
+            symbol("char").as(BaseType.CharType),
+            symbol("string").as(BaseType.StrType)
         )
 
     // Array type definition
