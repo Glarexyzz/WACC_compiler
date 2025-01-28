@@ -18,7 +18,9 @@ case class PairType(
     leftElem: PairElemType, 
     rightElem: PairElemType
 ) extends Type
-
+object PairType extends generic.ParserBridge2[
+    PairElemType, PairElemType, PairType
+]
 
 sealed trait PairElemType
 
