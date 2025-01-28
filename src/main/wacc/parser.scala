@@ -66,7 +66,7 @@ object parser {
         BoolLiteral(boolLiter) <|>
         CharLiteral(charLiter) <|>
         StrLiteral(strLiter) <|>
-        pairLiter.map(_ => PairLiteral) <|>
+        pairLiter.as(PairLiteral) <|>
         Identifier(ident) <|>
         arrayElem <|>
         '(' *> expr <* ')'
@@ -87,4 +87,43 @@ object parser {
             Ops(InfixR)(orOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right)))
         )
     
+    //  Types
+
+    //  <type>
+    private lazy val typeParser: Parsley[Type] =
+        baseType <|> arrayType <|> pairType
+
+    //  <base-type>
+    private lazy val baseType: Parsley[BaseType] = 
+        choice(
+            lexeme.symbol("int").as(BaseType.IntType),
+            lexeme.symbol("bool").as(BaseType.BoolType),
+            lexeme.symbol("char").as(BaseType.CharType),
+            lexeme.symbol("string").as(BaseType.StrType)
+        )
+
+    //  <array-type>
+    private lazy val arrayType: Parsley[ArrayType] =
+        (typeParser <* '[' <* ']').map(ArrayType)
+
+    //  <pair-type>
+    private lazy val pairType: Parsley[PairType] = 
+        PairType(pairElem *> 
+            '(' *> 
+            pairElemType, (',' *> pairElemType) <* 
+            ')'
+        )
+
+    //  <pair-elem-type>
+    private lazy val pairElemType: Parsley[PairElemType] = 
+        baseTElem <|> arrayTElem <|> pairElem
+
+    private lazy val baseTElem: Parsley[BaseTElem] =
+        baseType.map(BaseTElem)
+
+    private lazy val arrayTElem: Parsley[ArrayTElem] =
+        arrayType.map(ArrayTElem)
+
+    private lazy val pairElem: Parsley[PairElemType] = 
+        lexeme.symbol("pair").as(PairElem)
 }
