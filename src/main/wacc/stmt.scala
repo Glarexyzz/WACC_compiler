@@ -1,7 +1,6 @@
 package wacc
 
 import parsley.generic
-import parsley.Parsley
 
 case class Program(funcs: List[Func], stmt: Stmt)
 object Program extends generic.ParserBridge2[List[Func], Stmt, Program]

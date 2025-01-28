@@ -1,7 +1,6 @@
 package wacc
 
 import parsley.generic
-import parsley.Parsley
 
 sealed trait Expr
 

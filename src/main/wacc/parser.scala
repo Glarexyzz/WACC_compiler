@@ -3,7 +3,6 @@ package wacc
 import parsley.{Parsley, Result}
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
 import parsley.syntax.character.charLift
-import parsley.syntax.zipped.*
 import parsley.quick.*
 
 import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
@@ -107,7 +106,7 @@ object parser {
 
     // Array type definition
     private lazy val arrayType: Parsley[ArrayType] =
-        (typeParser <* '[' <* ']').map(ArrayType)
+        ArrayType(typeParser <* '[' <* ']')
 
     // Pair definition
     private lazy val pairType: Parsley[PairType] = 
@@ -122,10 +121,10 @@ object parser {
         baseTElem <|> arrayTElem <|> pairKeyword
 
     private lazy val baseTElem: Parsley[BaseTElem] =
-        baseType.map(BaseTElem)
+        BaseTElem(baseType)
 
     private lazy val arrayTElem: Parsley[ArrayTElem] =
-        arrayType.map(ArrayTElem)
+        ArrayTElem(arrayType)
 
     private lazy val pairKeyword: Parsley[PairElemType] = 
         symbol("pair").as(PairKeyword)
