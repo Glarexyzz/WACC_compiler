@@ -4,17 +4,33 @@ import parsley.{Parsley, Result}
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
 import parsley.syntax.character.charLift
 import parsley.quick.*
+import parsley.debug.DebugCombinators
 
 import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
-import lexer.lexeme
+import wacc.lexer
 
 
 object parser {
-    def parse(input: String): Result[String, BigInt] = parser.parse(input)
-    //private val parser = fully(expr)
+    def parse(input: String): Either[String, Any] = {
+        parsers.foldLeft(Option.empty[Either[String, Any]]) {
+            case (Some(result), _) => Some(result) // If parsing succeeded, stop
+            case (None, (name, parser)) =>
+                parser.parse(input) match {
+                    case parsley.Success(result) => Some(Right(result))
+                    case parsley.Failure(_)      => None // Try the next parser
+                }
+        }.getOrElse(Left("Input does not match any valid WACC construct."))
+    }
 
-    val symbol = lexeme.symbol  //  shorten for hardKeyword & hardOps
-    val softOp = lexeme.symbol.softOperator  //  shorten for softOps
+    val parsers: List[(String, Parsley[Any])] = List(
+        "Expression" -> fully(expr),
+        "Statement" -> fully(stmt),
+        "Function" -> fully(func),
+        "Program" -> fully(program)
+    )
+
+    private lazy val symbol = lexer.lexeme.symbol  //  shorten for hardKeyword & hardOps
+    val softOp = lexer.lexeme.symbol.softOperator  //  shorten for softOps
 
     // Expression parsers
 
@@ -64,14 +80,14 @@ object parser {
 
     // Atom definition
     private lazy val atom: Parsley[Expr] =
-        IntLiteral(intLiter) <|>
+        (IntLiteral(intLiter) <|>
         BoolLiteral(boolLiter) <|>
         CharLiteral(charLiter) <|>
         StrLiteral(strLiter) <|>
         pairLiter.as(PairLiteral) <|>
         Identifier(ident) <|>
         arrayElem <|>
-        '(' *> expr <* ')'
+        '(' *> expr <* ')')
 
     // Array element definition
     private lazy val arrayElem: Parsley[ArrayElem] =
@@ -157,9 +173,9 @@ object parser {
 
     //  Statement definition
     private lazy val stmtAtom: Parsley[Stmt] =
-        lexeme.symbol("skip").as(SkipStmt) <|>
-        DeclAssignStmt(typeParser, ident, (softOp("=") *> rValue)) <|>
-        AssignStmt(lValue, (softOp("=") *> rValue)) <|>
+        symbol("skip").as(SkipStmt) <|>
+        DeclAssignStmt(typeParser, ident, (symbol("=") *> rValue)) <|>
+        AssignStmt(lValue, (symbol("=") *> rValue)) <|>
         ReadStmt(symbol("read") *> lValue) <|>
         FreeStmt(symbol("free") *> expr) <|>
         ReturnStmt(symbol("return") *> expr) <|>
