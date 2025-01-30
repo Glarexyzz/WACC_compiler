@@ -137,7 +137,7 @@ object parser {
 
     // Type definition
     private lazy val typeParser: Parsley[Type] =
-        baseType <|> arrayType <|> pairType
+        baseType <|> pairType <|> arrayType 
 
     // Base type definition
     private lazy val baseType: Parsley[BaseType] = 
