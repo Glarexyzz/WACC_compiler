@@ -22,12 +22,19 @@ object parser {
         }.getOrElse(Left("Input does not match any valid WACC construct."))
     }
 
-    val parsers: List[(String, Parsley[Any])] = List(
-        "Expression" -> fully(expr),
-        "Statement" -> fully(stmt),
-        "Function" -> fully(func),
-        "Program" -> fully(program)
-    )
+
+    // Individual parsing functions
+    def parseProgram(input: String): Either[String, Program] =
+        fully(program).parse(input).toEither
+
+    def parseFunc(input: String): Either[String, Func] =
+        fully(func).parse(input).toEither
+
+    def parseStmt(input: String): Either[String, Stmt] =
+        fully(stmt).parse(input).toEither
+
+    def parseExpr(input: String): Either[String, Expr] =
+        fully(expr).parse(input).toEither
 
     private lazy val symbol = lexer.lexeme.symbol  //  shorten for hardKeyword & hardOps
     val softOp = lexer.lexeme.symbol.softOperator  //  shorten for softOps
