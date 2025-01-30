@@ -224,7 +224,7 @@ object parser {
     
     private lazy val stmt: Parsley[Stmt] = 
         precedence(stmtAtom)(
-            Ops(InfixN)(SeqStmt from symbol(";"))
+            Ops(InfixL)(SeqStmt from symbol(";"))
         )
 
     //  Left value definition
