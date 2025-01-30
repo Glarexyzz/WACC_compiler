@@ -21,11 +21,11 @@ object lexer {
                 "return", "exit", "print", "println", "then", "else",
                 "fi", "while", "do", "done", "newpair", "call", "fst",
                 "snd", "int", "bool", "char", "string", "pair", "null",
-                "true", "false", "len", "ord", "chr"
+                "true", "false"
             ),
             hardOperators = Set(
                 "!", "-", "len", "ord", "chr", "*", "/", "%", "+",
-                ">", ">=", "<", "<=", "==", "!=", "&&", "||"
+                ">", ">=", "<", "<=", "==", "!=", "&&", "||", ";"
             )
         ),
         textDesc = TextDesc.plain.copy(
@@ -76,26 +76,13 @@ object lexer {
     val pairLiter: Parsley[Unit] = lexeme.symbol("null")
 
     val ident: Parsley[String] = lexeme.names.identifier
+        .filter((id: String) => !desc.symbolDesc.hardKeywords.contains(id))
+
 
     // Comments
     val eol: Parsley[Char] = endOfLine <|> crlf
     val eof: Parsley[Unit] = notFollowedBy(item)
     val comment: Parsley[Unit] = lexer.space.skipComments
-
-    // Don't think we need this in the lexer?
-
-    //val types: Parsley[String] = baseType <|> arrayType <|> pairType
-
-    //val arrayType: Parsley[String] = types <* char('[') <* char(']')
-
-    //val pairElemType: Parsley[String] = baseType <|> arrayType <|> lexer.lexeme.symbol("pair").map(_ => "pair")
-    
-    // val pairType: Parsley[String] = 
-    // lexer.lexeme.symbol("pair") *>
-    // char('(') *>
-    // pairElemType <* char(',') <* pairElemType <* char(')')
-    
-    
 
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)

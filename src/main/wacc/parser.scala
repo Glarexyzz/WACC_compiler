@@ -1,81 +1,110 @@
 package wacc
 
-import parsley.quick.some
-import parsley.{Parsley, Result}
+import parsley.{Parsley}
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
 import parsley.syntax.character.charLift
-import parsley.syntax.zipped.*
-import parsley.combinator._
-import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
-import lexer.lexeme
+import parsley.quick.*
 
+import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
 
 object parser {
-    def parse(input: String): Result[String, BigInt] = parser.parse(input)
-    //private val parser = fully(expr)
-
-    //  Parser for expressions  
-
-    //  Unary Operators (Highest Precedence)
-    val unaryOps: Parsley[UnaryOperator] =
-        choice(
-            lexeme.symbol("!").as(UnaryOperator.Not),
-            lexeme.symbol("-").as(UnaryOperator.Negate),
-            lexeme.symbol("len").as(UnaryOperator.Length),
-            lexeme.symbol("ord").as(UnaryOperator.Ord),
-            lexeme.symbol("chr").as(UnaryOperator.Chr)
+    def parse(input: String): Either[String, Any] = {
+        val parsers: List[(String, Parsley[Any])] = List(
+            "Expression" -> fully(expr),
+            "Statement" -> fully(stmt),
+            "Program" -> fully(program),
+            "Function" -> fully(func)
         )
 
-    //  Binary Operators
+        parsers.foldLeft(Option.empty[Either[String, Any]]) {
+            case (Some(result), _) => Some(result) // If parsing succeeded, stop
+            case (None, (name, parser)) =>
+                parser.parse(input) match {
+                    case parsley.Success(result) => Some(Right(result))
+                    case parsley.Failure(msg)      => None // Try the next parser
+                }
+        }.getOrElse(Left("Input does not match any valid WACC construct."))
+    }
+
+
+    // Individual parsing functions
+    def parseProgram(input: String): Either[String, Program] =
+        fully(program).parse(input).toEither
+
+    def parseFunc(input: String): Either[String, Func] =
+        fully(func).parse(input).toEither
+
+    def parseStmt(input: String): Either[String, Stmt] =
+        fully(stmt).parse(input).toEither
+
+    def parseExpr(input: String): Either[String, Expr] =
+        fully(expr).parse(input).toEither
+
+    private lazy val symbol = lexer.lexeme.symbol  //  shorten for hardKeyword & hardOps
+    val softOp = lexer.lexeme.symbol.softOperator  //  shorten for softOps
+
+    // Expression parsers
+
+    // Unary Operators (Highest Precedence)
+    val unaryOps: Parsley[UnaryOperator] =
+        choice(
+            symbol("!").as(UnaryOperator.Not),
+            symbol("-").as(UnaryOperator.Negate),
+            symbol("len").as(UnaryOperator.Length),
+            symbol("ord").as(UnaryOperator.Ord),
+            symbol("chr").as(UnaryOperator.Chr)
+        )
+
+    // Binary operators
     val mulOps: Parsley[BinaryOperator] =
         choice(
-            lexeme.symbol("*").as(BinaryOperator.Multiply),
-            lexeme.symbol("/").as(BinaryOperator.Divide),
-            lexeme.symbol("%").as(BinaryOperator.Modulus)
+            symbol("*").as(BinaryOperator.Multiply),
+            symbol("/").as(BinaryOperator.Divide),
+            symbol("%").as(BinaryOperator.Modulus)
         )
 
     val addOps: Parsley[BinaryOperator] =
         choice(
-            lexeme.symbol("+").as(BinaryOperator.Add),
-            lexeme.symbol("-").as(BinaryOperator.Subtract)
+            symbol("+").as(BinaryOperator.Add),
+            symbol("-").as(BinaryOperator.Subtract)
         )
 
     val relOps: Parsley[BinaryOperator] =
         choice(
-            lexeme.symbol(">").as(BinaryOperator.Greater),
-            lexeme.symbol(">=").as(BinaryOperator.GreaterEqual),
-            lexeme.symbol("<").as(BinaryOperator.Less),
-            lexeme.symbol("<=").as(BinaryOperator.LessEqual)
+            symbol(">").as(BinaryOperator.Greater),
+            symbol(">=").as(BinaryOperator.GreaterEqual),
+            symbol("<").as(BinaryOperator.Less),
+            symbol("<=").as(BinaryOperator.LessEqual)
         )
 
     val eqOps: Parsley[BinaryOperator] =
         choice(
-            lexeme.symbol("==").as(BinaryOperator.Equal),
-            lexeme.symbol("!=").as(BinaryOperator.NotEqual)
+            symbol("==").as(BinaryOperator.Equal),
+            symbol("!=").as(BinaryOperator.NotEqual)
         )
 
     val andOps: Parsley[BinaryOperator] =
-        lexeme.symbol("&&").as(BinaryOperator.And)
+        symbol("&&").as(BinaryOperator.And)
 
     val orOps: Parsley[BinaryOperator] =
-        lexeme.symbol("||").as(BinaryOperator.Or)
+        symbol("||").as(BinaryOperator.Or)
 
-    //  <atom>
+    // Atom definition
     private lazy val atom: Parsley[Expr] =
         IntLiteral(intLiter) <|>
         BoolLiteral(boolLiter) <|>
         CharLiteral(charLiter) <|>
         StrLiteral(strLiter) <|>
-        pairLiter.map(_ => PairLiteral) <|>
+        pairLiter.as(PairLiteral) <|>
         Identifier(ident) <|>
         arrayElem <|>
-        '(' *> expr <* ')'
+        ('(' *> expr <* ')')
 
-    //  <arrayElem>
+    // Array element definition
     private lazy val arrayElem: Parsley[ArrayElem] =
         ArrayElem(ident, some('[' *> expr <* ']'))
 
-    //  <expr>
+    // Expression definition
     private lazy val expr: Parsley[Expr] = 
         precedence(atom)(
             Ops(Prefix)(unaryOps.map(op => (expr: Expr) => UnaryOp(op, expr))),
@@ -87,120 +116,142 @@ object parser {
             Ops(InfixR)(orOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right)))
         )
     
-    lazy val baseType: Parsley[BaseType] =
-    choice(
-        lexeme.symbol("int").map(_ => BaseType.IntType),
-        lexeme.symbol("bool").map(_ => BaseType.BoolType),
-        lexeme.symbol("char").map(_ => BaseType.CharType),
-        lexeme.symbol("string").map(_ => BaseType.StringType)
-    )
+    // Types
+
+    // Type definition
+    private lazy val typeParser: Parsley[Type] =
+        baseType <|> arrayType <|> pairType
+
+    // Base type definition
+    private lazy val baseType: Parsley[BaseType] = 
+        choice(
+            symbol("int").as(BaseType.IntType),
+            symbol("bool").as(BaseType.BoolType),
+            symbol("char").as(BaseType.CharType),
+            symbol("string").as(BaseType.StrType)
+        )
+
+    // Array type definition
+    private lazy val arrayType: Parsley[ArrayType] =
+        (baseType <|> pairType).flatMap { t =>
+            some('[' *> ']').map(_ => ArrayType(t))
+        }
+
+    // Pair definition
+    private lazy val pairType: Parsley[PairType] = 
+        PairType(
+            (pairKeyword *> '(' *> pairElemType), 
+            (',' *> pairElemType <* ')')
+        )
+
+    // Pair element type definition
+    private lazy val pairElemType: Parsley[PairElemType] = 
+        baseTElem <|> arrayTElem <|> pairKeyword
+
+    private lazy val baseTElem: Parsley[BaseTElem] =
+        BaseTElem(baseType)
+
+    private lazy val arrayTElem: Parsley[ArrayTElem] =
+        ArrayTElem(arrayType)
+
+    private lazy val pairKeyword: Parsley[PairElemType] = 
+        symbol("pair").as(PairKeyword)
+
+    //  Statements
+
+    //  Program definition
+
+    private lazy val program: Parsley[Program] = 
+        Program(
+            (symbol("begin") *> many(func)), 
+            (stmt <* symbol("end"))
+        )
+
+    //  Func definition
+    private lazy val func: Parsley[Func] = 
+        Func(  
+            typeParser, 
+            ident, 
+            ('(' *> option(paramList) <* ')'),
+            (symbol("is") *> stmt <* symbol("end"))
+        )
+    
+    //  ParamList definition
+    private lazy val paramList: Parsley[List[Param]] = sepBy1(param, ',')
     
 
-    lazy val pairElemType: Parsley[Type] =
-    choice(
-        baseType,                               
-        arrayType,                                                        
-        lexeme.symbol("pair").map(_ => ErasedPairType) 
-    )
+    //  Param definition
+    private lazy val param: Parsley[Param] = Param(typeParser, ident)
 
-    lazy val pairType: Parsley[PairType] =
-    lexeme.symbol("pair") *> (
-        ('(' *> pairElemType <* lexeme.symbol(",")).flatMap { fst =>
-            pairElemType.map { snd =>
-                PairType(fst, snd)
-            }
-        } <* ')'
-    )
-
-    lazy val arrayType: Parsley[ArrayType] =
-    (types <* lexeme.symbol("[") <* lexeme.symbol("]"))
-        .map(inner => ArrayType(inner))
-
-    lazy val types: Parsley[Type] =
-    choice(
-        baseType,
-        arrayType,
-        pairType
-    )
-
-    lazy val param: Parsley[Param] =
-    (types <~> ident).map { case (paramType, name) =>
-        Param(paramType, name)  //doesn't preserve result of ident??
-    }
+    //  Statement definition
+    private lazy val stmtAtom: Parsley[Stmt] =
+        symbol("skip").as(SkipStmt) <|>
+        DeclAssignStmt(typeParser, ident, (softOp("=") *> rValue)) <|>
+        AssignStmt(lValue, (softOp("=") *> rValue)) <|>
+        ReadStmt(symbol("read") *> lValue) <|>
+        FreeStmt(symbol("free") *> expr) <|>
+        ReturnStmt(symbol("return") *> expr) <|>
+        ExitStmt(symbol("exit") *> expr) <|>
+        PrintStmt(symbol("print") *> expr) <|>
+        PrintlnStmt(symbol("println") *> expr) <|>
+        IfStmt(
+            (symbol("if") *> expr), 
+            (symbol("then") *> stmt), 
+            (symbol("else") *> stmt <* symbol("fi"))
+        ) <|>
+        WhileStmt(
+            (symbol("while") *> expr),
+            (symbol("do") *> stmt <* symbol("done"))
+        ) <|>
+        BodyStmt(symbol("begin") *> stmt <* symbol("end"))
     
+    private lazy val stmt: Parsley[Stmt] = 
+        precedence(stmtAtom)(
+            Ops(InfixN)(SeqStmt from symbol(";"))
+        )
 
-    // some syntax errors to resolve 
+    //  Left value definition
+    private lazy val lValue: Parsley[LValue] = 
+        lName <|> lArray <|> lPair
+
+    private lazy val lName: Parsley[LValue] = LValue.LName(ident)
+    private lazy val lArray: Parsley[LValue] = LValue.LArray(arrayElem)
+    private lazy val lPair: Parsley[LValue] = LValue.LPair(pairElem)
+
+    //  Right value definition
+    private lazy val rValue: Parsley[RValue] =
+        rExpr <|> 
+        rArrayLiter <|>
+        rNewPair <|>
+        rPair <|>
+        rCall
+
+    private lazy val rExpr: Parsley[RValue] = RValue.RExpr(expr)
+    private lazy val rArrayLiter: Parsley[RValue] = RValue.RArrayLiter(arrayLiter)
+    private lazy val rNewPair: Parsley[RValue] = 
+        RValue.RNewPair(
+            (symbol("newpair") *> '(' *> expr),
+            (',' *> expr <* ')')
+        )
+    private lazy val rPair: Parsley[RValue] = RValue.RPair(pairElem)
+    private lazy val rCall: Parsley[RValue] = 
+        RValue.RCall(
+            (symbol("call") *> ident),
+            ('(' *> option(argList) <* ')')
+        )
     
-    lazy val skipStmt: Parsley[Statement] =
-    lexeme.symbol("skip").map(_ => Skip)
+    //  Argument list definition
+    private lazy val argList: Parsley[List[Expr]] = sepBy1(expr, ',')
 
-    /*
-    lazy val varDeclareStmt: Parsley[Statement] =
-    (types <*> ident <* lexeme.symbol("=")).map { case (paramType, name: String) =>
-        expr.map { rvalue =>
-            VarDecl(paramType, Identifier(name), RValue(rvalue))
-        }
-    }
+    //  Pair elem definition
+    private lazy val pairElem: Parsley[PairElem] = fstElem <|> sndElem
 
-    lazy val assignStmt: Parsley[Statement] = 
-        (lvalue <* lexeme.symbol *> rvalue).map { case(lvalue, rvalue) => Assign(lvalue, rvalue)}
-    */
+    private lazy val fstElem: Parsley[PairElem] =
+        PairElem.FstElem(symbol("fst") *> lValue)
+    private lazy val sndElem: Parsley[PairElem] =
+        PairElem.SndElem(symbol("snd") *> lValue)
 
-    lazy val readStmt: Parsley[Statement] =
-    (lexeme.symbol("read") *> ident).map(ident => Read(LIdent(ident)))
-
-    lazy val freeStmt: Parsley[Statement] = 
-    (lexeme.symbol("free") *> expr).map(expr => Free(expr))
-
-    lazy val returnStmt: Parsley[Statement] = 
-    (lexeme.symbol("return") *> expr).map(expr => Return(expr))
-
-    lazy val exitStmt: Parsley[Statement] = 
-    (lexeme.symbol("exit") *> expr).map(expr => Exit(expr))
-
-    lazy val printStmt: Parsley[Statement] =
-    (lexeme.symbol("print") *> expr).map(expr => Print(expr, false))
-
-    lazy val printlnStmt: Parsley[Statement] =
-        (lexeme.symbol("println") *> expr).map(expr => Print(expr, true))
-
-    lazy val ifStmt: Parsley[Statement] =
-    (lexeme.symbol("if") *> expr).flatMap { cond =>
-        (lexeme.symbol("then") *> stmt).flatMap { thenBranch =>
-        (lexeme.symbol("else") *> stmt <* lexeme.symbol("fi")).map { elseBranch =>
-            If(cond, thenBranch, elseBranch)
-        }
-        }
-    }
-
-    lazy val whileStmt: Parsley[Statement] =
-    (lexeme.symbol("while") *> expr <* lexeme.symbol("do") *> 
-    stmt <* lexeme.symbol("done")).map { case (cond: Expr, body: Statement) =>
-        While(cond, body)
-    }
-
-
-    lazy val semicolonStmt: Parsley[Statement] =
-    (stmt <* lexeme.symbol(";") *> stmt).map { case (firstStmt: Statement, secondStmt: Statement) =>
-        Seq(firstStmt, secondStmt)
-    }
-
-    lazy val beginEndStmt: Parsley[Statement] =
-    (lexeme.symbol("begin") *> stmt <* lexeme.symbol("end")).map(stmt => Block(stmt))
-  
-    lazy val stmt: Parsley[Statement]  = 
-        skipStmt <|>
-        varDeclareStmt <|>
-        assignStmt
-        readStmt <|>
-        freeStmt <|>
-        returnStmt <|>
-        exitStmt <|>
-        printStmt <|>
-        printlnStmt <|>
-        ifStmt <|>
-        whileStmt <|>
-        semicolonStmt <|>
-        beginEndStmt
-
+    //  ArrayLiter definition
+    private lazy val arrayLiter: Parsley[ArrayLiter] =
+        ArrayLiter('[' *> option(argList) <* ']')
 }
