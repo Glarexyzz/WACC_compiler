@@ -16,11 +16,15 @@ trait WACCTestUtils {
   "sequence", "read", "while")
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {
-    val subdirs = dir.listFiles.filter(_.isDirectory)
-    subdirs.map { subdir =>
-      val files = subdir.listFiles.filter(_.getName.endsWith(".wacc")).toList
-      subdir.getName -> files
-    }.toMap
+    def collectWaccFiles(currentDir: File): List[File] = {
+        val files = currentDir.listFiles
+        val waccFiles = files.filter(_.isFile).filter(_.getName.endsWith(".wacc")).toList
+        val subdirFiles = files.filter(_.isDirectory).flatMap(collectWaccFiles).toList
+        waccFiles ++ subdirFiles
+    }
+
+    val allWaccFiles = collectWaccFiles(dir)
+    allWaccFiles.groupBy(_.getParentFile.getName)
   }
 
   def runCompilerAndGetExitCode(filePath: String): Int = {
