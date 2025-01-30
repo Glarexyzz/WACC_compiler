@@ -1,14 +1,11 @@
 package wacc
 
-import parsley.{Parsley, Result}
+import parsley.{Parsley}
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
 import parsley.syntax.character.charLift
 import parsley.quick.*
-import parsley.debug.DebugCombinators
 
 import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
-import wacc.lexer
-
 
 object parser {
     def parse(input: String): Either[String, Any] = {

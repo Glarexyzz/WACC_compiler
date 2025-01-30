@@ -1,6 +1,5 @@
 package wacc
 
-import parsley.{Success, Failure}
 import Constants._
 
 def main(args: Array[String]): Unit = {
