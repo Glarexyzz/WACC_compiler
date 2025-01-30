@@ -76,7 +76,6 @@ object lexer {
     val pairLiter: Parsley[Unit] = lexeme.symbol("null")
 
     val ident: Parsley[String] = lexeme.names.identifier
-        .filter((id: String) => !desc.symbolDesc.hardKeywords.contains(id))
 
 
     // Comments
