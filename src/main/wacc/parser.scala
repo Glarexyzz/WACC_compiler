@@ -18,22 +18,22 @@ object parser {
 
         var lastError: Option[String] = None // Store the last error encountered
 
+        var parserUsed: String = ""  // Store the last parser used
         parsers.foldLeft(Option.empty[Either[String, Any]]) {
             case (Some(result), _) => Some(result) // If parsing succeeded, stop
             case (None, (name, parser)) =>
-                println(s" Trying to parse as: $name")
                 parser.parse(prog) match {
                     case parsley.Success(result) => 
                         println(s" Success! Parsed as: $name")
                         Some(Right(result))
                     case parsley.Failure(msg)      => 
-                        println(s" Failed to parse as: $name - $msg")
+                        parserUsed = name
                         lastError = Some(msg)
                         None // Try the next parser
                 }
         }.getOrElse{
             val detailedError = lastError.getOrElse("Unknown parsing error")
-            println("Input does not match any valid WACC construct.")
+            println(s" Failed to parse as: $parserUsed")
             Left(detailedError)
         }
     }
