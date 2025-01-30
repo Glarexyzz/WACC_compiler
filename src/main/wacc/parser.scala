@@ -18,7 +18,6 @@ object parser {
 
         var lastError: Option[String] = None // Store the last error encountered
 
-        var parserUsed: String = ""  // Store the last parser used
         parsers.foldLeft(Option.empty[Either[String, Any]]) {
             case (Some(result), _) => Some(result) // If parsing succeeded, stop
             case (None, (name, parser)) =>
@@ -27,13 +26,11 @@ object parser {
                         println(s" Success! Parsed as: $name")
                         Some(Right(result))
                     case parsley.Failure(msg)      => 
-                        parserUsed = name
                         lastError = Some(msg)
                         None // Try the next parser
                 }
         }.getOrElse{
             val detailedError = lastError.getOrElse("Unknown parsing error")
-            println(s" Failed to parse as: $parserUsed")
             Left(detailedError)
         }
     }
