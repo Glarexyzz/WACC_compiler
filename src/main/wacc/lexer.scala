@@ -7,8 +7,19 @@ import parsley.token.descriptions.*
 import parsley.character.{
     char, crlf, endOfLine, item, satisfy
 }
+// for error checking
+// import parsley.token.errors.* 
 
 object lexer {
+    // private val errorConfig = new ErrorConfig {
+    //     override def labelSymbol = Map(
+    //         "}" -> LabelAndReason(reason = "unclosed braces", label = "closing braces")
+            
+    //     )
+    //     // errors: syntax and semantic
+    //     // stuff like incomplete brackets, no begin and end, and so on
+    // }
+
     private val desc = LexicalDesc.plain.copy(
         // your configuration goes here
         nameDesc = NameDesc.plain.copy(

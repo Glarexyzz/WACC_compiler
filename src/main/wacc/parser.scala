@@ -5,6 +5,9 @@ import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
 import parsley.syntax.character.charLift
 import parsley.quick.*
 
+// for testing
+import parsley.errors.ErrorBuilder
+
 import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
 
 object parser {
