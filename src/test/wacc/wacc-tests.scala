@@ -5,15 +5,49 @@ import scala.sys.process._
 import wacc.Constants._
 
 /* all possible subcategories: 
-  Set ("advanced", "array", "basic", "exit", "expressions", 
-  "function", "if", "literals", "IO", "multiple", "pairs", "runtimeErr", "print", "scope", 
-  "sequence", "read",  "variables", "while")
+  val ignoredSubcategories =   Set ("advanced", "array", "basic", "basic/exit", "basic/skip", "badChar", 
+  "exit", "expressions", "function", "function/nested_functions", "function/simple_functions", "if", 
+  "literals", "IO", "IO/print", "IO/read", "multiple", "pairs", "print", "runtimeErr", "runtimeErr/arrayOutOfBounds", 
+  "runtimeErr/badChar", "runtimeErr/divideByZero", "runtimeErr/integerOverflow", "runtimeErr/nullDereference", "scope", 
+  "sequence", "read", "variables", "while")
   */
   
 trait WACCTestUtils {
-  val ignoredSubcategories =   Set ("advanced", "array", "exit", "expressions", 
-  "function", "if", "literals", "IO", "multiple", "pairs", "runtimeErr", "print", "scope", 
-  "sequence", "read", "while")
+  val ignoredSubcategories =   Set ("advanced", "array", "basic", "basic/exit", "basic/skip", "badChar", 
+  "exit", "expressions", "function", "function/nested_functions", "function/simple_functions", "if", 
+  "literals", "IO", "IO/print", "IO/read", "multiple", "pairs", "print", "runtimeErr", "runtimeErr/arrayOutOfBounds", 
+  "runtimeErr/badChar", "runtimeErr/divideByZero", "runtimeErr/integerOverflow", "runtimeErr/nullDereference", "scope", 
+  "sequence", "read", "variables", "while")
+
+/*
+  def getListOfWaccFiles(dir: File): Map[String, List[File]] = 
+   val subdirs = dir.listFiles.filter(_.isDirectory)
+    subdirs.map { subdir =>
+      val files = subdir.listFiles.filter(_.getName.endsWith(".wacc")).toList
+      subdir.getName -> files
+}
+
+
+  def getListOfWaccFiles(dir: File): Map[String, List[File]] = {
+    def collectWaccFiles(currentDir: File): Map[String, List[File]] = {
+      val files = currentDir.listFiles
+      val waccFiles = files.filter(_.isFile).filter(_.getName.endsWith(".wacc")).toList
+      val subdirs = files.filter(_.isDirectory).toList
+
+      val subdirFiles = subdirs.flatMap(subdir => collectWaccFiles(subdir)).toMap
+
+      val category = dir.toPath.relativize(currentDir.toPath).toString.replace("\\", "/")
+      
+      // Only include categories that have direct .wacc files
+      val currentMap = if (waccFiles.nonEmpty) Map(category -> waccFiles) else Map.empty
+
+      currentMap ++ subdirFiles
+    }
+
+    collectWaccFiles(dir)
+  }
+
+*/
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {
     def collectWaccFiles(currentDir: File): List[File] = {
@@ -24,7 +58,10 @@ trait WACCTestUtils {
     }
 
     val allWaccFiles = collectWaccFiles(dir)
-    allWaccFiles.groupBy(_.getParentFile.getName)
+    allWaccFiles.groupBy(file => {
+      val parent = file.getParentFile 
+      dir.toPath.relativize(parent.toPath).toString
+    })
   }
 
   def runCompilerAndGetExitCode(filePath: String): Int = {
