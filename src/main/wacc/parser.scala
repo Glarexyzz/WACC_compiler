@@ -1,6 +1,7 @@
 package wacc
 
 import parsley.{Parsley}
+import scala.io.Source
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
 import parsley.syntax.character.charLift
 import parsley.quick.*
@@ -9,6 +10,9 @@ import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
 
 object parser {
     def parse(input: String): Either[String, Any] = {
+        println(input)
+        val prog = Source.fromFile(input).mkString
+
         val parsers: List[(String, Parsley[Any])] = List(
             "Expression" -> fully(expr),
             "Statement" -> fully(stmt),
@@ -19,7 +23,7 @@ object parser {
         parsers.foldLeft(Option.empty[Either[String, Any]]) {
             case (Some(result), _) => Some(result) // If parsing succeeded, stop
             case (None, (name, parser)) =>
-                parser.parse(input) match {
+                parser.parse(prog) match {
                     case parsley.Success(result) => Some(Right(result))
                     case parsley.Failure(msg)      => None // Try the next parser
                 }

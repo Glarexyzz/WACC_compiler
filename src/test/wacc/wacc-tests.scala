@@ -11,9 +11,9 @@ import wacc.Constants._
   */
   
 trait WACCTestUtils {
-  val ignoredSubcategories =   Set ("advanced", "array", "basic", "exit", "expressions", 
+  val ignoredSubcategories =   Set ("advanced", "array", "exit", "expressions", 
   "function", "if", "literals", "IO", "multiple", "pairs", "runtimeErr", "print", "scope", 
-  "sequence", "read",  "variables", "while")
+  "sequence", "read", "while")
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {
     val subdirs = dir.listFiles.filter(_.isDirectory)
