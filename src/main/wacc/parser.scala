@@ -11,8 +11,9 @@ object parser {
         val parsers: List[(String, Parsley[Any])] = List(
             "Expression" -> fully(expr),
             "Statement" -> fully(stmt),
-            "Program" -> fully(program),
-            "Function" -> fully(func)
+            "Function" -> fully(func),
+            "Program" -> fully(program)
+            
         )
 
         var firstMeaningfulError: Option[(String, String)] = None
@@ -27,7 +28,7 @@ object parser {
                         println(s" Success! Parsed as: $name")
                         Some(Right(result))
                     case parsley.Failure(msg)      => 
-                        if (!msg.contains("line 1, column 1") && firstMeaningfulError.isEmpty) {
+                        if (!msg.contains("column 1") && firstMeaningfulError.isEmpty) {
                             firstMeaningfulError = Some(name -> msg) // Store first meaningful error
                         }
                         lastError = Some(name -> msg)
