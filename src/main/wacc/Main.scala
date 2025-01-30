@@ -8,6 +8,7 @@ def main(args: Array[String]): Unit = {
 
     args match {
         case Array(input) =>
+            println(input)
             val prog = Source.fromFile(input).mkString
             val result = parser.parse(prog) // Call the central parse function
             result match {
