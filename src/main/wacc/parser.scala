@@ -12,12 +12,19 @@ import wacc.lexer
 
 object parser {
     def parse(input: String): Either[String, Any] = {
+        val parsers: List[(String, Parsley[Any])] = List(
+            "Expression" -> fully(expr),
+            "Statement" -> fully(stmt),
+            "Program" -> fully(program),
+            "Function" -> fully(func)
+        )
+
         parsers.foldLeft(Option.empty[Either[String, Any]]) {
             case (Some(result), _) => Some(result) // If parsing succeeded, stop
             case (None, (name, parser)) =>
                 parser.parse(input) match {
                     case parsley.Success(result) => Some(Right(result))
-                    case parsley.Failure(_)      => None // Try the next parser
+                    case parsley.Failure(msg)      => None // Try the next parser
                 }
         }.getOrElse(Left("Input does not match any valid WACC construct."))
     }
@@ -87,14 +94,14 @@ object parser {
 
     // Atom definition
     private lazy val atom: Parsley[Expr] =
-        (IntLiteral(intLiter) <|>
+        IntLiteral(intLiter) <|>
         BoolLiteral(boolLiter) <|>
         CharLiteral(charLiter) <|>
         StrLiteral(strLiter) <|>
         pairLiter.as(PairLiteral) <|>
         Identifier(ident) <|>
         arrayElem <|>
-        '(' *> expr <* ')')
+        ('(' *> expr <* ')')
 
     // Array element definition
     private lazy val arrayElem: Parsley[ArrayElem] =
@@ -129,14 +136,15 @@ object parser {
 
     // Array type definition
     private lazy val arrayType: Parsley[ArrayType] =
-        ArrayType(typeParser <* '[' <* ']')
+        (baseType <|> pairType).flatMap { t =>
+            some('[' *> ']').map(_ => ArrayType(t))
+        }
 
     // Pair definition
     private lazy val pairType: Parsley[PairType] = 
-        PairType(pairKeyword *> 
-            '(' *> 
-            pairElemType, (',' *> pairElemType) <* 
-            ')'
+        PairType(
+            (pairKeyword *> '(' *> pairElemType), 
+            (',' *> pairElemType <* ')')
         )
 
     // Pair element type definition
@@ -181,8 +189,8 @@ object parser {
     //  Statement definition
     private lazy val stmtAtom: Parsley[Stmt] =
         symbol("skip").as(SkipStmt) <|>
-        DeclAssignStmt(typeParser, ident, (symbol("=") *> rValue)) <|>
-        AssignStmt(lValue, (symbol("=") *> rValue)) <|>
+        DeclAssignStmt(typeParser, ident, (softOp("=") *> rValue)) <|>
+        AssignStmt(lValue, (softOp("=") *> rValue)) <|>
         ReadStmt(symbol("read") *> lValue) <|>
         FreeStmt(symbol("free") *> expr) <|>
         ReturnStmt(symbol("return") *> expr) <|>
