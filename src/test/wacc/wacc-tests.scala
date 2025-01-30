@@ -5,7 +5,7 @@ import scala.sys.process._
 import wacc.Constants._
 
 /* all possible subcategories: 
-  val ignoredSubcategories =   Set ("advanced", "array", "basic", "basic/exit", "basic/skip", "badChar", 
+  val ignoredSubcategories =   Set ("advanced", "array", "basic", "basic/exit", "basic/skip", 
   "exit", "expressions", "function", "function/nested_functions", "function/simple_functions", "if", 
   "literals", "IO", "IO/print", "IO/read", "multiple", "pairs", "print", "runtimeErr", "runtimeErr/arrayOutOfBounds", 
   "runtimeErr/badChar", "runtimeErr/divideByZero", "runtimeErr/integerOverflow", "runtimeErr/nullDereference", "scope", 
@@ -13,7 +13,7 @@ import wacc.Constants._
   */
   
 trait WACCTestUtils {
-  val ignoredSubcategories =   Set ("advanced", "array", "basic", "basic/exit", "basic/skip", "badChar", 
+  val ignoredSubcategories =   Set ("advanced", "array", "basic", "basic/exit", "basic/skip", 
   "exit", "expressions", "function", "function/nested_functions", "function/simple_functions", "if", 
   "literals", "IO", "IO/print", "IO/read", "multiple", "pairs", "print", "runtimeErr", "runtimeErr/arrayOutOfBounds", 
   "runtimeErr/badChar", "runtimeErr/divideByZero", "runtimeErr/integerOverflow", "runtimeErr/nullDereference", "scope", 
