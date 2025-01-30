@@ -16,7 +16,9 @@ object parser {
             "Function" -> fully(func)
         )
 
-        var lastError: Option[String] = None // Store the last error encountered
+        var firstMeaningfulError: Option[(String, String)] = None
+
+        var lastError: Option[(String, String)] = None 
 
         parsers.foldLeft(Option.empty[Either[String, Any]]) {
             case (Some(result), _) => Some(result) // If parsing succeeded, stop
@@ -26,12 +28,18 @@ object parser {
                         println(s" Success! Parsed as: $name")
                         Some(Right(result))
                     case parsley.Failure(msg)      => 
-                        lastError = Some(msg)
+                        if (!msg.contains("line 1, column 1") && firstMeaningfulError.isEmpty) {
+                            firstMeaningfulError = Some(name -> msg) // Store first meaningful error
+                        }
+                        lastError = Some(name -> msg)
                         None // Try the next parser
                 }
         }.getOrElse{
-            val detailedError = lastError.getOrElse("Unknown parsing error")
-            Left(detailedError)
+            val (errorParser, detailedError) = 
+                firstMeaningfulError
+                .orElse(lastError)
+                .getOrElse("Unknown Parser" -> "Unknown parsing error")
+            Left(s"Parsing failed in [$errorParser]: $detailedError")
         }
     }
 
