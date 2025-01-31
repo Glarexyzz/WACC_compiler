@@ -21,7 +21,6 @@ object lexer {
     // }
 
     private val desc = LexicalDesc.plain.copy(
-        // your configuration goes here
         nameDesc = NameDesc.plain.copy(
             identifierStart = Basic(c => c.isLetter || c == '_'),
             identifierLetter = Basic(c => c.isLetterOrDigit || c == '_'),
@@ -32,7 +31,7 @@ object lexer {
                 "return", "exit", "print", "println", "then", "else",
                 "fi", "while", "do", "done", "newpair", "call", "fst",
                 "snd", "int", "bool", "char", "string", "pair", "null",
-                "true", "false"
+                "true", "false", ",", "(", ")", "[", "]"
             ),
             hardOperators = Set(
                 "!", "-", "len", "ord", "chr", "*", "/", "%", "+",
@@ -54,8 +53,8 @@ object lexer {
     val lexeme = lexer.lexeme // For parser to use lexeme
 
     // Numbers
-    val digit: Parsley[Char] = digit  // single digit '0'-'9'
-    val intSign: Parsley[Char] = char('+') <|> char('-') // '+' or '-'
+    val digit: Parsley[Char] = digit                      // single digit '0'-'9'
+    val intSign: Parsley[Char] = char('+') <|> char('-')  // '+' or '-'
     val intLiter: Parsley[BigInt] = lexeme.signed.decimal
     
     // Boolean
@@ -87,7 +86,6 @@ object lexer {
     val pairLiter: Parsley[Unit] = lexeme.symbol("null")
 
     val ident: Parsley[String] = lexeme.names.identifier
-        .filter((id: String) => !desc.symbolDesc.hardKeywords.contains(id))
 
 
     // Comments
