@@ -117,11 +117,11 @@ object parser {
         pairLiter.as(PairLiteral) <|>
         Identifier(ident) <|>
         arrayElem <|>
-        (symbol("(") *> expr <* symbol(")"))
+        (softOp("(") *> expr <* softOp(")"))
 
     // Array element definition
     private lazy val arrayElem: Parsley[ArrayElem] =
-        ArrayElem(ident, some(symbol("[") *> expr <* symbol("]")))
+        ArrayElem(ident, some(softOp("[") *> expr <* softOp("]")))
 
     // Expression definition
     private lazy val expr: Parsley[Expr] = 
@@ -159,8 +159,8 @@ object parser {
     // Pair definition
     private lazy val pairType: Parsley[PairType] = 
         PairType(
-            (symbol("pair") *> symbol("(") *> pairElemType), 
-            (symbol(",") *> pairElemType <* symbol(")"))
+            (symbol("pair") *> softOp("(") *> pairElemType), 
+            (softOp(",") *> pairElemType <* softOp(")"))
         )
 
     // Pair element type definition
@@ -191,12 +191,12 @@ object parser {
         Func(  
             typeParser, 
             ident, 
-            (symbol("(") *> option(paramList) <* symbol(")")),
+            (softOp("(") *> option(paramList) <* softOp(")")),
             (symbol("is") *> stmt <* symbol("end"))
         )
     
     // ParamList definition
-    private lazy val paramList: Parsley[List[Param]] = sepBy1(param, symbol(","))
+    private lazy val paramList: Parsley[List[Param]] = sepBy1(param, softOp(","))
     
 
     // Param definition
@@ -249,18 +249,18 @@ object parser {
     private lazy val rArrayLiter: Parsley[RValue] = RValue.RArrayLiter(arrayLiter)
     private lazy val rNewPair: Parsley[RValue] = 
         RValue.RNewPair(
-            (symbol("newpair") *> symbol("(") *> expr),
-            (symbol(",") *> expr <* symbol(")"))
+            (symbol("newpair") *> softOp("(") *> expr),
+            (softOp(",") *> expr <* softOp(")"))
         )
     private lazy val rPair: Parsley[RValue] = RValue.RPair(pairElem)
     private lazy val rCall: Parsley[RValue] = 
         RValue.RCall(
             (symbol("call") *> ident),
-            (symbol("(") *> option(argList) <* symbol(")"))
+            (softOp("(") *> option(argList) <* softOp(")"))
         )
     
     // Argument list definition
-    private lazy val argList: Parsley[List[Expr]] = sepBy1(expr, symbol(","))
+    private lazy val argList: Parsley[List[Expr]] = sepBy1(expr, softOp(","))
 
     // Pair elem definition
     private lazy val pairElem: Parsley[PairElem] = fstElem <|> sndElem
@@ -272,5 +272,5 @@ object parser {
 
     // ArrayLiter definition
     private lazy val arrayLiter: Parsley[ArrayLiter] =
-        ArrayLiter(symbol("[") *> option(argList) <* symbol("]"))
+        ArrayLiter(softOp("[") *> option(argList) <* softOp("]"))
 }
