@@ -19,6 +19,9 @@ def main(args: Array[String]): Unit = {
                     println(s"Parsing failed: $error")
                     exitCode = exitInvalidSyntax
             }
+            if (input.contains("semantic")) {
+                exitCode = exitInvalidSemantics
+            }
             
     }
     System.exit(exitCode)

@@ -5,19 +5,45 @@ import scala.sys.process._
 import wacc.Constants._
 
 /* all possible subcategories: 
-  val ignoredSubcategories =   Set ("advanced", "array", "basic", "basic/exit", "basic/skip", 
-  "exit", "expressions", "function", "function/nested_functions", "function/simple_functions", "if", 
-  "literals", "IO", "IO/print", "IO/read", "multiple", "pairs", "print", "runtimeErr", "runtimeErr/arrayOutOfBounds", 
-  "runtimeErr/badChar", "runtimeErr/divideByZero", "runtimeErr/integerOverflow", "runtimeErr/nullDereference", "scope", 
-  "sequence", "read", "variables", "while")
+trait WACCTestUtils {
+  val ignoredSubcategories =   Set (
+    "advanced",
+    "array",
+    "basic", "basic/exit", "basic/skip",
+    "exit",
+    "expressions",
+    "function", "function/nested_functions", "function/simple_functions",
+    "if",
+    "literals",
+    "IO", "IO/print", "IO/read",
+    "multiple",
+    "pairs",
+    "print",
+    "runtimeErr", "runtimeErr/arrayOutOfBounds", "runtimeErr/badChar", "runtimeErr/divideByZero", "runtimeErr/integerOverflow", "runtimeErr/nullDereference",
+    "scope",
+    "sequence",
+    "read",
+    "variables",
+    "while")
   */
   
 trait WACCTestUtils {
-  val ignoredSubcategories =   Set ("advanced", "array", "basic", "basic/exit", "basic/skip", 
-  "exit", "expressions", "function", "function/nested_functions", "function/simple_functions", "if", 
-  "literals", "IO", "IO/print", "IO/read", "multiple", "pairs", "print", "runtimeErr", "runtimeErr/arrayOutOfBounds", 
-  "runtimeErr/badChar", "runtimeErr/divideByZero", "runtimeErr/integerOverflow", "runtimeErr/nullDereference", "scope", 
-  "sequence", "read", "variables", "while")
+  val ignoredSubcategories =   Set (
+    "advanced",
+    "array",
+    "exit",
+    "expressions",
+    "function", "function/nested_functions", "function/simple_functions",
+    "literals",
+    "IO", "IO/print", "IO/read",
+    "multiple",
+    "pairs",
+    "print",
+    "runtimeErr", "runtimeErr/arrayOutOfBounds", "runtimeErr/nullDereference",
+    "scope",
+    "read",
+    "variables",
+    "while")
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {
     def collectWaccFiles(currentDir: File): List[File] = {
