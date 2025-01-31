@@ -165,7 +165,7 @@ object parser {
 
     // Pair element type definition
     private lazy val pairElemType: Parsley[PairElemType] = 
-        pairKeyword <|> baseTElem <|> arrayTElem  
+        pairKeyword <|> atomic(arrayTElem) <|> baseTElem
 
     private lazy val baseTElem: Parsley[BaseTElem] =
         BaseTElem(baseType)
