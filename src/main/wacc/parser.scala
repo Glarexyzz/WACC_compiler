@@ -182,7 +182,7 @@ object parser {
 
     private lazy val program: Parsley[Program] = 
         Program(
-            (symbol("begin") *> many(func)), 
+            (symbol("begin") *> many(atomic(func))), 
             (stmt <* symbol("end"))
         )
 
