@@ -80,7 +80,8 @@ object lexer {
         
     
     val charLiter: Parsley[Char] = //lexeme.character.ascii
-        char('\'') *> character <* char('\'') <* lexer.space.whiteSpace
+        char('\'') *> character <* char('\'') <* 
+        lexer.space.whiteSpace
 
     val strLiter: Parsley[String] = //lexeme.string.ascii
         (char('"') *> many(character) <* char('"'))
