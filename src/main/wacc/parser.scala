@@ -153,7 +153,7 @@ object parser {
     // Array type definition
     private lazy val arrayType: Parsley[ArrayType] =
         ArrayType(
-            (pairType <|> baseType) <* softOp("[") <* softOp("]")
+            (pairType <|> baseType) <* some(softOp("[") <* softOp("]"))
         )
 
     // Pair definition
