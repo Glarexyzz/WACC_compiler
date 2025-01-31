@@ -18,6 +18,41 @@ object parser {
             "Program" -> fully(program)
             
         )
+
+
+        var lastError: Option[Err] = None
+        parsers.foldLeft(Option.empty[Either[Err, Any]]) {
+            case (Some(result), _) => Some(result) // Parsing succeeded!
+            case (None, (name, parser)) => 
+                parser.parse(prog) match {
+                    case parsley.Success(result) => 
+                        println(s"Success! Parsed as: $name")
+                        Some(Right(result))
+                    case parsley.Failure(err) => // there seems to be a conflict between the Err from parsley and the Err in Option[Err]
+                        lastError = Some(err)
+                        None
+                        // None
+                        // currently it will keep trying to parse, but next time, 
+                        // we want it to fail the moment we find a syntax error, 
+                        // but continue for a semantic error (and report multiple semantic errors)
+                }
+        }.getOrElse{
+            Left(lastError.getOrElse{
+                ParserError((1,1), "<input>", ParserErrorLines.SpecialisedError(Set("All parsers failed"), 0))
+            })
+            // 
+        }
+
+    }
+    /*
+       def parse[Err >: ParserError: ErrorBuilder](prog: String): Either[Err, Any] = {
+        val parsers: List[(String, Parsley[Any])] = List(
+            "Expression" -> fully(expr),
+            "Statement" -> fully(stmt),
+            "Function" -> fully(func),
+            "Program" -> fully(program)
+            
+        )
         parsers.foldLeft(Option.empty[Either[Err, Any]]) {
             case (Some(result), _) => Some(result) // Parsing succeeded!
             case (None, (err, parser)) => 
@@ -30,8 +65,6 @@ object parser {
         }
 
     }
-    /*
-
         var firstMeaningfulError: Option[(String, String)] = None
 
         var lastError: Option[(String, String)] = None 
