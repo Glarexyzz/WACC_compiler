@@ -80,7 +80,7 @@ object lexer {
     
     val charLiter: Parsley[Char] = lexeme.character.ascii
 
-    val strLiter: Parsley[String] =lexeme.string.ascii
+    val strLiter: Parsley[String] = lexeme.string.ascii
 
     // Null
     val pairLiter: Parsley[Unit] = lexeme.symbol("null")
