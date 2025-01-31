@@ -55,7 +55,12 @@ object lexer {
     // Numbers
     val digit: Parsley[Char] = digit                      // single digit '0'-'9'
     val intSign: Parsley[Char] = char('+') <|> char('-')  // '+' or '-'
-    val intLiter: Parsley[BigInt] = lexeme.signed.decimal
+    val maxIntValue: BigInt = BigInt(2147483647)
+    val minIntValue: BigInt = BigInt(-2147483648)
+    val intLiter: Parsley[BigInt] = 
+        lexeme.signed.decimal.filter(
+            n => n <= maxIntValue && n >= minIntValue
+        )
     
     // Boolean
     val boolLiter: Parsley[Boolean] =
