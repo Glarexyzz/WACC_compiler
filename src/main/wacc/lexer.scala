@@ -10,7 +10,6 @@ import parsley.character.{
 
 object lexer {
     private val desc = LexicalDesc.plain.copy(
-        // your configuration goes here
         nameDesc = NameDesc.plain.copy(
             identifierStart = Basic(c => c.isLetter || c == '_'),
             identifierLetter = Basic(c => c.isLetterOrDigit || c == '_'),
@@ -43,8 +42,8 @@ object lexer {
     val lexeme = lexer.lexeme // For parser to use lexeme
 
     // Numbers
-    val digit: Parsley[Char] = digit  // single digit '0'-'9'
-    val intSign: Parsley[Char] = char('+') <|> char('-') // '+' or '-'
+    val digit: Parsley[Char] = digit                      // single digit '0'-'9'
+    val intSign: Parsley[Char] = char('+') <|> char('-')  // '+' or '-'
     val intLiter: Parsley[BigInt] = lexeme.signed.decimal
     
     // Boolean

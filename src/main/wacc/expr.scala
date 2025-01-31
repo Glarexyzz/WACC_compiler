@@ -29,9 +29,7 @@ case class UnaryOp(op: UnaryOperator, expr: Expr) extends Expr
 case class BinaryOp(left: Expr, op: BinaryOperator, right: Expr) extends Expr
 //case class ParenExpr(expr: Expr) extends Expr
 
-// Strongest Precedence
-
-// Unary Operators
+// Unary Operators by precedence
 enum UnaryOperator {
     case Not
     case Negate
@@ -39,8 +37,8 @@ enum UnaryOperator {
     case Ord
     case Chr
 }
- 
-// Binary Operators
+
+// Binary Operators by precedence
 enum BinaryOperator {
     case Multiply, Divide, Modulus
     case Add, Subtract
@@ -49,5 +47,3 @@ enum BinaryOperator {
     case And
     case Or
 }
-
-// Weakest Precedence
