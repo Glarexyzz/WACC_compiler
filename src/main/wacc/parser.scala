@@ -115,8 +115,8 @@ object parser {
         CharLiteral(charLiter) <|>
         StrLiteral(strLiter) <|>
         pairLiter.as(PairLiteral) <|>
+        atomic(arrayElem) <|>
         Identifier(ident) <|>
-        arrayElem <|>
         (softOp("(") *> expr <* softOp(")"))
 
     // Array element definition
@@ -231,7 +231,7 @@ object parser {
 
     // Left value definition
     private lazy val lValue: Parsley[LValue] = 
-        lName <|> lArray <|> lPair
+        atomic(lArray) <|> lName <|> lPair
 
     private lazy val lName: Parsley[LValue] = LValue.LName(ident)
     private lazy val lArray: Parsley[LValue] = LValue.LArray(arrayElem)
