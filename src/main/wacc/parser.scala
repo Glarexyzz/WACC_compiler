@@ -44,54 +44,6 @@ object parser {
         }
 
     }
-    /*
-       def parse[Err >: ParserError: ErrorBuilder](prog: String): Either[Err, Any] = {
-        val parsers: List[(String, Parsley[Any])] = List(
-            "Expression" -> fully(expr),
-            "Statement" -> fully(stmt),
-            "Function" -> fully(func),
-            "Program" -> fully(program)
-            
-        )
-        parsers.foldLeft(Option.empty[Either[Err, Any]]) {
-            case (Some(result), _) => Some(result) // Parsing succeeded!
-            case (None, (err, parser)) => 
-                parser.parse(prog) match {
-                    case parsley.Success(result) => Some(Right(result))
-                    case parsley.Failure(err) => Some(Left(err))
-                }
-        }.getOrElse{
-            Left(ParserError((1,1), "<input>", ParserErrorLines.SpecialisedError(Set("Unknown parsing Error"), 0)))
-        }
-
-    }
-        var firstMeaningfulError: Option[(String, String)] = None
-
-        var lastError: Option[(String, String)] = None 
-
-        parsers.foldLeft(Option.empty[Either[String, Any]]) {
-            case (Some(result), _) => Some(result) // If parsing succeeded, stop
-            case (None, (name, parser)) =>
-                parser.parse(prog) match {
-                    case parsley.Success(result) => 
-                        println(s" Success! Parsed as: $name")
-                        Some(Right(result))
-                    case parsley.Failure(msg)      => 
-                        if (!msg.contains("line 1, column 1") && firstMeaningfulError.isEmpty) {
-                            firstMeaningfulError = Some(name -> msg) // Store first meaningful error
-                        }
-                        lastError = Some(name -> msg)
-                        None // Try the next parser
-                }
-        }.getOrElse{
-            val (errorParser, detailedError) = 
-                firstMeaningfulError
-                .orElse(lastError)
-                .getOrElse("Unknown Parser" -> "Unknown parsing error")
-            Left(s"Parsing failed in [$errorParser]: $detailedError")
-        }
-    }
-}*/
 
 
     // Individual parsing functions

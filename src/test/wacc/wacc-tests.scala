@@ -25,25 +25,11 @@ trait WACCTestUtils {
     "read",
     "variables",
     "while")
+    To test all, use Set.empty[String]
   */
   
 trait WACCTestUtils {
-  val ignoredSubcategories =   Set (
-    "advanced",
-    "array",
-    "exit",
-    "expressions",
-    "function", "function/nested_functions", "function/simple_functions",
-    "literals",
-    "IO", "IO/print", "IO/read",
-    "multiple",
-    "pairs",
-    "print",
-    "runtimeErr", "runtimeErr/arrayOutOfBounds", "runtimeErr/nullDereference",
-    "scope",
-    "read",
-    "variables",
-    "while")
+  val ignoredSubcategories = Set.empty[String]
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {
     def collectWaccFiles(currentDir: File): List[File] = {
