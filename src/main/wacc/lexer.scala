@@ -64,23 +64,27 @@ object lexer {
 
     // Char & String
     val escapedChar: Parsley[Char] =
-        char('0') <|>
-        char('b') <|>
-        char('t') <|>
-        char('n') <|>
-        char('f') <|>
-        char('r') <|>
+        char('0').as('\u0000') <|>
+        char('b').as('\b') <|>
+        char('t').as('\t') <|>
+        char('n').as('\n') <|>
+        char('f').as('\f') <|>
+        char('r').as('\r') <|>
         char('\'') <|>
         char('"') <|>
         char('\\')
 
     val character: Parsley[Char] = 
-        satisfy(c => c != '\\' && c != '\'' && c != '"') <|>
-        char('\\') *> escapedChar
+        char('\\') *> escapedChar <|>
+        satisfy(c => c != '\\' && c != '\'' && c != '"') 
+        
     
-    val charLiter: Parsley[Char] = lexeme.character.ascii
+    val charLiter: Parsley[Char] = //lexeme.character.ascii
+        char('\'') *> character <* char('\'') <* lexer.space.whiteSpace
 
-    val strLiter: Parsley[String] = lexeme.string.ascii
+    val strLiter: Parsley[String] = //lexeme.string.ascii
+        (char('"') *> many(character) <* char('"'))
+        .map(_.mkString) <* lexer.space.whiteSpace
 
     // Null
     val pairLiter: Parsley[Unit] = lexeme.symbol("null")
