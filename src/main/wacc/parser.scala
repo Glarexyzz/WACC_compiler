@@ -10,7 +10,7 @@ import parsley.errors.ErrorBuilder
 import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
 
 object parser {
-    def parse(prog: String): Either[String, Any] = {
+    def parse[Err >: ParserError: ErrorBuilder](prog: String): Either[Err, Any] = {
         val parsers: List[(String, Parsley[Any])] = List(
             "Expression" -> fully(expr),
             "Statement" -> fully(stmt),
@@ -18,6 +18,19 @@ object parser {
             "Program" -> fully(program)
             
         )
+        parsers.foldLeft(Option.empty[Either[Err, Any]]) {
+            case (Some(result), _) => Some(result) // Parsing succeeded!
+            case (None, (err, parser)) => 
+                parser.parse(prog) match {
+                    case parsley.Success(result) => Some(Right(result))
+                    case parsley.Failure(err) => Some(Left(err))
+                }
+        }.getOrElse{
+            Left(ParserError((1,1), "<input>", ParserErrorLines.SpecialisedError(Set("Unknown parsing Error"), 0)))
+        }
+
+    }
+    /*
 
         var firstMeaningfulError: Option[(String, String)] = None
 
@@ -31,7 +44,7 @@ object parser {
                         println(s" Success! Parsed as: $name")
                         Some(Right(result))
                     case parsley.Failure(msg)      => 
-                        if (!msg.contains("column 1") && firstMeaningfulError.isEmpty) {
+                        if (!msg.contains("line 1, column 1") && firstMeaningfulError.isEmpty) {
                             firstMeaningfulError = Some(name -> msg) // Store first meaningful error
                         }
                         lastError = Some(name -> msg)
@@ -45,6 +58,7 @@ object parser {
             Left(s"Parsing failed in [$errorParser]: $detailedError")
         }
     }
+}*/
 
 
     // Individual parsing functions
