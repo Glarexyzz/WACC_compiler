@@ -20,7 +20,7 @@ object lexer {
                 "return", "exit", "print", "println", "then", "else",
                 "fi", "while", "do", "done", "newpair", "call", "fst",
                 "snd", "int", "bool", "char", "string", "pair", "null",
-                "true", "false"
+                "true", "false", ",", "(", ")", "[", "]"
             ),
             hardOperators = Set(
                 "!", "-", "len", "ord", "chr", "*", "/", "%", "+",
@@ -75,7 +75,6 @@ object lexer {
     val pairLiter: Parsley[Unit] = lexeme.symbol("null")
 
     val ident: Parsley[String] = lexeme.names.identifier
-        .filter((id: String) => !desc.symbolDesc.hardKeywords.contains(id))
 
 
     // Comments

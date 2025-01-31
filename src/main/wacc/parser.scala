@@ -2,7 +2,6 @@ package wacc
 
 import parsley.{Parsley}
 import parsley.expr.{precedence, Ops, InfixL, InfixN, InfixR, Prefix}
-import parsley.syntax.character.charLift
 import parsley.quick.*
 
 import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
@@ -12,11 +11,14 @@ object parser {
         val parsers: List[(String, Parsley[Any])] = List(
             "Expression" -> fully(expr),
             "Statement" -> fully(stmt),
-            "Program" -> fully(program),
-            "Function" -> fully(func)
+            "Function" -> fully(func),
+            "Program" -> fully(program)
+            
         )
 
-        var lastError: Option[String] = None // Store the last error encountered
+        var firstMeaningfulError: Option[(String, String)] = None
+
+        var lastError: Option[(String, String)] = None 
 
         parsers.foldLeft(Option.empty[Either[String, Any]]) {
             case (Some(result), _) => Some(result) // If parsing succeeded, stop
@@ -26,12 +28,18 @@ object parser {
                         println(s" Success! Parsed as: $name")
                         Some(Right(result))
                     case parsley.Failure(msg)      => 
-                        lastError = Some(msg)
+                        if (!msg.contains("column 1") && firstMeaningfulError.isEmpty) {
+                            firstMeaningfulError = Some(name -> msg) // Store first meaningful error
+                        }
+                        lastError = Some(name -> msg)
                         None // Try the next parser
                 }
         }.getOrElse{
-            val detailedError = lastError.getOrElse("Unknown parsing error")
-            Left(detailedError)
+            val (errorParser, detailedError) = 
+                firstMeaningfulError
+                .orElse(lastError)
+                .getOrElse("Unknown Parser" -> "Unknown parsing error")
+            Left(s"Parsing failed in [$errorParser]: $detailedError")
         }
     }
 
@@ -107,11 +115,11 @@ object parser {
         pairLiter.as(PairLiteral) <|>
         Identifier(ident) <|>
         arrayElem <|>
-        ('(' *> expr <* ')')
+        (symbol("(") *> expr <* symbol(")"))
 
     // Array element definition
     private lazy val arrayElem: Parsley[ArrayElem] =
-        ArrayElem(ident, some('[' *> expr <* ']'))
+        ArrayElem(ident, some(symbol("[") *> expr <* symbol("]")))
 
     // Expression definition
     private lazy val expr: Parsley[Expr] = 
@@ -129,7 +137,7 @@ object parser {
 
     // Type definition
     private lazy val typeParser: Parsley[Type] =
-        baseType <|> arrayType <|> pairType
+        baseType <|> pairType <|> arrayType 
 
     // Base type definition
     private lazy val baseType: Parsley[BaseType] = 
@@ -143,19 +151,19 @@ object parser {
     // Array type definition
     private lazy val arrayType: Parsley[ArrayType] =
         (baseType <|> pairType).flatMap { t =>
-            some('[' *> ']').map(_ => ArrayType(t))
+            some(symbol("[") *> symbol("]")).map(_ => ArrayType(t))
         }
 
     // Pair definition
     private lazy val pairType: Parsley[PairType] = 
         PairType(
-            (pairKeyword *> '(' *> pairElemType), 
-            (',' *> pairElemType <* ')')
+            (symbol("pair") *> symbol("(") *> pairElemType), 
+            (symbol(",") *> pairElemType <* symbol(")"))
         )
 
     // Pair element type definition
     private lazy val pairElemType: Parsley[PairElemType] = 
-        baseTElem <|> arrayTElem <|> pairKeyword
+        pairKeyword <|> baseTElem <|> arrayTElem  
 
     private lazy val baseTElem: Parsley[BaseTElem] =
         BaseTElem(baseType)
@@ -181,12 +189,12 @@ object parser {
         Func(  
             typeParser, 
             ident, 
-            ('(' *> option(paramList) <* ')'),
+            (symbol("(") *> option(paramList) <* symbol(")")),
             (symbol("is") *> stmt <* symbol("end"))
         )
     
     // ParamList definition
-    private lazy val paramList: Parsley[List[Param]] = sepBy1(param, ',')
+    private lazy val paramList: Parsley[List[Param]] = sepBy1(param, symbol(","))
     
 
     // Param definition
@@ -216,7 +224,7 @@ object parser {
     
     private lazy val stmt: Parsley[Stmt] = 
         precedence(stmtAtom)(
-            Ops(InfixN)(SeqStmt from symbol(";"))
+            Ops(InfixL)(SeqStmt from symbol(";"))
         )
 
     // Left value definition
@@ -239,18 +247,18 @@ object parser {
     private lazy val rArrayLiter: Parsley[RValue] = RValue.RArrayLiter(arrayLiter)
     private lazy val rNewPair: Parsley[RValue] = 
         RValue.RNewPair(
-            (symbol("newpair") *> '(' *> expr),
-            (',' *> expr <* ')')
+            (symbol("newpair") *> symbol("(") *> expr),
+            (symbol(",") *> expr <* symbol(")"))
         )
     private lazy val rPair: Parsley[RValue] = RValue.RPair(pairElem)
     private lazy val rCall: Parsley[RValue] = 
         RValue.RCall(
             (symbol("call") *> ident),
-            ('(' *> option(argList) <* ')')
+            (symbol("(") *> option(argList) <* symbol(")"))
         )
     
     // Argument list definition
-    private lazy val argList: Parsley[List[Expr]] = sepBy1(expr, ',')
+    private lazy val argList: Parsley[List[Expr]] = sepBy1(expr, symbol(","))
 
     // Pair elem definition
     private lazy val pairElem: Parsley[PairElem] = fstElem <|> sndElem
@@ -262,5 +270,5 @@ object parser {
 
     // ArrayLiter definition
     private lazy val arrayLiter: Parsley[ArrayLiter] =
-        ArrayLiter('[' *> option(argList) <* ']')
+        ArrayLiter(symbol("[") *> option(argList) <* symbol("]"))
 }
