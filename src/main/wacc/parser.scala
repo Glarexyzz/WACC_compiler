@@ -13,9 +13,9 @@ object parser {
     def parse[Err >: ParserError: ErrorBuilder](prog: String): Either[Err, Any] = {
         val parsers: List[(String, Parsley[Any])] = List(
             "Expression" -> fully(expr),
-            "Statement" -> fully(stmt),
-            "Function" -> fully(func),
-            "Program" -> fully(program)
+            "Statement"  -> fully(stmt),
+            "Function"   -> fully(func),
+            "Program"    -> fully(program)
             
         )
 
