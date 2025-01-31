@@ -139,7 +139,7 @@ object parser {
 
     // Type definition
     private lazy val typeParser: Parsley[Type] =
-        baseType <|> pairType <|> arrayType 
+        atomic(arrayType) <|> pairType <|> baseType 
 
     // Base type definition
     private lazy val baseType: Parsley[BaseType] = 
@@ -152,9 +152,9 @@ object parser {
 
     // Array type definition
     private lazy val arrayType: Parsley[ArrayType] =
-        (baseType <|> pairType).flatMap { t =>
-            some(symbol("[") *> symbol("]")).map(_ => ArrayType(t))
-        }
+        ArrayType(
+            (pairType <|> baseType) <* softOp("[") <* softOp("]")
+        )
 
     // Pair definition
     private lazy val pairType: Parsley[PairType] = 
