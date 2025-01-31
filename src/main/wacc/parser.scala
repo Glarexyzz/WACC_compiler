@@ -192,9 +192,36 @@ object parser {
             typeParser, 
             ident, 
             (softOp("(") *> option(paramList) <* softOp(")")),
-            (symbol("is") *> stmt <* symbol("end"))
+            (symbol("is") *> 
+                stmt.filter(returningBlock) <* 
+            symbol("end"))
         )
     
+    // Returning statement definition
+    private lazy val returningStmt: Parsley[Stmt] =
+        returnStmt <|> exitStmt <|> returningIfStmt
+    
+    private lazy val returnStmt: Parsley[Stmt] =
+        ReturnStmt(symbol("return") *> expr)
+
+    private lazy val exitStmt: Parsley[Stmt] =
+        ReturnStmt(symbol("exit") *> expr)
+
+    private lazy val returningIfStmt: Parsley[Stmt] =
+        IfStmt(
+            (symbol("if") *> expr), 
+            (symbol("then") *> returningStmt), 
+            (symbol("else") *> returningStmt <* symbol("fi"))
+        )
+
+    private def returningBlock(s: Stmt): Boolean = s match {
+        case ReturnStmt(_) | ExitStmt(_) => true  //  Return/Exit is valid
+        case IfStmt(_, thenStmt, elseStmt) => 
+            returningBlock(thenStmt) && returningBlock(elseStmt) 
+        case SeqStmt(_, lastStmt) => returningBlock(lastStmt) 
+        case _ => false  // Any other statement is invalid
+    }
+
     // ParamList definition
     private lazy val paramList: Parsley[List[Param]] = sepBy1(param, softOp(","))
     
@@ -209,10 +236,9 @@ object parser {
         AssignStmt(lValue, (softOp("=") *> rValue)) <|>
         ReadStmt(symbol("read") *> lValue) <|>
         FreeStmt(symbol("free") *> expr) <|>
-        ReturnStmt(symbol("return") *> expr) <|>
-        ExitStmt(symbol("exit") *> expr) <|>
         PrintStmt(symbol("print") *> expr) <|>
         PrintlnStmt(symbol("println") *> expr) <|>
+        atomic(returningStmt) <|>
         IfStmt(
             (symbol("if") *> expr), 
             (symbol("then") *> stmt), 
