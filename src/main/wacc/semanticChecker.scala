@@ -69,10 +69,16 @@ class SemanticChecker {
   }
 
   def areTypesCompatible(t1: Type, t2: Type): Boolean = (t1, t2) match {
-  case (ArrayType(BaseType.CharType), BaseType.StrType) => true // Weakening rule for char[] and string
-  case (BaseType.StrType, ArrayType(BaseType.CharType)) => false // String cannot be treated as char[]
-  case _ if t1 == t2 => true // Exact match
-  case _ => false  // return semantic error for false cases??
+    case (ArrayType(BaseType.CharType), BaseType.StrType) => true // Weakening rule for char[] and string
+    case (BaseType.StrType, ArrayType(BaseType.CharType)) => false // String cannot be treated as char[]
+    case _ if t1 == t2 => true // Exact match
+    case _ => false  // return semantic error for false cases??
+  }
+
+  def checkArrayElementType(elementType: Type): Boolean = elementType match {
+    case PairKeyword => false // Arrays cannot hold pairs
+    case _ => true
 }
+
 
 }
