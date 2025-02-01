@@ -68,12 +68,31 @@ class SemanticChecker {
     case _ => 
   }
 
+  
   def areTypesCompatible(t1: Type, t2: Type): Boolean = (t1, t2) match {
-    case (ArrayType(BaseType.CharType), BaseType.StrType) => true // Weakening rule for char[] and string
-    case (BaseType.StrType, ArrayType(BaseType.CharType)) => false // String cannot be treated as char[]
-    case _ if t1 == t2 => true // Exact match
-    case _ => false  // return semantic error for false cases??
+    // char[] can be treated as string
+    case (ArrayType(BaseType.CharType), BaseType.StrType) => true 
+    // string cannot be treated as char[]
+    case (BaseType.StrType, ArrayType(BaseType.CharType)) => false // string to char[] is not allowed
+    
+    // arrays with compatible inner types
+    case (ArrayType(innerType1), ArrayType(innerType2)) =>
+      areTypesCompatible(innerType1, innerType2) // recursively check if inner types are compatible
+
+    case (BaseType.IntType, BaseType.IntType) => true
+    case (BaseType.BoolType, BaseType.BoolType) => true
+    case (BaseType.CharType, BaseType.CharType) => true
+    case (BaseType.StrType, BaseType.StrType) => true
+
+    case (PairType(leftElem1 : Type, rightElem1 : Type), PairType(leftElem2 : Type, rightElem2 : Type)) =>
+      areTypesCompatible(leftElem1, leftElem2) && areTypesCompatible(rightElem1, rightElem2)
+
+    case _ => false
   }
+
+
+  
+
 
   def checkArrayElementType(elementType: Type): Boolean = elementType match {
     case PairKeyword => false // Arrays cannot hold pairs
