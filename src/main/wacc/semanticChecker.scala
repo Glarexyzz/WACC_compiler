@@ -3,26 +3,6 @@ import scala.collection.mutable
 
 case class SemanticError(message: String) extends Exception(message)
 
-class SemanticErrorBuilder {
-  def typeMismatch(expected: String, actual: String): SemanticError =
-    SemanticError(s"Type mismatch: expected $expected, got $actual")
-
-  def undeclaredVariable(name: String): SemanticError =
-    SemanticError(s"Undeclared variable: $name")
-
-  def duplicateDeclaration(name: String): SemanticError =
-    SemanticError(s"Duplicate declaration: $name")
-
-  def invalidFree(target: String): SemanticError =
-    SemanticError(s"Cannot free non-heap object of type $target")
-
-  def invalidOperator(op: String, t: String): SemanticError =
-    SemanticError(s"Invalid operator '$op' for type $t")
-
-  def invalidReturnType(expected: String, actual: String): SemanticError =
-    SemanticError(s"Invalid return type: expected $expected, got $actual")
-
-}
 
 sealed trait SymbolEntry
 
@@ -64,4 +44,35 @@ class SymbolTable {
   }
 
   def lookup(name: String): Option[SymbolEntry] = table.get(name)
+}
+
+class SemanticChecker {
+  
+  // Top-level check for the program
+  def checkProgram(program: Program): Unit = {
+    // Check function declarations
+    program.funcs.foreach(checkFunctionDeclaration)
+    
+    // Check the top-level statement (stmt)
+    checkStatement(program.stmt)
+  }
+
+  // Check function declarations
+  def checkFunctionDeclaration(func: Func): Unit = {
+    println(s"Checking function: ${func.name}")
+    // Example: Check function body (statements) for semantic errors
+    checkStatement(func.stmt)
+  }
+
+  def checkStatement(stmt: Stmt): Unit = stmt match {
+    case _ => 
+  }
+
+  def areTypesCompatible(t1: Type, t2: Type): Boolean = (t1, t2) match {
+  case (ArrayType(BaseType.CharType), BaseType.StrType) => true // Weakening rule for char[] and string
+  case (BaseType.StrType, ArrayType(BaseType.CharType)) => false // String cannot be treated as char[]
+  case _ if t1 == t2 => true // Exact match
+  case _ => false  // return semantic error for false cases??
+}
+
 }
