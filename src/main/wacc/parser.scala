@@ -68,7 +68,7 @@ object parser {
     val unaryOps: Parsley[UnaryOperator] =
         choice(
             symbol("!").as(UnaryOperator.Not),
-            symbol("-").as(UnaryOperator.Negate),
+            //symbol("-").as(UnaryOperator.Negate),
             symbol("len").as(UnaryOperator.Length),
             symbol("ord").as(UnaryOperator.Ord),
             symbol("chr").as(UnaryOperator.Chr)

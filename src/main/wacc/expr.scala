@@ -5,8 +5,8 @@ import parsley.generic
 sealed trait Expr
 
 
-case class IntLiteral(value: Long) extends Expr
-object IntLiteral extends generic.ParserBridge1[Long, Expr]
+case class IntLiteral(value: BigInt) extends Expr
+object IntLiteral extends generic.ParserBridge1[BigInt, Expr]
 
 case class BoolLiteral(value: Boolean) extends Expr
 object BoolLiteral extends generic.ParserBridge1[Boolean, Expr]

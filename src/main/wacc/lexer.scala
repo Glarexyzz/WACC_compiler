@@ -55,16 +55,7 @@ object lexer {
     // Numbers
     val digit: Parsley[Char] = digit                      // single digit '0'-'9'
     val intSign: Parsley[Char] = char('+') <|> char('-')  // '+' or '-'
-    val maxIntValue: Long = 2147483648
-    val minIntValue: Long = -2147483649
-    val intLiter: Parsley[Long] = 
-        lexeme.signed.decimal64.filter(
-            n => n <= maxIntValue && n > minIntValue 
-        ) 
-        // still fails the edge case :
-        // it should be -2147483648 <= n <= 2147483647
-        // but now it is:
-        // -2147483648 <= n <= 2147483648
+    val intLiter: Parsley[BigInt] = lexeme.signed.decimal32
     
     // Boolean
     val boolLiter: Parsley[Boolean] =
