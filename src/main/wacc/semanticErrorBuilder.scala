@@ -1,4 +1,5 @@
 package wacc
+import scala.collection.mutable
 
 case class SemanticError(message: String) extends Exception(message)
 
@@ -21,4 +22,46 @@ class SemanticErrorBuilder {
   def invalidReturnType(expected: String, actual: String): SemanticError =
     SemanticError(s"Invalid return type: expected $expected, got $actual")
 
+}
+
+sealed trait SymbolEntry
+
+case class VariableEntry(varType: String, scopeLevel: Int) extends SymbolEntry
+case class FunctionEntry(returnType: String, paramTypes: List[String]) extends SymbolEntry
+
+
+class SymbolTable {
+  private val table: mutable.Map[String, SymbolEntry] = mutable.Map()
+  private var scopeLevel: Int = 0
+
+  
+  def enterScope(): Unit = {
+    scopeLevel += 1
+  }
+
+  
+  def exitScope(): Unit = {
+    table.filterInPlace { case (_, entry) =>
+      entry match {
+        case VariableEntry(_, level) => level < scopeLevel
+        case _ => true
+      }
+    }
+    scopeLevel -= 1
+  }
+
+  
+  def addVariable(name: String, varType: String): Boolean = {
+    if (table.contains(name)) return false 
+    table(name) = VariableEntry(varType, scopeLevel)
+    true
+  }
+
+  def addFunction(name: String, returnType: String, paramTypes: List[String]): Boolean = {
+    if (table.contains(name)) return false
+    table(name) = FunctionEntry(returnType, paramTypes)
+    true
+  }
+
+  def lookup(name: String): Option[SymbolEntry] = table.get(name)
 }
