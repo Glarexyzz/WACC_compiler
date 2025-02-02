@@ -22,6 +22,7 @@ case object PairLiteral extends Expr
 case class Identifier(name: String) extends Expr
 object Identifier extends generic.ParserBridge1[String, Expr]
 
+// <ident> ('[ <expr> ']')+
 case class ArrayElem(name: String, indices: List[Expr]) extends Expr
 object ArrayElem extends generic.ParserBridge2[String, List[Expr], ArrayElem]
 

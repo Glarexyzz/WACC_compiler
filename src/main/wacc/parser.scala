@@ -117,7 +117,12 @@ object parser {
         pairLiter.as(PairLiteral) <|>
         atomic(arrayElem) <|>
         Identifier(ident) <|>
+<<<<<<< Updated upstream
         (softOp("(") *> expr <* softOp(")"))
+=======
+        arrayElem <|>
+        (symbol("(") *> expr <* symbol(")").label("closing bracket").explain("missing closing bracket"))
+>>>>>>> Stashed changes
 
     // Array element definition
     private lazy val arrayElem: Parsley[ArrayElem] =
@@ -126,13 +131,13 @@ object parser {
     // Expression definition
     private lazy val expr: Parsley[Expr] = 
         precedence(atom)(
-            Ops(Prefix)(unaryOps.map(op => (expr: Expr) => UnaryOp(op, expr))),
-            Ops(InfixL)(mulOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))),
-            Ops(InfixL)(addOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))),
-            Ops(InfixN)(relOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))),
-            Ops(InfixN)(eqOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))),
-            Ops(InfixR)(andOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))),
-            Ops(InfixR)(orOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right)))
+            Ops(Prefix)(unaryOps.map(op => (expr: Expr) => UnaryOp(op, expr))), // '!' | '-' | 'len' | 'ord' | 'chr'
+            Ops(InfixL)(mulOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))), // '*' | '/' | '%'
+            Ops(InfixL)(addOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))), // '+' | '-'
+            Ops(InfixN)(relOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))), // '>' | '>=' | '<' | '<='
+            Ops(InfixN)(eqOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))),  // '==' | '!='
+            Ops(InfixR)(andOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))), // '&&'
+            Ops(InfixR)(orOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right)))   // '||'
         )
     
     // Types
