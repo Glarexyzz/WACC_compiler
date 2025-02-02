@@ -43,13 +43,9 @@ object lexer {
     val lexeme = lexer.lexeme // For parser to use lexeme
 
     // Numbers
-    val digit: Parsley[Char] = digit                      // single digit '0'-'9'
-    val intSign: Parsley[Char] = char('+') <|> char('-')  // '+' or '-'
-<<<<<<< Updated upstream
-    val intLiter: Parsley[BigInt] = lexeme.signed.decimal32
-=======
-    val intLiter: Parsley[BigInt] = lexeme.signed.decimal // intSign with digits
->>>>>>> Stashed changes
+    val digit: Parsley[Char] = digit                        // single digit '0'-'9'
+    val intSign: Parsley[Char] = char('+') <|> char('-')    // '+' or '-'
+    val intLiter: Parsley[BigInt] = lexeme.signed.decimal32 // intSign with digits
     
     // Boolean
     val boolLiter: Parsley[Boolean] =                     // 'true' or 'false'
@@ -57,29 +53,18 @@ object lexer {
         lexeme.symbol("false").map(_ => false)
 
     // Char & String
-<<<<<<< Updated upstream
     val escapedChar: Parsley[Char] =
-        char('0').as('\u0000') <|>
+        char('0').as('\u0000') <|> // '0', 'b', 't', 'n', 'f', 'r', '\'', '"', '\\'
         char('b').as('\b') <|>
         char('t').as('\t') <|>
         char('n').as('\n') <|>
         char('f').as('\f') <|>
         char('r').as('\r') <|>
-=======
-    val escapedChar: Parsley[Char] =              // '0', 'b', 't', 'n', 'f', 'r', '\'', '"', '\\'
-        char('0') <|>
-        char('b') <|>
-        char('t') <|>
-        char('n') <|>
-        char('f') <|>
-        char('r') <|>
->>>>>>> Stashed changes
         char('\'') <|>
         char('"') <|>
         char('\\')
 
-<<<<<<< Updated upstream
-    val character: Parsley[Char] = 
+    val character: Parsley[Char] = // any ACSII character except '\', ''' and '"' or '\'escapedChar
         char('\\') *> escapedChar <|>
         satisfy(c => c != '\\' && c != '\'' && c != '"') 
         
@@ -91,15 +76,6 @@ object lexer {
     val strLiter: Parsley[String] = //lexeme.string.ascii
         (char('"') *> many(character) <* char('"'))
         .map(_.mkString) <* lexer.space.whiteSpace
-=======
-    val character: Parsley[Char] =                // any ACSII character except '\', ''' and '"' or '\'escapedChar
-        satisfy(c => c != '\\' && c != '\'' && c != '"') <|>
-        char('\\') *> escapedChar
-    
-    val charLiter: Parsley[Char] = lexeme.character.ascii // ''' character '''
-
-    val strLiter: Parsley[String] =lexeme.string.ascii    // '"' character '"'
->>>>>>> Stashed changes
 
     // Null
     val pairLiter: Parsley[Unit] = lexeme.symbol("null")  // 'null'

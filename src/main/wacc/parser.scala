@@ -6,6 +6,7 @@ import parsley.quick.*
 
 // for testing
 import parsley.errors.ErrorBuilder
+import parsley.errors.combinator.ErrorMethods
 
 import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
 
@@ -68,7 +69,7 @@ object parser {
     val unaryOps: Parsley[UnaryOperator] =
         choice(
             symbol("!").as(UnaryOperator.Not),
-            //symbol("-").as(UnaryOperator.Negate),
+            symbol("-").as(UnaryOperator.Negate),
             symbol("len").as(UnaryOperator.Length),
             symbol("ord").as(UnaryOperator.Ord),
             symbol("chr").as(UnaryOperator.Chr)
@@ -117,12 +118,7 @@ object parser {
         pairLiter.as(PairLiteral) <|>
         atomic(arrayElem) <|>
         Identifier(ident) <|>
-<<<<<<< Updated upstream
-        (softOp("(") *> expr <* softOp(")"))
-=======
-        arrayElem <|>
-        (symbol("(") *> expr <* symbol(")").label("closing bracket").explain("missing closing bracket"))
->>>>>>> Stashed changes
+        (softOp("(") *> expr <* softOp(")").label("closing bracket").explain("missing closing bracket"))
 
     // Array element definition
     private lazy val arrayElem: Parsley[ArrayElem] =
