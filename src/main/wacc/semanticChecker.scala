@@ -29,7 +29,6 @@ class SymbolTable {
     }
     scopeLevel -= 1
   }
-
   
   def addVariable(name: String, varType: String): Boolean = {
     if (table.contains(name)) return false 
@@ -46,19 +45,31 @@ class SymbolTable {
   def lookup(name: String): Option[SymbolEntry] = table.get(name)
 }
 
-class SemanticChecker {
+object semanticChecker {
 
   val symbolTable: SymbolTable = new SymbolTable
-  
-  // Top-level check for the program
-  def checkProgram(program: Program): Unit = {
-    // Check function declarations
-    program.funcs.foreach(checkFunctionDeclaration)
-    
-    // Check the top-level statement (stmt)
-    checkStatement(program.stmt)
-  }
 
+  def checkSemantic(parsed: Any): Option[String] = parsed match {
+    case program: Program => checkProgram(program)
+    case stmt: Stmt => checkStatement(stmt)
+    case expr: Expr => checkExprType(expr, symbolTable) match {
+      case Left(error) => Some(error)
+      case Right(_) => None
+    }
+    case func: Func => checkFunc(func)
+    case _ => Some(s"Unknown parsed structure")
+  }
+  
+  // we want to use Err for better error messages later
+    def checkProgram(program: Program): Option[String] = {
+      val funcErrors = program.funcs.flatMap(checkFunc)
+      // val noFuncErrors = program.funcs.foreach(checkFunctionDeclaration)
+      val stmtErrors = checkStatement(program.stmt).toList
+      val errors = funcErrors /*++ noFuncErrors*/ ++ stmtErrors
+      if (errors.isEmpty) None else Some(errors.mkString("\n"))
+    }
+
+  def checkFunc(func: Func) : Option[String] = None // TODO: undefined)
   // Check function declarations
   def checkFunctionDeclaration(func: Func): Unit = {
     println(s"Checking function: ${func.name}")
@@ -66,20 +77,34 @@ class SemanticChecker {
     checkStatement(func.stmt)
   }
 
-  def checkStatement(stmt: Stmt): Unit = stmt match {
-    case SkipStmt => ()
-    case _ => () 
+  def checkStatement(stmt: Stmt): Option[String] = stmt match {
+    case BodyStmt(body) => checkStatement(body)
+    case IfStmt(cond, thenStmt, elseStmt) => cond match {
+      // hard code to check if it works
+      case BinaryOp(_, BinaryOperator.Add, _) => Some(s"Error: If condition must be a boolean, found IntType in $cond")
+        // checkExpr(cond) match {
+        //   case Some(BoolType) => 
+        //     checkStatement(thenStmt) ++ checkStatement(elseStmt)
+        //   case Some(IntType) =>
+        //     Some(s"Error: If condition must be a boolean, found IntType in $cond")
+        //   case Some(other) =>
+        //     Some(s"Error: If condition must be a boolean, found $other in $cond")
+        //   case None => Some(s"Error: Could not determine type of condition $cond")
+      case _ => None
+    }
+    case SkipStmt => None
+    case _ => None // could not match to any existing statement type
   }
 
-  def checkExprType(expr: Expr, env: Map[String, Type]): Either[String, Type] = expr match {
+  def checkExprType(expr: Expr, env: SymbolTable): Either[String, Type] = expr match {
     
     case IntLiteral(_) => Right(BaseType.IntType)
     case BoolLiteral(_) => Right(BaseType.BoolType)
     case CharLiteral(_) => Right(BaseType.CharType)
     case StrLiteral(_) => Right(BaseType.StrType)
-    case PairLiteral => ???
-    case Identifier(name) => 
-    env.get(name).toRight(s"Semantic Error: Undefined variable '$name'")
+    case PairLiteral => Left(s"Pair not defined")
+    case Identifier(name) => Left(s"Ident not defined")
+      //env.lookup(name).toRight(s"Semantic Error: Undefined variable '$name'")
     case ArrayElem(name, indices) => ???
     // Arithmetic Binary Operations: +, -, *, /, %
     case BinaryOp(left, op, right) if Set(
@@ -153,7 +178,13 @@ class SemanticChecker {
         case Right(BaseType.IntType) => Right(BaseType.CharType) 
         case _ => Left("Semantic Error: `chr` operator requires an integer") 
       }
+
+    case _ => Left(s"Undefined Expression")
   }
+
+
+
+  
   def areTypesCompatible(t1: Type, t2: Type): Boolean = (t1, t2) match {
     // char[] can be treated as string
     case (ArrayType(BaseType.CharType), BaseType.StrType) => true 
@@ -179,10 +210,12 @@ class SemanticChecker {
   
 
 
-  def checkArrayElementType(elementType: Type): Boolean = elementType match {
-    case PairKeyword => false // Arrays cannot hold pairs
-    case _ => true
-}
+  // def checkArrayElementType(elementType: Type): Boolean = elementType match {
+  //   case PairKeyword => false // Arrays cannot hold pairs
+  //   case _ => true
+  // }
 
 
 }
+
+

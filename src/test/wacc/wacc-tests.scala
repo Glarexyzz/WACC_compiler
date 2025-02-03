@@ -25,17 +25,17 @@ trait WACCTestUtils {
     "read",
     "variables",
     "while")
+    To test all, use Set.empty[String]
   */
   
 trait WACCTestUtils {
-  val ignoredSubcategories =   Set (
+  val ignoredSubcategories = Set (
     "advanced",
     "array",
     "basic", "basic/exit", "basic/skip",
     "exit",
     "expressions",
-    "function/nested_functions", "function/simple_functions",
-    "if",
+    "function", "function/nested_functions", "function/simple_functions",
     "literals",
     "IO", "IO/print", "IO/read",
     "multiple",

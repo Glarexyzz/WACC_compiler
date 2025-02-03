@@ -11,15 +11,21 @@ def main(args: Array[String]): Unit = {
             println(input)
             val prog = Source.fromFile(input).mkString
             val result = parser.parse(prog) // Call the central parse function
+            // put a wrapper around parsed to check semantic
             result match {
                 case Right(parsed) =>
-                    println(s"Successfully parsed:\n$parsed")
-                    exitCode = exitValid
+                    semanticChecker.checkSemantic(parsed) match {
+                        case Some(errors) => 
+                            println(s"Semantic errors found:\n$errors")
+                            exitCode = exitInvalidSemantics
+                        case None => 
+                            println(s"Successfully parsed:\n$parsed")
+                            exitCode = exitValid
+                    }
                 case Left(error) =>
                     println(s"Parsing failed: $error")
                     exitCode = exitInvalidSyntax
             }
-            
     }
     System.exit(exitCode)
 }
