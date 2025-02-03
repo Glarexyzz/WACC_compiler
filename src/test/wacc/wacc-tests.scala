@@ -29,7 +29,7 @@ trait WACCTestUtils {
   */
   
 trait WACCTestUtils {
-  val ignoredSubcategories = Set ("runtimeErr/integerOverflow", "literals")
+  val ignoredSubcategories = Set.empty[String]
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {
     def collectWaccFiles(currentDir: File): List[File] = {
