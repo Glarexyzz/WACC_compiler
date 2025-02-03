@@ -68,7 +68,7 @@ trait WACCTestUtils {
     val process = Process(command)
     val exitValue = process.!
     exitValue
-  }
+  } 
 }
 
 class ValidTest extends AnyFlatSpec with Matchers with WACCTestUtils {
