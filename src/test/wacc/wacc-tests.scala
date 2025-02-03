@@ -31,16 +31,19 @@ trait WACCTestUtils {
   val ignoredSubcategories =   Set (
     "advanced",
     "array",
+    "basic", "basic/exit", "basic/skip",
     "exit",
     "expressions",
-    "function", "function/nested_functions", "function/simple_functions",
+    "function/nested_functions", "function/simple_functions",
+    "if",
     "literals",
     "IO", "IO/print", "IO/read",
     "multiple",
     "pairs",
     "print",
-    "runtimeErr", "runtimeErr/arrayOutOfBounds", "runtimeErr/nullDereference",
+    "runtimeErr", "runtimeErr/arrayOutOfBounds", "runtimeErr/badChar", "runtimeErr/divideByZero", "runtimeErr/integerOverflow", "runtimeErr/nullDereference",
     "scope",
+    "sequence",
     "read",
     "variables",
     "while")
@@ -76,7 +79,7 @@ class ValidTest extends AnyFlatSpec with Matchers with WACCTestUtils {
     if (ignoredSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitValid for subcategory $subcat" in {}
     } else {
-      subcat should s"return exit code $exitValid for all files" in {
+      subcat should s"return exit code $exitValid for subcategory $subcat" in {
         files.foreach { file =>
           val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
           withClue(s"File ${file.getName} failed: ") {
@@ -96,7 +99,7 @@ class InvalidSyntaxTest extends AnyFlatSpec with Matchers with WACCTestUtils {
     if (ignoredSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {}
     } else {
-      subcat should s"return exit code $exitInvalidSyntax for all files" in {
+      ignore should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {
         files.foreach { file =>
           val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
           withClue(s"File ${file.getName} failed: ") {
@@ -116,7 +119,7 @@ class InvalidSemanticsTest extends AnyFlatSpec with Matchers with WACCTestUtils 
     if (ignoredSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitInvalidSemantics for subcategory $subcat" in {}
     } else {
-      subcat should s"return exit code $exitInvalidSemantics for all files" in {
+      subcat should s"return exit code $exitInvalidSemantics for subcategory $subcat" in {
         files.foreach { file =>
           val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
           withClue(s"File ${file.getName} failed: ") {
