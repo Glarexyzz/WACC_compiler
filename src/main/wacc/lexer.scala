@@ -66,7 +66,16 @@ object lexer {
 
     val character: Parsley[Char] = // any ACSII character except '\', ''' and '"' or '\'escapedChar
         char('\\') *> escapedChar <|>
-        satisfy(c => c != '\\' && c != '\'' && c != '"') 
+        satisfy(
+            c => 
+            c != '\\' && 
+            c != '\'' &&
+            c != '"' && 
+            c != '\n' && 
+            c != '\r' &&
+            c >= 0x00.toChar &&
+            c <= 0x7F.toChar
+        ) 
         
     
     val charLiter: Parsley[Char] = //lexeme.character.ascii
