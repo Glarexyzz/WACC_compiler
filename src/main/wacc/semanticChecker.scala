@@ -71,7 +71,7 @@ class SemanticChecker {
     case _ => () 
   }
 
-  def checkExpr(expr: Expr, env: Map[String, Type]): Either[String, Type] = expr match {
+  def checkExprType(expr: Expr, env: Map[String, Type]): Either[String, Type] = expr match {
     
     case IntLiteral(_) => Right(BaseType.IntType)
     case BoolLiteral(_) => Right(BaseType.BoolType)
@@ -89,7 +89,7 @@ class SemanticChecker {
       BinaryOperator.Divide,
       BinaryOperator.Modulus
     ).contains(op) =>
-      (checkExpr(left, env), checkExpr(right, env)) match {
+      (checkExprType(left, env), checkExprType(right, env)) match {
         case (Right(BaseType.IntType), Right(BaseType.IntType)) => Right(BaseType.IntType) 
         case _ => Left("Semantic Error: Incompatible types for arithmetic operation") 
       }
@@ -100,7 +100,7 @@ class SemanticChecker {
       BinaryOperator.Less,
       BinaryOperator.LessEqual,
     ).contains(op) =>
-      (checkExpr(left, env), checkExpr(right, env)) match {
+      (checkExprType(left, env), checkExprType(right, env)) match {
         case (Right(BaseType.IntType), Right(BaseType.IntType)) => Right(BaseType.BoolType) 
         case (Right(BaseType.CharType), Right(BaseType.CharType)) => Right(BaseType.BoolType) 
         case _ => Left("Semantic Error: Incompatible types for comparison operation") 
@@ -110,7 +110,7 @@ class SemanticChecker {
       BinaryOperator.Equal,
       BinaryOperator.NotEqual
     ).contains(op) =>
-      (checkExpr(left, env), checkExpr(right, env)) match {
+      (checkExprType(left, env), checkExprType(right, env)) match {
         case (Right(t1), Right(t2)) if areTypesCompatible(t1, t2) => Right(BaseType.BoolType) 
         case _ => Left("Semantic Error: Incompatible types for equality comparison") 
       }
@@ -118,38 +118,38 @@ class SemanticChecker {
       BinaryOperator.And,
       BinaryOperator.Or
     ).contains(op) =>
-      (checkExpr(left, env), checkExpr(right, env)) match {
+      (checkExprType(left, env), checkExprType(right, env)) match {
         case (Right(BaseType.BoolType), Right(BaseType.BoolType)) => Right(BaseType.BoolType) 
         case _ => Left("Semantic Error: Logical operators require boolean operands") 
     }
 
     // Unary Operators: !, -, len, ord, chr
     case UnaryOp(UnaryOperator.Not, expr) =>
-      checkExpr(expr, env) match {
+      checkExprType(expr, env) match {
         case Right(BaseType.BoolType) => Right(BaseType.BoolType) 
         case _ => Left("Semantic Error: `!` operator requires a boolean operand") 
       }
 
     case UnaryOp(UnaryOperator.Negate, expr) =>
-      checkExpr(expr, env) match {
+      checkExprType(expr, env) match {
         case Right(BaseType.IntType) => Right(BaseType.IntType) 
         case _ => Left("Semantic Error: `-` operator requires an integer operand") 
       }
 
     case UnaryOp(UnaryOperator.Length, expr) =>
-      checkExpr(expr, env) match {
+      checkExprType(expr, env) match {
         case Right(ArrayType(_)) => Right(BaseType.IntType) 
         case _ => Left("Semantic Error: `len` operator requires an array")
       }
 
     case UnaryOp(UnaryOperator.Ord, expr) =>
-      checkExpr(expr, env) match {
+      checkExprType(expr, env) match {
         case Right(BaseType.CharType) => Right(BaseType.IntType) 
         case _ => Left("Semantic Error: `ord` operator requires a character") 
       }
 
     case UnaryOp(UnaryOperator.Chr, expr) =>
-      checkExpr(expr, env) match {
+      checkExprType(expr, env) match {
         case Right(BaseType.IntType) => Right(BaseType.CharType) 
         case _ => Left("Semantic Error: `chr` operator requires an integer") 
       }
