@@ -46,17 +46,27 @@ class SymbolTable {
   def lookup(name: String): Option[SymbolEntry] = table.get(name)
 }
 
-class SemanticChecker {
-  
-  // Top-level check for the program
-  def checkProgram(program: Program): Unit = {
-    // Check function declarations
-    program.funcs.foreach(checkFunctionDeclaration)
-    
-    // Check the top-level statement (stmt)
-    checkStatement(program.stmt)
-  }
+object semanticChecker {
 
+
+  def checkSemantic(parsed: Any): Option[String] = parsed match {
+    case program: Program => checkProgram(program)
+    case stmt: Stmt => checkStatement(stmt)
+    case expr: Expr => checkExpr(expr)
+    case func: Func => checkFunc(func)
+    case _ => Some(s"Unknown parsed structure")
+  }
+  
+  // we want to use Err for better error messages later
+    def checkProgram(program: Program): Option[String] = {
+      val funcErrors = program.funcs.flatMap(checkFunc)
+      // val noFuncErrors = program.funcs.foreach(checkFunctionDeclaration)
+      val stmtErrors = checkStatement(program.stmt).toList
+      val errors = funcErrors /*++ noFuncErrors*/ ++ stmtErrors
+      if (errors.isEmpty) None else Some(errors.mkString("\n"))
+    }
+
+  def checkFunc(func: Func) : Option[String] = ???
   // Check function declarations
   def checkFunctionDeclaration(func: Func): Unit = {
     println(s"Checking function: ${func.name}")
@@ -64,9 +74,26 @@ class SemanticChecker {
     checkStatement(func.stmt)
   }
 
-  def checkStatement(stmt: Stmt): Unit = stmt match {
-    case _ => 
+  def checkStatement(stmt: Stmt): Option[String] = stmt match {
+    case BodyStmt(body) => checkStatement(body)
+    case IfStmt(cond, thenStmt, elseStmt) => cond match {
+      // hard code to check if it works
+      case BinaryOp(_, BinaryOperator.Add, _) => Some(s"Error: If condition must be a boolean, found IntType in $cond")
+        // checkExpr(cond) match {
+        //   case Some(BoolType) => 
+        //     checkStatement(thenStmt) ++ checkStatement(elseStmt)
+        //   case Some(IntType) =>
+        //     Some(s"Error: If condition must be a boolean, found IntType in $cond")
+        //   case Some(other) =>
+        //     Some(s"Error: If condition must be a boolean, found $other in $cond")
+        //   case None => Some(s"Error: Could not determine type of condition $cond")
+      case _ => None
+    }
+    case SkipStmt => None
+    case _ => None // could not match to any existing statement type
   }
+
+  def checkExpr(expr: Expr): Option[String] = None // undefined
 
   
   def areTypesCompatible(t1: Type, t2: Type): Boolean = (t1, t2) match {
@@ -94,10 +121,12 @@ class SemanticChecker {
   
 
 
-  def checkArrayElementType(elementType: Type): Boolean = elementType match {
-    case PairKeyword => false // Arrays cannot hold pairs
-    case _ => true
-}
+  // def checkArrayElementType(elementType: Type): Boolean = elementType match {
+  //   case PairKeyword => false // Arrays cannot hold pairs
+  //   case _ => true
+  // }
 
 
 }
+
+

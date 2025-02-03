@@ -14,13 +14,17 @@ def main(args: Array[String]): Unit = {
             // put a wrapper around parsed to check semantic
             result match {
                 case Right(parsed) =>
-                    println(s"Successfully parsed:\n$parsed")
-                    exitCode = exitValid
+                    semanticChecker.checkSemantic(parsed) match {
+                        case Some(errors) => 
+                            println(s"Semantic errors found:\n$errors")
+                            exitCode = exitInvalidSemantics
+                        case None => 
+                            println(s"Successfully parsed:\n$parsed")
+                    }
                 case Left(error) =>
                     println(s"Parsing failed: $error")
                     exitCode = exitInvalidSyntax
             }
-            
     }
     System.exit(exitCode)
 }
