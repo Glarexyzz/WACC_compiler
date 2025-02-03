@@ -47,6 +47,8 @@ class SymbolTable {
 }
 
 class SemanticChecker {
+
+  val symbolTable: SymbolTable = new SymbolTable
   
   // Top-level check for the program
   def checkProgram(program: Program): Unit = {
@@ -65,7 +67,8 @@ class SemanticChecker {
   }
 
   def checkStatement(stmt: Stmt): Unit = stmt match {
-    case _ => 
+    case SkipStmt => ()
+    case _ => () 
   }
 
   
