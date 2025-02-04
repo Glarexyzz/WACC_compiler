@@ -7,7 +7,7 @@ case class SemanticError(message: String) extends Exception(message)
 sealed trait SymbolEntry
 
 case class VariableEntry(varType: Type) extends SymbolEntry
-case class FunctionEntry(returnType: Type, paramTypes: Option[List[Param]]) extends SymbolEntry
+case class FunctionEntry(returnType: Type, params: Option[List[Param]]) extends SymbolEntry
 
 
 class SymbolTable {
@@ -19,6 +19,7 @@ class SymbolTable {
   //private val variableScopes: mutable.Map[String, mutable.Stack[VariableEntry]] = mutable.Map()
   private val variableScopes: mutable.Stack[mutable.Map[String, VariableEntry]] = mutable.Stack()
   private var scopeLevel: Int = 0 // Tracks current scope depth
+  private var functionStatus: Option[Type] = None // Tracks the return type of the current function
 
   
   def enterScope(): Unit = {
@@ -86,6 +87,12 @@ class SymbolTable {
     lookupVariable(name).orElse(lookupFunction(name))
   }
 
+  def setFunctionStatus(t: Option[Type]): Unit = {
+    functionStatus = t
+  }
+
+  def checkFunctionStatus(): Option[Type] = functionStatus
+  
 }
 
 object semanticChecker {
@@ -115,10 +122,12 @@ object semanticChecker {
   def checkFunc(func: Func) : Option[String] =  {
     symbolTable.enterScope()
     symbolTable.addFunction(func.name, func.t, func.paramList)
+    symbolTable.setFunctionStatus(Some(func.t))
     checkStatement(func.stmt)
     // Check function declarations
     // def checkFunctionDeclaration(func: Func): Unit = {
     //   println(s"Checking function: ${func.name}")
+    symbolTable.setFunctionStatus(None) 
     symbolTable.exitScope()
     None
   }
@@ -135,12 +144,6 @@ object semanticChecker {
           if (can_add_if_no_duplicate) None
           else Some(s"Semantic Error in Declaration: Variable $name is already declared")
       }
-      
-//   begin
-// 	 int a=13;
-//   if a==13then a=1else a=0fi;
-//   println a
-//   end
 
     case AssignStmt(lvalue, rvalue) => 
       (checkLValue(lvalue), checkRValue(rvalue)) match {
@@ -180,9 +183,15 @@ object semanticChecker {
       }
 
     // 'read' <lValue>
-    case ReadStmt(value) => checkExprType(value, symbolTable) match {
-      case Left(error) => Some(error)
-      case Right(_) => None
+    // must be either type int or type char
+    case ReadStmt(lvalue) => lvalue match {
+      case LValue.LName(name) => symbolTable.lookup(name) match {
+        case Some(VariableEntry(BaseType.IntType)) => None
+        case Some(VariableEntry(BaseType.CharType)) => None
+        case Some(_) => Some(s"Semantic Error: Variable $name must be of type int or char")
+        case None => Some(s"Semantic Error: Variable $name not declared")
+      }
+      case _ => Some("Semantic Error: Invalid lvalue in read statement")
     }
 
     // 'free' <expr>
@@ -200,10 +209,10 @@ object semanticChecker {
       checkExprType(expr, symbolTable) match {
         case Left(error) => Some(error)
         case Right(retType) =>
-          symbolTable.lookup("currFunction") match { // keep track of function 
-            case Some(FunctionEntry(expectedRetType, _)) if areTypesCompatible(retType, expectedRetType) => None
-            case Some(FunctionEntry(expectedRetType, _)) => Some(s"Semantic Error: Return type mismatch. Expected $expectedRetType, found $retType.")
-            case _ => Some("Semantic Error: `return` statement is not allowed in the main program")
+          symbolTable.checkFunctionStatus() match {
+            case Some(funcType) if areTypesCompatible(funcType, retType) => None
+            case Some(funcType) => Some(s"Semantic Error: Incompatible return type, expected $funcType, found $retType")
+            case None => Some("Semantic Error: Return statement must be inside a function")
           }
       }
 
