@@ -6,43 +6,86 @@ case class SemanticError(message: String) extends Exception(message)
 
 sealed trait SymbolEntry
 
-case class VariableEntry(varType: Type, scopeLevel: Int) extends SymbolEntry
-case class FunctionEntry(returnType: Type, paramTypes: List[String]) extends SymbolEntry
+case class VariableEntry(varType: Type) extends SymbolEntry
+case class FunctionEntry(returnType: Type, paramTypes: Option[List[Param]]) extends SymbolEntry
 
 
 class SymbolTable {
-  private val table: mutable.Map[String, SymbolEntry] = mutable.Map()
-  private var scopeLevel: Int = 0
+  //private val table: mutable.Map[String, mutable.Stack[SymbolEntry]] = mutable.Map()
+
+  // Table to store symbol entries. 
+  // Variables are stored in a mutable Stack (to handle scopes), while functions are stored directly.
+  private val functionTable: mutable.Map[String, FunctionEntry] = mutable.Map()
+  //private val variableScopes: mutable.Map[String, mutable.Stack[VariableEntry]] = mutable.Map()
+  private val variableScopes: mutable.Stack[mutable.Map[String, VariableEntry]] = mutable.Stack()
+  private var scopeLevel: Int = 0 // Tracks current scope depth
 
   
   def enterScope(): Unit = {
     scopeLevel += 1
+    variableScopes.push(mutable.Map())  
   }
 
-  
+  /*
   def exitScope(): Unit = {
-    table.filterInPlace { case (_, entry) =>
-      entry match {
-        case VariableEntry(_, level) => level < scopeLevel
-        case _ => true
+    // Remove all variables/functions declared at current scope level
+    table.keys.foreach { key =>
+      if (table(key).size > scopeLevel) {
+        table(key).pop()
       }
+      if (table(key).isEmpty) table.remove(key) // Clean up empty entries
     }
     scopeLevel -= 1
   }
+  */
+
+  def exitScope(): Unit = {
+    if (scopeLevel > 0) {
+      variableScopes.pop()
+      scopeLevel -= 1
+    }
+  }
   
   def addVariable(name: String, varType: Type): Boolean = {
-    if (table.contains(name)) return false 
-    table(name) = VariableEntry(varType, scopeLevel)
-    true
+    // val entries = variableScopes.getOrElseUpdate(name, mutable.Stack())
+    // // Add the variable to the current scope
+    // entries.push(VariableEntry(varType))
+    // true
+    if (variableScopes.nonEmpty) {
+      val currentScope = variableScopes.top // Get current scope
+      if (currentScope.contains(name)) {
+        return false // Variable already declared in this scope
+      }
+      currentScope(name) = VariableEntry(varType) // Add variable
+      return true
+    }
+    false // No active scope
   }
 
-  def addFunction(name: String, returnType: Type, paramTypes: List[String]): Boolean = {
-    if (table.contains(name)) return false
-    table(name) = FunctionEntry(returnType, paramTypes)
+
+  def addFunction(name: String, returnType: Type, params: Option[List[Param]]): Boolean = {
+    // Check if the function already exists in the table
+    if (functionTable.contains(name)) return false
+    // Add the function entry
+    val functionEntry = FunctionEntry(returnType, params)
+    functionTable(name) = functionEntry
     true
   }
+  def lookupVariable(name: String): Option[VariableEntry] = {
+    variableScopes.reverseIterator.collectFirst {
+      case scope if scope.contains(name) => scope(name)
+    }
+  }
+  
 
-  def lookup(name: String): Option[SymbolEntry] = table.get(name)
+  def lookupFunction(name: String): Option[FunctionEntry] = {
+    functionTable.get(name)
+  }
+
+  def lookup(name: String): Option[SymbolEntry] = {
+    lookupVariable(name).orElse(lookupFunction(name))
+  }
+
 }
 
 object semanticChecker {
@@ -60,7 +103,7 @@ object semanticChecker {
     case _ => Some(s"Unknown parsed structure")
   }
   
-  // we want to use Err for better error messages later
+  // 
   def checkProgram(program: Program): Option[String] = {
     val funcErrors = program.funcs.flatMap(checkFunc)
     // val noFuncErrors = program.funcs.foreach(checkFunctionDeclaration)
@@ -69,12 +112,15 @@ object semanticChecker {
     if (errors.isEmpty) None else Some(errors.mkString("\n"))
   }
 
-  def checkFunc(func: Func) : Option[String] = None // TODO: undefined)
-  // Check function declarations
-  def checkFunctionDeclaration(func: Func): Unit = {
-    println(s"Checking function: ${func.name}")
-    // Example: Check function body (statements) for semantic errors
+  def checkFunc(func: Func) : Option[String] =  {
+    symbolTable.enterScope()
+    symbolTable.addFunction(func.name, func.t, func.paramList)
     checkStatement(func.stmt)
+    // Check function declarations
+    // def checkFunctionDeclaration(func: Func): Unit = {
+    //   println(s"Checking function: ${func.name}")
+    symbolTable.exitScope()
+    None
   }
 
   def checkStatement(stmt: Stmt): Option[String] = stmt match {
@@ -85,40 +131,52 @@ object semanticChecker {
       checkRValue(value) match {
         case Left(error) => Some(error)
         case Right(rType) => 
-          if (symbolTable.addVariable(name, rType)) None
-          else Some(s"Semantic Error: Variable $name already declared")
+          val can_add_if_no_duplicate = symbolTable.addVariable(name, rType)
+          if (can_add_if_no_duplicate) None
+          else Some(s"Semantic Error in Declaration: Variable $name is already declared")
       }
       
-    // <lValue> '=' <rValue> Check if lvalue is declared and types match
-    // lvalue must be an identifier or array-element or pair-element
-    // rvalue must be a <expr> | <arrayLiter> | 'newpair' '(' <expr> ',' <expr> ')' | <pairElem> | 'call' <ident> '(' <argList>? ')'
+//   begin
+// 	 int a=13;
+//   if a==13then a=1else a=0fi;
+//   println a
+//   end
+
     case AssignStmt(lvalue, rvalue) => 
       (checkLValue(lvalue), checkRValue(rvalue)) match {
         case (Some(error), _) => Some(error)
         case (_, Left(error)) => Some(error)
         case (None, Right(rType)) => lvalue match {
           case LValue.LName(name) => symbolTable.lookup(name) match {
-            case Some(VariableEntry(lType, _)) if areTypesCompatible(lType, rType) => None
+            case Some(VariableEntry(lType)) if areTypesCompatible(lType, rType) => None
             case Some(_) => Some(s"Semantic Error: Incompatible types in assignment to $name")
             case None => Some(s"Semantic Error: Variable $name not declared")
           }
           case LValue.LArray(ArrayElem(name, _)) => symbolTable.lookup(name) match {
-            case Some(VariableEntry(ArrayType(lType), _)) if areTypesCompatible(lType, rType) => None
+            case Some(VariableEntry(ArrayType(lType))) if areTypesCompatible(lType, rType) => None
             case Some(_) => Some(s"Semantic Error: Incompatible types in assignment to $name")
             case None => Some(s"Semantic Error: Variable $name not declared")
           }
-          // but LPair takes in a pair of type PairElem... 
-          case LValue.LPair(pair) => checkPairElem(pair) match {
-            // rType is also a PairType, check to see if leftPairType and rightPairType are compatible
-            case Right(PairType(lLType, lRType)) => 
-              rType = PairType(lRType, rRType)
-              if (areTypesCompatible(lLType, rLType) && areTypesCompatible(lRType, rRType)) None
-              else Some("Semantic Error: Incompatible types in assignment inside pair") 
-            case Right(_) => Some("Semantic Error: Incompatible types in assignment to pair")
-            case Left(error) => Some(error)
+
+          case LValue.LPair(pairElem) => 
+          // Extract types from both LHS and RHS pairs
+            rvalue match {
+              case RValue.RPair(pairElemR) => 
+                (checkPairElem(pairElem), checkPairElem(pairElemR)) match {
+                  case (Right(PairType(lLType, lRType)), Right(PairType(rLType, rRType))) =>
+                    // Check if types match
+                    if (areTypesCompatible(lLType, rLType) && areTypesCompatible(lRType, rRType)) {
+                      None // Types are compatible
+                    } else {
+                      Some("Semantic Error: Incompatible types in pair assignment")
+                    }
+                  case (Left(error), _) => Some(error)  // Error in LHS pair element
+                  case (_, Left(error)) => Some(error)  // Error in RHS pair element
+                  case _ => Some("Semantic Error: Incompatible types between LHS and RHS pair elements")
+                }
+              case _ => Some("Semantic Error: Incompatible types in pair assignment")
+            }
           }
-        }
-        //case (None, _) => None
       }
 
     // 'read' <lValue>
@@ -132,14 +190,23 @@ object semanticChecker {
       case Left(error) => Some(error)
       case Right(ArrayType(_)) | Right(PairType(_, _)) => None // The ‘free’ statement takes an argument that must be of type 𝜏[] or pair(𝜏, 𝜎).
       case Right(_) => Some("Semantic Error: `free` statement must be applied to an array or pair")
-      case _ => None // Could not match statement type
     }
 
     // 'return' <expr>
-    case ReturnStmt(expr) => checkExprType(expr, symbolTable) match {
-      case Left(error) => Some(error)
-      case Right(_) => None
-    }
+    // A return statement can only be present in the body of a function:
+    // When executed, it will evaluate its argument, and pass teh resulting value back to the caller
+    // of the function, exiting the current call immediately
+    case ReturnStmt(expr) => 
+      checkExprType(expr, symbolTable) match {
+        case Left(error) => Some(error)
+        case Right(retType) =>
+          symbolTable.lookup("currFunction") match { // keep track of function 
+            case Some(FunctionEntry(expectedRetType, _)) if areTypesCompatible(retType, expectedRetType) => None
+            case Some(FunctionEntry(expectedRetType, _)) => Some(s"Semantic Error: Return type mismatch. Expected $expectedRetType, found $retType.")
+            case _ => Some("Semantic Error: `return` statement is not allowed in the main program")
+          }
+      }
+
 
     // 'exit' <IntType>
     case ExitStmt(expr) => 
@@ -182,7 +249,9 @@ object semanticChecker {
       case _ => None
     }
     // 'begin' <stmt> 'end'
-    case BodyStmt(body) => checkStatement(body)
+    case BodyStmt(body) => 
+      symbolTable.enterScope()
+      checkStatement(body)
 
     // <stmt> ';' <stmt>
     case SeqStmt(left, right) =>
@@ -196,12 +265,12 @@ object semanticChecker {
 
   def checkLValue(lvalue: LValue): Option[String] = lvalue match {
     case LValue.LName(name) => symbolTable.lookup(name) match {
-      case Some(VariableEntry(_, _)) => None
+      case Some(VariableEntry(_)) => None
       case Some(_) => Some(s"Error: $name is not a variable")
       case None => Some(s"Error: $name is not declared")
     }
-    case LValue.LArrayLiter(name, indices) => symbolTable.lookup(name) match {
-      case Some(VariableEntry(ArrayType(_), _)) => None
+    case LValue.LArray(ArrayElem(name, indices)) => symbolTable.lookup(name) match {
+      case Some(VariableEntry(ArrayType(_))) => None
       case Some(_) => Some(s"Error: $name is not an array")
       case None => Some(s"Error: $name is not declared")
     }
@@ -213,20 +282,37 @@ object semanticChecker {
 
   def checkRValue(rvalue: RValue): Either[String, Type] = rvalue match {
     case RValue.RExpr(expr) => checkExprType(expr, symbolTable)
+    //case class ArrayLiter(elements: Option[List[Expr]])
     case RValue.RArrayLiter(arrayLiter) =>
-      val exprTypes = arrayLiter.elements.map(checkExprType(_, symbolTable))
-      if (exprTypes.forall(_.isRight)) {
-        val elementType = exprTypes.head.right.get // Get the first element type (which may be None)
-        if (exprTypes.forall(_ == elementType)) Right(ArrayType(elementType))
-        else Left("Semantic Error: Array elements must be of the same type")
-      }
-      else {
-        // Error evaluating expression
-        Left(exprTypes.collect { case Left(error) => error }.mkString(", "))
-      }
+      val elements = arrayLiter.elements
+      elements match {
+        case None => Right(ArrayType(AnyType))
+        case Some(list) => 
+          list.foldLeft[Either[String, Type]](Right(ArrayType(AnyType))) {
+            case (acc, expr) =>
+              acc match {
+                case Left(error) => Left(error) // If there's an error from previous elements, propagate it
+                case Right(ArrayType(elementType)) =>
+                  checkExprType(expr, symbolTable) match {
+                    // Pattern match will fail on pattern case: 
+                    // Right(IntType), Right(BoolType), Right(CharType), Right(StrType), Right(AnyType), Right(wacc.PairType(_, _))
+                    case Right(exprType) => // AnyType is compatible with any type
+                      if (areTypesCompatible(elementType, exprType)) Right(ArrayType(elementType)) // Accumulate the element type if they are compatible
+                      else Left("Semantic Error: Array elements must be of the same type") // Return error if types mismatch
+                    case Left(error) => Left(error) // Propagate any errors from checkExprType
+                  }
+                case _ => Left("Semantic Error: Elements must be ArrayType in Array")
+              }
+          }
+        }
+      
     case RValue.RNewPair(lExpr, rExpr) =>
       (checkExprType(lExpr, symbolTable), checkExprType(rExpr, symbolTable)) match {
-        case (Right(lType), Right(rType)) => Right(PairType(lType, rType))
+        case (Right(lType), Right(rType)) => 
+          (lType, rType) match {
+            case (left: PairElemType, right: PairElemType) => Right(PairType(left, right))
+            case _ => Left("Error: Pair elements must be of type pairElemType")
+          }
         case (Left(lError), Left(rError)) => Left(s"$lError,\n $rError")
         case (Left(error), _) => Left(error)
         case (_, Left(error)) => Left(error)
@@ -240,69 +326,36 @@ object semanticChecker {
   // and if someLValue is LPair(), then type would become 'pair' (erased type) PairKeyword
     case RValue.RPair(pairElem) => checkPairElem(pairElem)
 
-    case RCall(name, argList) => Left("Error: Function calls not implemented")
+    case RValue.RCall(name, argList) => Left("Error: Function calls not implemented")
 
   }
 
   def checkPairElem(pairElem: PairElem): Either[String, Type] = pairElem match {
-      case PairElem.FstElem(LName(p)) => symbolTable.lookup(p) match {
-        case Some(VariableEntry(PairType(leftType, _), _)) => Right(leftType)
+      case PairElem.FstElem(LValue.LName(p)) => symbolTable.lookup(p) match {
+        case Some(VariableEntry(PairType(leftType, _))) => Right(leftType)
         case Some(_) => Left(s"Error: $p is not a pair")
         case None => Left(s"Error: $p is not declared")
       }
-      case PairElem.SndElem(LName(p)) => symbolTable.lookup(p) match {
-        case Some(VariableEntry(PairType(_, rightType), _)) => Right(rightType)
+      case PairElem.SndElem(LValue.LName(p)) => symbolTable.lookup(p) match {
+        case Some(VariableEntry(PairType(_, rightType))) => Right(rightType)
         case Some(_) => Left(s"Error: $p is not a pair")
         case None => Left(s"Error: $p is not declared")
       }
-      case PairElem.FstElem(LArrayElem(name, _)) | PairElem.SndElem(LArrayElem(name, _)) => symbolTable.lookup(name) match {
-        case Some(VariableEntry(ArrayType(leftType), _)) => Right(leftType)
-        case Some(_) => Left(s"Error: $name is not an array")
-        case None => Left(s"Error: $name is not declared")
+      case PairElem.FstElem(LValue.LArray(ArrayElem(name, _))) => 
+        symbolTable.lookup(name) match {
+          case Some(VariableEntry(ArrayType(leftType))) => Right(leftType)
+          case Some(_) => Left(s"Error: $name is not an array")
+          case None => Left(s"Error: $name is not declared")
       }
-      case PairElem.FstElem(LPairElem(name)) | SndElem(LPairElem(name)) => Right(PairKeyword)
+      case PairElem.SndElem(LValue.LArray(ArrayElem(name, _))) => 
+        symbolTable.lookup(name) match {
+          case Some(VariableEntry(ArrayType(leftType))) => Right(leftType)
+          case Some(_) => Left(s"Error: $name is not an array")
+          case None => Left(s"Error: $name is not declared")
+      }
+      case PairElem.FstElem(LValue.LPair(_)) | PairElem.SndElem(LValue.LPair(_)) => Right(PairKeyword)
       case _ => Left("Error: Invalid pair element")
     }
-  
-
-  
-
-  /* To quote the spec:
-     Erasure: When either type within a pair are themselves a pair, they MUST have
-     an erased type 'pair'. For instance, 'pair(int, pair(int, int))' is not allowed, 
-     but pair(int,pair) is legal. pair(T1, T2) can be weakened to pair and vice versa.
-     If nested pairs were not subject to erasure, this would involve infinite types.
-     Since the type 'pair' is not itself a legal type of a variable, nested pairs
-     will cease to be erased once they are extracted; at this point, the full type of the
-     pair MUST be known.
-     ^ if this makes any sense to any of y'all, since I don't fully get it.
-  */
-  // pair (int, char) p = newpair(1, 'a');
-  // int x = fst p;
-  // print x
-  // DeclAssignStmt(IntType, x, RPair(FstElem(LName(p))))
-  // Assignment is legal when assigning array (even of unknown type) in nested pair extraction
-  // probably cos of the pair info loss
-  // pair(int, int) p = newpair(1, 2);
-  // pair(pair, int) q = newpair(p, 3);
-  // fst fst q = []
-  // AssignStmt(LPair(FstElem(LPair(FstElem(LName(q))))), RArrayLiter(ArrayLiter(None)))
-
-  // pair(int. int) p = newpair(1, 2);
-  // pair(int, int)[] a = [p, p];
-  // fst a[0] = 3;
-  // int x = fst a[1];
-  // AssignStmt(LPair(FstElem(LArrayElem(a, IntLiteral(0)))), RExpr(IntLiteral(3)))
-  // DeclAssignStmt(IntType, x, RPair(FstElem(LArrayElem(a, IntLiteral(1))))
-  // I think checkPairElem has different behaviours depending on whether it is called in an
-  // Assign or Declaration.
-  // In a declaration, it would be on the right hand side, as RPair(FstElem(someLValue))
-  // In other words, it should already have a value. 
-  // So we should check the table to find LName(p), expecting us to find PairType(Type1, Type2)
-  // then type of FstElem(LName(p)) should be Type1
-  // Although it seems in the definitition, both sides are defined as PairElemType... which works since the rest extend it
-  // and if someLValue is LArrayElem(name, IntLiteral(index)), then we should find ArrayType(Type)
-  // and if someLValue is LPair(), then type would become 'pair' (erased type) PairKeyword
 
   def checkExprType(expr: Expr, env: SymbolTable): Either[String, Type] = expr match {
     
@@ -311,7 +364,11 @@ object semanticChecker {
     case CharLiteral(_) => Right(BaseType.CharType)
     case StrLiteral(_) => Right(BaseType.StrType)
     case PairLiteral => Left(s"Pair not defined")
-    case Identifier(name) => Left(s"Ident not defined")
+    case Identifier(name) => env.lookup(name) match {
+      case Some(VariableEntry(t)) => Right(t)
+      case Some(FunctionEntry(t, _)) => Right(t)
+      case None => Left(s"Semantic Error: $name is not declared")
+    }
       //env.lookup(name).toRight(s"Semantic Error: Undefined variable '$name'")
     case ArrayElem(name, indices) => ???
     // Arithmetic Binary Operations: +, -, *, /, %

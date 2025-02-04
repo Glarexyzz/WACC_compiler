@@ -206,7 +206,7 @@ object parser {
         ReturnStmt(symbol("return") *> expr)
 
     private lazy val exitStmt: Parsley[Stmt] =
-        ReturnStmt(symbol("exit") *> expr)
+        ExitStmt(symbol("exit") *> expr)
 
     private lazy val returningIfStmt: Parsley[Stmt] =
         IfStmt(
