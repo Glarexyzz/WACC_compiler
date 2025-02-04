@@ -66,10 +66,10 @@ object parser {
     // Expression parsers
 
     // Unary Operators (Highest Precedence)
-    val unaryOps: Parsley[UnaryOperator] =
+    private lazy val unaryOps: Parsley[UnaryOperator] =
         choice(
             symbol("!").as(UnaryOperator.Not),
-            symbol("-").as(UnaryOperator.Negate),
+            atomic(symbol("-") <* notFollowedBy(digit)).as(UnaryOperator.Negate),
             symbol("len").as(UnaryOperator.Length),
             symbol("ord").as(UnaryOperator.Ord),
             symbol("chr").as(UnaryOperator.Chr)
