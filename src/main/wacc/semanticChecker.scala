@@ -190,13 +190,13 @@ object semanticChecker {
                       if (areTypesCompatible(lLType, rLType) && areTypesCompatible(lRType, rRType)) {
                         None // Types are compatible
                       } else {
-                        Some("Semantic Error: Incompatible types in pair assignment")
+                        Some("Semantic Error: $lLType is not compatible with $rLType or $lRType is not compatible with $rRType")
                       }
                     case (Left(error), _) => Some(error)  // Error in LHS pair element
                     case (_, Left(error)) => Some(error)  // Error in RHS pair element
                     case _ => Some("Semantic Error: Incompatible types between LHS and RHS pair elements")
                   }
-                case _ => Some("Semantic Error: Incompatible types in pair assignment")
+                case _ => Some(s"Semantic Error: $rvalue must be a Rpair")
               }
             }
       }
@@ -538,9 +538,13 @@ object semanticChecker {
     case (BaseType.CharType, BaseType.CharType) => true
     case (BaseType.StrType, BaseType.StrType) => true
 
-    case (PairType(leftElem1 : Type, rightElem1 : Type), PairType(leftElem2 : Type, rightElem2 : Type)) =>
+    case (PairType(leftElem1, rightElem1), PairType(leftElem2, rightElem2)) =>
       areTypesCompatible(leftElem1, leftElem2) && areTypesCompatible(rightElem1, rightElem2)
-
+    case(BaseTElem(elem1), BaseTElem(elem2)) => 
+      areTypesCompatible(elem1, elem2)
+    case(ArrayTElem(elem1), ArrayTElem(elem2)) => 
+      areTypesCompatible(elem1, elem2)
+    case(PairKeyword, PairKeyword) => true
     // any type can be weaken to AnyType
     case (_, AnyType) => true
 
@@ -551,6 +555,16 @@ object semanticChecker {
     // any PairElemType can be weakened to a PairKeyword and vice versa
     case (PairType(_, _), PairKeyword) => true
     case (PairKeyword, PairType(_, _)) => true
+
+    // We can treat the wrapper and non-wrapper types as the same (can we?)
+    case(BaseTElem(elem1), elem2) =>
+      areTypesCompatible(elem1, elem2)
+    case(elem1, BaseTElem(elem2)) =>
+      areTypesCompatible(elem1, elem2)
+    case(ArrayTElem(elem1), elem2) =>
+      areTypesCompatible(elem1, elem2)
+    case(elem1, ArrayTElem(elem2)) =>
+      areTypesCompatible(elem1, elem2)
 
     case _ => false
   }
