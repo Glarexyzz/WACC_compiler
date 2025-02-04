@@ -29,7 +29,7 @@ object parser {
                     case parsley.Success(result) => 
                         println(s"Success! Parsed as: $name")
                         Some(Right(result))
-                    case parsley.Failure(err) => // there seems to be a conflict between the Err from parsley and the Err in Option[Err]
+                    case parsley.Failure(err) => 
                         lastError = Some(err)
                         None
                         // None
@@ -206,7 +206,7 @@ object parser {
         ReturnStmt(symbol("return") *> expr)
 
     private lazy val exitStmt: Parsley[Stmt] =
-        ReturnStmt(symbol("exit") *> expr)
+        ExitStmt(symbol("exit") *> expr)
 
     private lazy val returningIfStmt: Parsley[Stmt] =
         IfStmt(

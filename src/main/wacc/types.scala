@@ -11,6 +11,8 @@ enum BaseType extends Type {
     case StrType
 }
 
+case object AnyType extends Type
+
 // <type> '[' ']'
 case class ArrayType(innerType: Type) extends Type
 object ArrayType extends generic.ParserBridge1[Type, ArrayType]
@@ -25,7 +27,7 @@ object PairType extends generic.ParserBridge2[
 ]
 
 // <baseType> | <arrayType> | 'pair'
-sealed trait PairElemType
+sealed trait PairElemType extends Type
 
 case class BaseTElem(elem: BaseType) extends PairElemType
 object BaseTElem extends generic.ParserBridge1[BaseType, BaseTElem]

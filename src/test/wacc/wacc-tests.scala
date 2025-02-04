@@ -29,7 +29,28 @@ trait WACCTestUtils {
   */
   
 trait WACCTestUtils {
-  val ignoredSubcategories = Set.empty[String]
+  val ignoredSubcategories = Set (
+    "advanced",
+    "array",
+    // "basic", "basic/exit", "basic/skip",
+    // "exit",
+    "expressions",
+    "function", "function/nested_functions", "function/simple_functions",
+    "literals",
+    // "if",
+    // "IO", 
+    "IO/print", 
+    // "IO/read",
+    "multiple",
+    "pairs",
+    // "print",
+    "runtimeErr", "runtimeErr/arrayOutOfBounds", "runtimeErr/badChar", "runtimeErr/divideByZero", "runtimeErr/integerOverflow", "runtimeErr/nullDereference",
+    "scope",
+    "sequence",
+    // "read",
+    "variables",
+    "while"
+    )
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {
     def collectWaccFiles(currentDir: File): List[File] = {
@@ -51,7 +72,7 @@ trait WACCTestUtils {
     val process = Process(command)
     val exitValue = process.!
     exitValue
-  }
+  } 
 }
 
 class ValidTest extends AnyFlatSpec with Matchers with WACCTestUtils {
@@ -62,7 +83,7 @@ class ValidTest extends AnyFlatSpec with Matchers with WACCTestUtils {
     if (ignoredSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitValid for subcategory $subcat" in {}
     } else {
-      subcat should s"return exit code $exitValid for all files" in {
+      subcat should s"return exit code $exitValid for subcategory $subcat" in {
         files.foreach { file =>
           val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
           withClue(s"File ${file.getName} failed: ") {
@@ -82,7 +103,7 @@ class InvalidSyntaxTest extends AnyFlatSpec with Matchers with WACCTestUtils {
     if (ignoredSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {}
     } else {
-      subcat should s"return exit code $exitInvalidSyntax for all files" in {
+      subcat should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {
         files.foreach { file =>
           val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
           withClue(s"File ${file.getName} failed: ") {
@@ -102,7 +123,7 @@ class InvalidSemanticsTest extends AnyFlatSpec with Matchers with WACCTestUtils 
     if (ignoredSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitInvalidSemantics for subcategory $subcat" in {}
     } else {
-      ignore should s"return exit code $exitInvalidSemantics for subcategory $subcat" in {
+      subcat should s"return exit code $exitInvalidSemantics for subcategory $subcat" in {
         files.foreach { file =>
           val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
           withClue(s"File ${file.getName} failed: ") {

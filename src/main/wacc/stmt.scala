@@ -63,7 +63,16 @@ object PrintlnStmt extends generic.ParserBridge1[Expr, Stmt]
 
 // 'if' <expr> 'then' <stmt> 'else' <stmt> 'fi'
 case class IfStmt(cond: Expr, thenStmt: Stmt, elseStmt: Stmt) extends Stmt
-object IfStmt extends generic.ParserBridge3[Expr, Stmt, Stmt, Stmt]
+object IfStmt extends generic.ParserBridge3[Expr, Stmt, Stmt, Stmt] {
+  //   override def apply(condParser: Parsley[Expr], thenStmtParser: Parsley[Stmt], elseStmtParser: Parsley[Stmt]): Parsley[Stmt] = {
+  //   // Use guardAgainst to ensure the condition is a boolean expression
+  //   val cond = condParser.guardAgainst {
+  //     case BoolLiteral(_) => Seq.empty // Valid boolean expression, no error
+  //     case Identifier(name) => Seq.empty // Valid boolean identifier, no error
+  //     case _ => Seq("Expected boolean expression for condition") // Error message if the condition isn't boolean
+  //   }
+  // }
+}
 
 // 'while' <expr> 'do' <stmt> 'done'
 case class WhileStmt(cond: Expr, body: Stmt) extends Stmt
@@ -79,7 +88,7 @@ object SeqStmt extends generic.ParserBridge2[Stmt, Stmt, Stmt]
 
 //  Values
 // <ident> | <arrayElem> | <pairElem>
-enum LValue {
+enum LValue extends Expr{
   case LName(name: String)
   case LArray(array: ArrayElem)
   case LPair(pair: PairElem)
@@ -92,7 +101,7 @@ object LValue {
 }
 
 // <expr> | <arrayLiter> | 'newpair' '(' <expr> ',' <expr> ')' | <pairElem> | 'call' <ident> '(' <argList>? ')'
-enum RValue {
+enum RValue extends Expr{
   case RExpr(expr: Expr)
   case RArrayLiter(arrayLiter: ArrayLiter)
   case RNewPair(lExpr: Expr, rExpr: Expr)
