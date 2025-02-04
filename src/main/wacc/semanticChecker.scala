@@ -145,15 +145,17 @@ object semanticChecker {
       checkRValue(value) match {
         case Left(error) => Some(error)
         case Right(rType) => 
+        // can t be weakened to rType? Can char[] be weakened to rType?
+        // but string cannot be weakened to char[] (char[] is more specific)
           if (areTypesCompatible(t, rType)) {
             printf("Checking declaration of variable '%s' of type %s\n", name, t)
-            val can_add_if_no_duplicate = symbolTable.addVariable(name, rType)
+            val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate) 
              println(s"Added variable $name of type $rType at scope level ${symbolTable.scopeLevel}")
              None
             else Some(s"Semantic Error in Declaration: Variable $name is already declared")
            }
-          else Some(s"Semantic Error in Declaration: Incompatible type ($t, $rType) for variable $name")
+          else Some(s"Semantic Error in Declaration: $t is not compatible with $rType for variable $name")
 
       }
 
