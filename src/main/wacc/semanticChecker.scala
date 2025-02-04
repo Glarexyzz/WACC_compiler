@@ -145,11 +145,16 @@ object semanticChecker {
       checkRValue(value) match {
         case Left(error) => Some(error)
         case Right(rType) => 
-          val can_add_if_no_duplicate = symbolTable.addVariable(name, rType)
-          if (can_add_if_no_duplicate) 
-            println(s"Added variable $name of type $rType at scope level ${symbolTable.scopeLevel}")
-            None
-          else Some(s"Semantic Error in Declaration: Variable $name is already declared")
+          if (areTypesCompatible(t, rType)) {
+            printf("Checking declaration of variable '%s' of type %s\n", name, t)
+            val can_add_if_no_duplicate = symbolTable.addVariable(name, rType)
+            if (can_add_if_no_duplicate) 
+             println(s"Added variable $name of type $rType at scope level ${symbolTable.scopeLevel}")
+             None
+            else Some(s"Semantic Error in Declaration: Variable $name is already declared")
+           }
+          else Some(s"Semantic Error in Declaration: Incompatible type ($t, $rType) for variable $name")
+
       }
 
     case AssignStmt(lvalue, rvalue) => 
@@ -244,43 +249,44 @@ object semanticChecker {
     }
 
     // 'println' <expr>
-    case PrintlnStmt(expr) => checkExprType(expr, symbolTable) match {
-      case Left(error) => Some(error)
-      case Right(_) => None
-    }
+    case PrintlnStmt(expr) => 
+      println(s"Checking println of $expr")
+      checkExprType(expr, symbolTable) match {
+        case Left(error) => Some(error)
+        case Right(_) => None
+      }
 
     // 'if' <expr> 'then' <stmt> 'else' <stmt> 'fi'
-    case IfStmt(cond, thenStmt, elseStmt) => cond match {
-      // hard code to check if it works
-      case BinaryOp(_, BinaryOperator.Add, _) => Some(s"Error: If condition must be a boolean, found IntType in $cond")
-        // checkExpr(cond) match {
-        //   case Some(BoolType) => 
-        //     checkStatement(thenStmt) ++ checkStatement(elseStmt)
-        //   case Some(IntType) =>
-        //     Some(s"Error: If condition must be a boolean, found IntType in $cond")
-        //   case Some(other) =>
-        //     Some(s"Error: If condition must be a boolean, found $other in $cond")
-        //   case None => Some(s"Error: Could not determine type of condition $cond")
-      case _ => None
-    }
+    case IfStmt(cond, thenStmt, elseStmt) => 
+      checkExprType(cond, symbolTable) match {
+        case Left(error) => Some(error)
+        case Right(BaseType.BoolType) => 
+          checkStatement(thenStmt) ++ checkStatement(elseStmt)
+        case Right(_) => Some("Semantic Error: If condition must be a boolean")
+      }
 
     // 'while' <expr> 'do' <stmt> 'done'
-    case WhileStmt(cond, body) => cond match {
-      case BinaryOp(_, BinaryOperator.Add, _) => Some(s"Error: While condition must be a boolean, found IntType in $cond")
-      case _ => None
-    }
+    case WhileStmt(cond, body) => 
+      checkExprType(cond, symbolTable) match {
+        case Left(error) => Some(error)
+        case Right(BaseType.BoolType) => 
+          checkStatement(body)
+        case Right(_) => Some("Semantic Error: If condition must be a boolean")
+      }
+
     // 'begin' <stmt> 'end'
     case BodyStmt(body) => 
-      symbolTable.enterScope()
+      symbolTable.enterScope() // because some of our parsed output have a bodystmt wrapper
       checkStatement(body)
 
     // <stmt> ';' <stmt>
     case SeqStmt(left, right) =>
-      (checkStatement(left), checkStatement(right)) match {
-        case (Some(errorL), Some(errorR)) => Some(s"$errorL, $errorR")  // Combine both errors
-        case (Some(errorL), None) => Some(errorL)  // Only left statement has an error
-        case (None, Some(errorR)) => Some(errorR)  // Only right statement has an error
-        case (None, None) => None  // No errors in either statement
+      checkStatement(left) match {
+        case Some(errorL) => checkStatement(right) match {
+          case Some(errorR) => Some(s"Left: $errorL, \nRight: $errorR")  // Combine errors from both left and right
+          case None => Some(errorL)  // Only left has an error
+        }
+        case None => checkStatement(right)  // Check right if left has no error
       }
   }
 
@@ -330,18 +336,15 @@ object semanticChecker {
     case RValue.RNewPair(lExpr, rExpr) =>
       (checkExprType(lExpr, symbolTable), checkExprType(rExpr, symbolTable)) match {
         case (Right(lType), Right(rType)) => 
-          (lType, rType) match {
-            case (left: PairElemType, right: PairElemType) => Right(PairType(left, right))
-            case _ => Left("Error: Pair elements must be of type pairElemType")
-          }
+          Right(PairType(typeToPairElemType(lType), typeToPairElemType(rType)))
         case (Left(lError), Left(rError)) => Left(s"$lError,\n $rError")
         case (Left(error), _) => Left(error)
         case (_, Left(error)) => Left(error)
       }
 
     case RValue.RPair(pairElem) => checkPairElem(pairElem)
-  // 'call' <ident> '(' <argList>? ')'
-  // types of parameters (Option[List[Param]] and the types of the arguments (List[Expr]) must match
+
+    // 'call' <ident> '(' <argList>? ')'
     case RValue.RCall(name, argList) => 
       symbolTable.lookupFunction(name) match {
         case Some(FunctionEntry(returnType, params)) => 
@@ -406,6 +409,16 @@ object semanticChecker {
       case PairElem.FstElem(LValue.LPair(_)) | PairElem.SndElem(LValue.LPair(_)) => Right(PairKeyword)
       case _ => Left("Error: Invalid pair element")
     }
+  
+  def typeToPairElemType(t: Type): PairElemType = t match {
+    case BaseType.IntType => BaseTElem(BaseType.IntType)
+    case BaseType.BoolType => BaseTElem(BaseType.BoolType)
+    case BaseType.CharType => BaseTElem(BaseType.CharType)
+    case BaseType.StrType => BaseTElem(BaseType.StrType)
+    case ArrayType(innerType) => ArrayTElem(ArrayType(innerType))
+    case PairType(leftElem, rightElem) => PairKeyword
+    case _ => NullType // a bit doubtful - does this cover all possible types?
+  }
 
   def checkExprType(expr: Expr, env: SymbolTable): Either[String, Type] = expr match {
     
@@ -413,15 +426,23 @@ object semanticChecker {
     case BoolLiteral(_) => Right(BaseType.BoolType)
     case CharLiteral(_) => Right(BaseType.CharType)
     case StrLiteral(_) => Right(BaseType.StrType)
-    case PairLiteral => Left(s"Pair not defined")
+    // begin
+//   pair(pair, pair) p = null ;
+//   println p ;
+//   p = null ;
+//   println p
+// end
+    case PairLiteral => Right(PairType(NullType, NullType))
+    
     case Identifier(name) => env.lookup(name) match {
       case Some(VariableEntry(t)) => Right(t)
       case Some(FunctionEntry(t, _)) => Right(t)
       case None => Left(s"Semantic Error: $name is not declared")
     }
-      //env.lookup(name).toRight(s"Semantic Error: Undefined variable '$name'")
+
     case ArrayElem(name, indices) => ???
-    // Arithmetic Binary Operations: +, -, *, /, %
+
+
     case BinaryOp(left, op, right) if Set(
       BinaryOperator.Add,
       BinaryOperator.Subtract,
@@ -499,7 +520,7 @@ object semanticChecker {
 
 
 
-  
+  // t1 compatible to t2 = t1 can be weakend to t2
   def areTypesCompatible(t1: Type, t2: Type): Boolean = (t1, t2) match {
     // char[] can be treated as string
     case (ArrayType(BaseType.CharType), BaseType.StrType) => true 
@@ -517,6 +538,17 @@ object semanticChecker {
 
     case (PairType(leftElem1 : Type, rightElem1 : Type), PairType(leftElem2 : Type, rightElem2 : Type)) =>
       areTypesCompatible(leftElem1, leftElem2) && areTypesCompatible(rightElem1, rightElem2)
+
+    // any type can be weaken to AnyType
+    case (_, AnyType) => true
+
+    // any PairElemType can be weakened to a Null Type
+    case (BaseTElem(_), NullType) => true
+    case (ArrayTElem(_), NullType) => true
+    case (PairKeyword, NullType) => true
+    // any PairElemType can be weakened to a PairKeyword and vice versa
+    case (PairType(_, _), PairKeyword) => true
+    case (PairKeyword, PairType(_, _)) => true
 
     case _ => false
   }
