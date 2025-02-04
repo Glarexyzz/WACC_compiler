@@ -18,7 +18,7 @@ class SymbolTable {
   private val functionTable: mutable.Map[String, FunctionEntry] = mutable.Map()
   //private val variableScopes: mutable.Map[String, mutable.Stack[VariableEntry]] = mutable.Map()
   private val variableScopes: mutable.Stack[mutable.Map[String, VariableEntry]] = mutable.Stack()
-  private var scopeLevel: Int = 0 // Tracks current scope depth
+  var scopeLevel: Int = 0 // Tracks current scope depth
   private var functionStatus: Option[Type] = None // Tracks the return type of the current function
 
   
@@ -73,9 +73,12 @@ class SymbolTable {
     true
   }
   def lookupVariable(name: String): Option[VariableEntry] = {
-    variableScopes.reverseIterator.collectFirst {
-      case scope if scope.contains(name) => scope(name)
+    val result = variableScopes.zipWithIndex.reverseIterator.collectFirst {
+      case (scope, level) if level <= scopeLevel && scope.contains(name) => scope(name)
     }
+    printf("Lookup for variable '%s' at scope level %d: %s\n", name, scopeLevel, result)
+    result
+  
   }
   
 
@@ -110,11 +113,13 @@ object semanticChecker {
     case _ => Some(s"Unknown parsed structure")
   }
   
-  // 
+
   def checkProgram(program: Program): Option[String] = {
+    symbolTable.enterScope()
     val funcErrors = program.funcs.flatMap(checkFunc)
     // val noFuncErrors = program.funcs.foreach(checkFunctionDeclaration)
     val stmtErrors = checkStatement(program.stmt).toList
+    symbolTable.exitScope()
     val errors = funcErrors /*++ noFuncErrors*/ ++ stmtErrors
     if (errors.isEmpty) None else Some(errors.mkString("\n"))
   }
@@ -141,45 +146,52 @@ object semanticChecker {
         case Left(error) => Some(error)
         case Right(rType) => 
           val can_add_if_no_duplicate = symbolTable.addVariable(name, rType)
-          if (can_add_if_no_duplicate) None
+          if (can_add_if_no_duplicate) 
+            println(s"Added variable $name of type $rType at scope level ${symbolTable.scopeLevel}")
+            None
           else Some(s"Semantic Error in Declaration: Variable $name is already declared")
       }
 
     case AssignStmt(lvalue, rvalue) => 
+      println("Checking assignment")
       (checkLValue(lvalue), checkRValue(rvalue)) match {
         case (Some(error), _) => Some(error)
         case (_, Left(error)) => Some(error)
-        case (None, Right(rType)) => lvalue match {
-          case LValue.LName(name) => symbolTable.lookup(name) match {
-            case Some(VariableEntry(lType)) if areTypesCompatible(lType, rType) => None
-            case Some(_) => Some(s"Semantic Error: Incompatible types in assignment to $name")
-            case None => Some(s"Semantic Error: Variable $name not declared")
-          }
-          case LValue.LArray(ArrayElem(name, _)) => symbolTable.lookup(name) match {
-            case Some(VariableEntry(ArrayType(lType))) if areTypesCompatible(lType, rType) => None
-            case Some(_) => Some(s"Semantic Error: Incompatible types in assignment to $name")
-            case None => Some(s"Semantic Error: Variable $name not declared")
-          }
-
-          case LValue.LPair(pairElem) => 
-          // Extract types from both LHS and RHS pairs
-            rvalue match {
-              case RValue.RPair(pairElemR) => 
-                (checkPairElem(pairElem), checkPairElem(pairElemR)) match {
-                  case (Right(PairType(lLType, lRType)), Right(PairType(rLType, rRType))) =>
-                    // Check if types match
-                    if (areTypesCompatible(lLType, rLType) && areTypesCompatible(lRType, rRType)) {
-                      None // Types are compatible
-                    } else {
-                      Some("Semantic Error: Incompatible types in pair assignment")
-                    }
-                  case (Left(error), _) => Some(error)  // Error in LHS pair element
-                  case (_, Left(error)) => Some(error)  // Error in RHS pair element
-                  case _ => Some("Semantic Error: Incompatible types between LHS and RHS pair elements")
-                }
-              case _ => Some("Semantic Error: Incompatible types in pair assignment")
+        case (None, Right(rType)) => 
+          println(s"Matching lvalue: $lvalue and rvalue $rType")
+          lvalue match {
+            case LValue.LName(name) => symbolTable.lookupVariable(name) match {
+              case Some(VariableEntry(lType)) if areTypesCompatible(lType, rType) => 
+                println(s"Assignment of $rType to $lType in $name")
+                None
+              case Some(_) => Some(s"Semantic Error in identifier: Incompatible types in assignment to $name")
+              case None => Some(s"Semantic Errorin identifier: Variable $name not declared")
             }
-          }
+            case LValue.LArray(ArrayElem(name, _)) => symbolTable.lookupVariable(name) match {
+              case Some(VariableEntry(ArrayType(lType))) if areTypesCompatible(lType, rType) => None
+              case Some(_) => Some(s"Semantic Error in array: Incompatible types in assignment to $name")
+              case None => Some(s"Semantic Error in array: Variable $name not declared")
+            }
+
+            case LValue.LPair(pairElem) => 
+            // Extract types from both LHS and RHS pairs
+              rvalue match {
+                case RValue.RPair(pairElemR) => 
+                  (checkPairElem(pairElem), checkPairElem(pairElemR)) match {
+                    case (Right(PairType(lLType, lRType)), Right(PairType(rLType, rRType))) =>
+                      // Check if types match
+                      if (areTypesCompatible(lLType, rLType) && areTypesCompatible(lRType, rRType)) {
+                        None // Types are compatible
+                      } else {
+                        Some("Semantic Error: Incompatible types in pair assignment")
+                      }
+                    case (Left(error), _) => Some(error)  // Error in LHS pair element
+                    case (_, Left(error)) => Some(error)  // Error in RHS pair element
+                    case _ => Some("Semantic Error: Incompatible types between LHS and RHS pair elements")
+                  }
+                case _ => Some("Semantic Error: Incompatible types in pair assignment")
+              }
+            }
       }
 
     // 'read' <lValue>
@@ -326,16 +338,45 @@ object semanticChecker {
         case (Left(error), _) => Left(error)
         case (_, Left(error)) => Left(error)
       }
-      // In a declaration, it would be on the right hand side, as RPair(FstElem(someLValue))
-  // In other words, it should already have a value. 
-  // So we should check the table to find LName(p), expecting us to find PairType(Type1, Type2)
-  // then type of FstElem(LName(p)) should be Type1
-  // Although it seems in the definitition, both sides are defined as PairElemType... which works since the rest extend it
-  // and if someLValue is LArrayElem(name, IntLiteral(index)), then we should find ArrayType(Type)
-  // and if someLValue is LPair(), then type would become 'pair' (erased type) PairKeyword
-    case RValue.RPair(pairElem) => checkPairElem(pairElem)
 
-    case RValue.RCall(name, argList) => Left("Error: Function calls not implemented")
+    case RValue.RPair(pairElem) => checkPairElem(pairElem)
+  // 'call' <ident> '(' <argList>? ')'
+  // types of parameters (Option[List[Param]] and the types of the arguments (List[Expr]) must match
+    case RValue.RCall(name, argList) => 
+      symbolTable.lookupFunction(name) match {
+        case Some(FunctionEntry(returnType, params)) => 
+          params match {
+            case None =>
+              argList match {
+                case None => Right(returnType)
+                case Some(_) => Left("Semantic Error: Too many arguments in function call")
+              }
+            case Some(paramList) =>
+              argList match {
+                case None => Left("Semantic Error: Too few arguments in function call")
+                case Some(args) =>
+                  if (paramList.length != args.length) {
+                    Left("Semantic Error: Number of arguments does not match function definition")
+                    } 
+                  else {
+                    paramList.zip(args).foldLeft[Either[String, Type]](Right(returnType)) {
+                      case (acc, (param, arg)) =>
+                      acc match {
+                        case Left(error) => Left(error) // Propagate any errors from previous arguments
+                        case Right(_) =>
+                          checkExprType(arg, symbolTable) match {
+                            case Right(argType) =>
+                            if (areTypesCompatible(param.t, argType)) Right(returnType) // Check if types are compatible
+                            else Left(s"Semantic Error: Argument type mismatch for parameter ${param.name}")
+                            case Left(error) => Left(error) // Propagate any errors from checking the argument
+                          }
+                      }
+                    }
+                  }
+              }
+          }
+        case None => Left(s"Semantic Error: Function $name not declared")
+      }
 
   }
 
