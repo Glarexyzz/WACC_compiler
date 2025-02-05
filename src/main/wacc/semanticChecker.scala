@@ -149,7 +149,7 @@ object semanticChecker {
         // so t is the more 'broad case', rType is the more 'specific case'
         // Any is the broadest possible case?
         // can rType be weakened to t?
-          if (areTypesCompatible(rType, t)) {
+          if (isCompatibleTo(t, rType)) {
             printf("Checking declaration of variable '%s' of type %s\n", name, t)
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate) 
@@ -171,14 +171,14 @@ object semanticChecker {
           // can rType be weakened to lType?
           lvalue match {
             case LValue.LName(name) => symbolTable.lookupVariable(name) match {
-              case Some(VariableEntry(lType)) if areTypesCompatible(rType, lType) => 
+              case Some(VariableEntry(lType)) if isCompatibleTo(rType, lType) => 
                 println(s"Assignment of $rType to $lType in $name")
                 None
               case Some(_) => Some(s"Semantic Error in identifier: Incompatible types in assignment to $name")
               case None => Some(s"Semantic Errorin identifier: Variable $name not declared")
             }
             case LValue.LArray(ArrayElem(name, _)) => symbolTable.lookupVariable(name) match {
-              case Some(VariableEntry(ArrayType(lType))) if areTypesCompatible(rType, lType) => None
+              case Some(VariableEntry(ArrayType(lType))) if isCompatibleTo(rType, lType) => None
               case Some(_) => Some(s"Semantic Error in array: Incompatible types in assignment to $name")
               case None => Some(s"Semantic Error in array: Variable $name not declared")
             }
@@ -190,7 +190,7 @@ object semanticChecker {
                   (checkPairElem(pairElem), checkPairElem(pairElemR)) match {
                     case (Right(PairType(lLType, lRType)), Right(PairType(rLType, rRType))) =>
                       // Check if types match
-                      if (areTypesCompatible(rLType, lLType) && areTypesCompatible(rRType, lRType)) {
+                      if (isCompatibleTo(rLType, lLType) && isCompatibleTo(rRType, lRType)) {
                         None // Types are compatible
                       } else {
                         Some(s"Semantic Error: $rLType is not compatible with $lLType or $rRType is not compatible with $lRType")
@@ -234,7 +234,7 @@ object semanticChecker {
         case Left(error) => Some(error)
         case Right(retType) =>
           symbolTable.checkFunctionStatus() match {
-            case Some(funcType) if areTypesCompatible(retType, funcType) => None
+            case Some(funcType) if isCompatibleTo(retType, funcType) => None
             case Some(funcType) => Some(s"Semantic Error: $retType is incompatible to $funcType")
             case None => Some("Semantic Error: Return statement must be inside a function")
           }
@@ -333,8 +333,8 @@ object semanticChecker {
                     case Right(ArrayType(elementType)) =>
                       checkExprType(expr, symbolTable) match {
                         case Right(exprType) => // any type (exprType) can be weakened to AnyType - the type of the array takes the weakest type (except Any)
-                          if (areTypesCompatible(exprType, elementType)) Right(ArrayType(elementType)) // Accumulate the weakest type
-                          else if (areTypesCompatible(elementType, exprType)) Right(ArrayType(exprType)) // Accumulate the weakest type
+                          if (isCompatibleTo(exprType, elementType)) Right(ArrayType(elementType)) // Accumulate the weakest type
+                          else if (isCompatibleTo(elementType, exprType)) Right(ArrayType(exprType)) // Accumulate the weakest type
                           else Left(s"Semantic Error: Array elements $exprType must be compatible with $elementType") // Return error if types mismatch
                         case Left(error) => Left(error) // Propagate any errors from checkExprType
                       }
@@ -382,7 +382,7 @@ object semanticChecker {
                           checkExprType(arg, symbolTable) match {
                             case Right(argType) =>
                             // can the parameter type be weakened to the argument type?
-                            if (areTypesCompatible(param.t, argType)) Right(returnType) // Check if types are compatible
+                            if (isCompatibleTo(param.t, argType)) Right(returnType) // Check if types are compatible
                             else Left(s"Semantic Error: Argument type mismatch for parameter ${param.name}")
                             case Left(error) => Left(error) // Propagate any errors from checking the argument
                           }
@@ -459,7 +459,7 @@ object semanticChecker {
           case Right(_) =>
             checkExprType(index, env) match {
               // can int be weakened to the index type? (since int is the most specific type of element)
-              case Right(t) => areTypesCompatible(BaseType.IntType, t) match {
+              case Right(t) => isCompatibleTo(BaseType.IntType, t) match {
                 case true => Right(BaseType.IntType) // Continue if index is of type int
                 case false => Left(s"Semantic Error: Array indices must be compatible with type int but are $t") // Error if index is not of type int
               }
@@ -487,7 +487,7 @@ object semanticChecker {
       (checkExprType(left, env), checkExprType(right, env)) match {
         // case (Right(BaseType.IntType), Right(BaseType.IntType)) => Right(BaseType.IntType) 
         case (Right(t1), Right(t2)) =>
-          if (areTypesCompatible(BaseType.IntType, t1) && areTypesCompatible(BaseType.IntType, t2)) { 
+          if (isCompatibleTo(BaseType.IntType, t1) && isCompatibleTo(BaseType.IntType, t2)) { 
             Right(BaseType.IntType) 
           } else { 
             Left(s"Semantic Error: $t1 and $t2 are incompatible for arithmetic operation") 
@@ -515,7 +515,7 @@ object semanticChecker {
     ).contains(op) =>
       (checkExprType(left, env), checkExprType(right, env)) match {
         case (Right(t1), Right(t2)) => 
-          if (areTypesCompatible(t1, t2) || areTypesCompatible(t2, t1)) 
+          if (isCompatibleTo(t1, t2) || isCompatibleTo(t2, t1)) 
             Right(BaseType.BoolType) 
           else Left(s"Semantic Error: Incompatible types $t1, $t2 for equality comparison")
         case (Left(error1), Left(error2)) => Left(s"$error1, $error2")
@@ -546,7 +546,7 @@ object semanticChecker {
     case UnaryOp(UnaryOperator.Negate, expr) =>
       checkExprType(expr, env) match {
         case Right(t) => 
-          if (areTypesCompatible(BaseType.IntType, t)) 
+          if (isCompatibleTo(BaseType.IntType, t)) 
             Right(BaseType.IntType)
           else Left(s"Semantic Error: `-` operator requires an integer operand but found $t") 
         case Left(error) => Left(error)
@@ -569,7 +569,7 @@ object semanticChecker {
     case UnaryOp(UnaryOperator.Chr, expr) =>
       checkExprType(expr, env) match {
         case Right(t) => 
-          if (areTypesCompatible(BaseType.IntType, t)) 
+          if (isCompatibleTo(BaseType.IntType, t)) 
             Right(BaseType.CharType)
           else Left(s"Semantic Error: `-` operator requires an integer operand but found $t") 
         case Left(error) => Left(error)
@@ -579,7 +579,7 @@ object semanticChecker {
 
 
   // t1 compatible to t2 = t1 can be weakened to t2
-  def areTypesCompatible(t1: Type, t2: Type): Boolean = (t1, t2) match {
+  def isCompatibleTo(t1: Type, t2: Type): Boolean = (t1, t2) match {
     // char[] can be treated as string
     case (ArrayType(BaseType.CharType), BaseType.StrType) => true 
     // string cannot be treated as char[]
@@ -587,12 +587,12 @@ object semanticChecker {
     
     // arrays with compatible inner types
     case (ArrayType(innerType1), ArrayType(innerType2)) =>
-      areTypesCompatible(innerType1, innerType2) // recursively check if inner types are compatible
+      isCompatibleTo(innerType1, innerType2) // recursively check if inner types are compatible
     // things in an array are compatible with things of the same type outside the array
     // case (ArrayType(innerType), innerType2) =>
-    //   areTypesCompatible(innerType, innerType2) // check if inner type is compatible with the other type
+    //   isCompatibleTo(innerType, innerType2) // check if inner type is compatible with the other type
     // case (innerType1, ArrayType(innerType2)) =>
-    //   areTypesCompatible(innerType1, innerType2)
+    //   isCompatibleTo(innerType1, innerType2)
 
     case (BaseType.IntType, BaseType.IntType) => true
     case (BaseType.BoolType, BaseType.BoolType) => true
@@ -600,11 +600,11 @@ object semanticChecker {
     case (BaseType.StrType, BaseType.StrType) => true
 
     case (PairType(leftElem1, rightElem1), PairType(leftElem2, rightElem2)) =>
-      areTypesCompatible(leftElem1, leftElem2) && areTypesCompatible(rightElem1, rightElem2)
+      isCompatibleTo(leftElem1, leftElem2) && isCompatibleTo(rightElem1, rightElem2)
     case(BaseTElem(elem1), BaseTElem(elem2)) => 
-      areTypesCompatible(elem1, elem2)
+      isCompatibleTo(elem1, elem2)
     case(ArrayTElem(elem1), ArrayTElem(elem2)) => 
-      areTypesCompatible(elem1, elem2)
+      isCompatibleTo(elem1, elem2)
     case(PairKeyword, PairKeyword) => true
     // any type can be weaken to AnyType
     case (_, AnyType) => true
@@ -622,13 +622,13 @@ object semanticChecker {
 
     // We can treat the wrapper and non-wrapper types as the same (can we?)
     case(BaseTElem(elem1), elem2) =>
-      areTypesCompatible(elem1, elem2)
+      isCompatibleTo(elem1, elem2)
     case(elem1, BaseTElem(elem2)) =>
-      areTypesCompatible(elem1, elem2)
+      isCompatibleTo(elem1, elem2)
     case(ArrayTElem(elem1), elem2) =>
-      areTypesCompatible(elem1, elem2)
+      isCompatibleTo(elem1, elem2)
     case(elem1, ArrayTElem(elem2)) =>
-      areTypesCompatible(elem1, elem2)
+      isCompatibleTo(elem1, elem2)
 
     case _ => false
   }
