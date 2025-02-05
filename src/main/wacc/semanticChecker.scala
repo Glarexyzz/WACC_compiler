@@ -317,22 +317,26 @@ object semanticChecker {
       elements match {
         case None => Right(ArrayType(AnyType))
         case Some(list) => 
-          list.foldLeft[Either[String, Type]](Right(ArrayType(AnyType))) {
-            case (acc, expr) =>
-              acc match {
-                case Left(error) => Left(error) // If there's an error from previous elements, propagate it
-                case Right(ArrayType(elementType)) =>
-                  checkExprType(expr, symbolTable) match {
-                    // Pattern match will fail on pattern case: 
-                    // Right(IntType), Right(BoolType), Right(CharType), Right(StrType), Right(AnyType), Right(wacc.PairType(_, _))
-                    case Right(exprType) => // AnyType is compatible with any type
-                      if (areTypesCompatible(elementType, exprType)) Right(ArrayType(elementType)) // Accumulate the element type if they are compatible
-                      else Left("Semantic Error: Array elements must be of the same type") // Return error if types mismatch
-                    case Left(error) => Left(error) // Propagate any errors from checkExprType
+          // Check the first element type and propagate it
+          checkExprType(list.head, symbolTable) match {
+            case Left(error) => Left(error)
+            case Right(firstType) => 
+              list.foldLeft[Either[String, Type]](Right(ArrayType(firstType))) {
+                case (acc, expr) =>
+                  acc match {
+                    case Left(error) => Left(error) // If there's an error from previous elements, propagate it
+                    case Right(ArrayType(elementType)) =>
+                      checkExprType(expr, symbolTable) match {
+                        case Right(exprType) => // AnyType is compatible with any type
+                          if (areTypesCompatible(exprType, elementType)) Right(ArrayType(elementType)) // Accumulate the element type if they are compatible
+                          else Left(s"Semantic Error: Array elements $exprType must be compatible with $elementType") // Return error if types mismatch
+                        case Left(error) => Left(error) // Propagate any errors from checkExprType
+                      }
+                    case _ => Left("Semantic Error: Elements must be ArrayType in Array")
                   }
-                case _ => Left("Semantic Error: Elements must be ArrayType in Array")
               }
           }
+
         }
       
     case RValue.RNewPair(lExpr, rExpr) =>
@@ -428,12 +432,7 @@ object semanticChecker {
     case BoolLiteral(_) => Right(BaseType.BoolType)
     case CharLiteral(_) => Right(BaseType.CharType)
     case StrLiteral(_) => Right(BaseType.StrType)
-    // begin
-//   pair(pair, pair) p = null ;
-//   println p ;
-//   p = null ;
-//   println p
-// end
+
     case PairLiteral => Right(PairType(NullType, NullType))
     
     case Identifier(name) => env.lookup(name) match {
@@ -442,7 +441,32 @@ object semanticChecker {
       case None => Left(s"Semantic Error: $name is not declared")
     }
 
-    case ArrayElem(name, indices) => ???
+    // // <ident> ('[ <expr> ']')+
+// case class ArrayElem(name: String, indices: List[Expr]) extends Expr
+    case ArrayElem(name, indices) => 
+      // all Expr in indices must be compatible with IntExpr
+      indices.foldLeft[Either[String, Type]](Right(BaseType.IntType)) {
+        case (acc, index) =>
+          acc match {
+          case Left(error) => Left(error) // Propagate any errors from previous indices
+          case Right(_) =>
+            checkExprType(index, env) match {
+              case Right(t) => areTypesCompatible(t, BaseType.IntType) match {
+                case true => Right(BaseType.IntType) // Continue if index is of type int
+                case false => Left(s"Semantic Error: Array indices must be compatible with type int but are $t") // Error if index is not of type int
+              }
+              case Left(error) => Left(error) // Propagate any errors from checkExprType
+            }
+          }
+      } match {
+        case Right(_) =>
+          env.lookup(name) match {
+        case Some(VariableEntry(ArrayType(innerType))) => Right(ArrayType(innerType))
+        case Some(_) => Left(s"Semantic Error: $name is not an array")
+        case None => Left(s"Semantic Error: $name is not declared")
+          }
+        case Left(error) => Left(error)
+      }
 
 
     case BinaryOp(left, op, right) if Set(
@@ -453,8 +477,16 @@ object semanticChecker {
       BinaryOperator.Modulus
     ).contains(op) =>
       (checkExprType(left, env), checkExprType(right, env)) match {
-        case (Right(BaseType.IntType), Right(BaseType.IntType)) => Right(BaseType.IntType) 
-        case _ => Left("Semantic Error: Incompatible types for arithmetic operation") 
+        // case (Right(BaseType.IntType), Right(BaseType.IntType)) => Right(BaseType.IntType) 
+        case (Right(t1), Right(t2)) =>
+          if (areTypesCompatible(t1, BaseType.IntType) && areTypesCompatible(t2, BaseType.IntType)) { 
+            Right(BaseType.IntType) 
+          } else { 
+            Left(s"Semantic Error: $t1 and $t2 are incompatible for arithmetic operation") 
+          }
+        case (Left(error1), Left(error2)) => Left(s"$error1, $error2")
+        case (Left(error), _) => Left(error)
+        case (_, Left(error)) => Left(error)
       }
     
     case BinaryOp(left, op, right) if Set(
@@ -502,7 +534,8 @@ object semanticChecker {
     case UnaryOp(UnaryOperator.Length, expr) =>
       checkExprType(expr, env) match {
         case Right(ArrayType(_)) => Right(BaseType.IntType) 
-        case _ => Left("Semantic Error: `len` operator requires an array")
+        case Right(t) => Left(s"Semantic Error: `len` operator requires an array, found $t")
+        case Left(error) => Left(error)
       }
 
     case UnaryOp(UnaryOperator.Ord, expr) =>
@@ -532,6 +565,11 @@ object semanticChecker {
     // arrays with compatible inner types
     case (ArrayType(innerType1), ArrayType(innerType2)) =>
       areTypesCompatible(innerType1, innerType2) // recursively check if inner types are compatible
+    // things in an array are compatible with things of the same type outside the array
+    case (ArrayType(innerType), innerType2) =>
+      areTypesCompatible(innerType, innerType2) // check if inner type is compatible with the other type
+    case (innerType1, ArrayType(innerType2)) =>
+      areTypesCompatible(innerType1, innerType2)
 
     case (BaseType.IntType, BaseType.IntType) => true
     case (BaseType.BoolType, BaseType.BoolType) => true
@@ -547,6 +585,7 @@ object semanticChecker {
     case(PairKeyword, PairKeyword) => true
     // any type can be weaken to AnyType
     case (_, AnyType) => true
+    
 
     // any PairElemType can be weakened to a Null Type
     case (BaseTElem(_), NullType) => true
