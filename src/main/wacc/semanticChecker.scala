@@ -24,7 +24,7 @@ class SymbolTable {
   
   def enterScope(): Unit = {
     scopeLevel += 1
-    variableScopes.push(mutable.Map())  
+    variableScopes.push(mutable.Map())
   }
 
   /*
@@ -277,7 +277,10 @@ object semanticChecker {
       checkExprType(cond, symbolTable) match {
         case Left(error) => Some(error)
         case Right(BaseType.BoolType) => 
-          checkStatement(body)
+          symbolTable.enterScope()
+          val result: Option[String] = checkStatement(body)
+          symbolTable.exitScope()
+          result
         case Right(_) => Some("Semantic Error: If condition must be a boolean")
       }
 
