@@ -450,32 +450,59 @@ object semanticChecker {
 
     // // <ident> ('[ <expr> ']')+
 // case class ArrayElem(name: String, indices: List[Expr]) extends Expr
-    case ArrayElem(name, indices) => 
-      // all Expr in indices must be compatible with IntExpr
+    // case ArrayElem(name, indices) => 
+    //   // all Expr in indices must be compatible with IntExpr
+    //   indices.foldLeft[Either[String, Type]](Right(BaseType.IntType)) {
+    //     case (acc, index) =>
+    //       acc match {
+    //       case Left(error) => Left(error) // Propagate any errors from previous indices
+    //       case Right(_) =>
+    //         checkExprType(index, env) match {
+    //           // can int be weakened to the index type? (since int is the most specific type of element)
+    //           case Right(t) => isCompatibleTo(BaseType.IntType, t) match {
+    //             case true => Right(BaseType.IntType) // Continue if index is of type int
+    //             case false => Left(s"Semantic Error: Array indices must be compatible with type int but are $t") // Error if index is not of type int
+    //           }
+    //           case Left(error) => Left(error) // Propagate any errors from checkExprType
+    //         }
+    //       }
+    //   } match {
+    //     case Right(_) =>
+    //       env.lookup(name) match {
+    //     case Some(VariableEntry(ArrayType(innerType))) => Right(ArrayType(innerType))
+    //     case Some(_) => Left(s"Semantic Error: $name is not an array")
+    //     case None => Left(s"Semantic Error: $name is not declared")
+    //       }
+    //     case Left(error) => Left(error)
+    //   }
+    case ArrayElem(name, indices) =>
+  // Ensure all indices are of type Int
       indices.foldLeft[Either[String, Type]](Right(BaseType.IntType)) {
         case (acc, index) =>
           acc match {
-          case Left(error) => Left(error) // Propagate any errors from previous indices
-          case Right(_) =>
-            checkExprType(index, env) match {
-              // can int be weakened to the index type? (since int is the most specific type of element)
-              case Right(t) => isCompatibleTo(BaseType.IntType, t) match {
-                case true => Right(BaseType.IntType) // Continue if index is of type int
-                case false => Left(s"Semantic Error: Array indices must be compatible with type int but are $t") // Error if index is not of type int
+            case Left(error) => Left(error) // Propagate errors
+            case Right(_) =>
+              checkExprType(index, env) match {
+                case Right(t) if isCompatibleTo(BaseType.IntType, t) =>
+                  Right(BaseType.IntType) // Continue if index is valid
+                case Right(t) =>
+                  Left(s"Semantic Error: Array indices must be of type int, but found $t")
+                case Left(error) => Left(error) // Propagate errors
               }
-              case Left(error) => Left(error) // Propagate any errors from checkExprType
-            }
           }
       } match {
         case Right(_) =>
+          // Lookup variable in the environment
           env.lookup(name) match {
-        case Some(VariableEntry(ArrayType(innerType))) => Right(ArrayType(innerType))
-        case Some(_) => Left(s"Semantic Error: $name is not an array")
-        case None => Left(s"Semantic Error: $name is not declared")
+            case Some(VariableEntry(arrayType)) => 
+              checkValidArrayIndexing(arrayType, indices.length) // New function to check index depth
+            case Some(_) => Left(s"Semantic Error: $name is not an array")
+            case None => Left(s"Semantic Error: $name is not declared")
           }
         case Left(error) => Left(error)
       }
 
+  // Function to validate indexing depth
 
     case BinaryOp(left, op, right) if Set(
       BinaryOperator.Add,
@@ -581,9 +608,9 @@ object semanticChecker {
   // t1 compatible to t2 = t1 can be weakened to t2
   def isCompatibleTo(t1: Type, t2: Type): Boolean = (t1, t2) match {
     // char[] can be treated as string
-    case (ArrayType(BaseType.CharType), BaseType.StrType) => true 
+    case (ArrayType(BaseType.CharType), BaseType.StrType) => false 
     // string cannot be treated as char[]
-    case (BaseType.StrType, ArrayType(BaseType.CharType)) => false // string to char[] is not allowed
+    case (BaseType.StrType, ArrayType(BaseType.CharType)) => true // string to char[] is not allowed
     
     // arrays with compatible inner types
     case (ArrayType(innerType1), ArrayType(innerType2)) =>
@@ -632,6 +659,16 @@ object semanticChecker {
 
     case _ => false
   }
+
+  def checkValidArrayIndexing(arrayType: Type, numIndices: Int): Either[String, Type] = {
+    arrayType match {
+      case ArrayType(innerType) =>
+        if (numIndices == 1) Right(innerType) 
+        else checkValidArrayIndexing(innerType, numIndices - 1) // ✅ Now properly returns Either
+      case _ => Left("Semantic Error: Too many indices for array")
+    }
+    
+  } 
 
 
   
