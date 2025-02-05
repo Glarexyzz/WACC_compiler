@@ -34,3 +34,4 @@ object BaseTElem extends generic.ParserBridge1[BaseType, BaseTElem]
 case class ArrayTElem(elem: ArrayType) extends PairElemType
 object ArrayTElem extends generic.ParserBridge1[ArrayType, ArrayTElem]
 case object PairKeyword extends PairElemType // 'pair' keyword
+case object NullType extends PairElemType // 'null' keyword

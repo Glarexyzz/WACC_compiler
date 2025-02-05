@@ -151,11 +151,37 @@ object parser {
             symbol("string").as(BaseType.StrType)
         )
 
+// private lazy val arrayType: Parsley[ArrayType] = 
+  // First, parse the inner type (either a pair type or a base type)
+//   (pairType <|> baseType)
+//     .flatMap { innerType =>
+//       // Then, apply the wrapping for arrays (repeated "[]" wrapping)
+//       some(softOp("[") *> softOp("]")).map { _ =>
+//         // Each "[]" wraps the current array type
+//         ArrayType(innerType)
+//       }
+//     }
     // Array type definition
     private lazy val arrayType: Parsley[ArrayType] =
-        ArrayType(
-            (pairType <|> baseType) <* some(softOp("[") <* softOp("]"))
-        )
+        (pairType <|> baseType).flatMap { innerType =>
+            // Match one or more occurrences of []
+            some(softOp("[") *> softOp("]")).map { brackets =>
+                // Start with innerType, and wrap it for each "[]"
+                brackets.foldLeft(innerType) { (acc, _) =>
+                    // Ensure that the accumulator is always wrapped in ArrayType
+                    ArrayType(acc)  // Safely cast to ArrayType
+                }.asInstanceOf[ArrayType]
+            }
+        }
+            // flatMap { innerType =>
+            //     println(s"wrapping around $innerType")
+            //     // Then, apply the wrapping for arrays (repeated "[]" wrapping)
+            //     some(softOp("[") *> softOp("]")).map { _ =>
+            //         // Each "[]" wraps the current array type
+            //         ArrayType(innerType)
+            //     }
+            // }
+        
 
     // Pair definition
     private lazy val pairType: Parsley[PairType] = 
