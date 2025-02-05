@@ -589,10 +589,10 @@ object semanticChecker {
     case (ArrayType(innerType1), ArrayType(innerType2)) =>
       areTypesCompatible(innerType1, innerType2) // recursively check if inner types are compatible
     // things in an array are compatible with things of the same type outside the array
-    case (ArrayType(innerType), innerType2) =>
-      areTypesCompatible(innerType, innerType2) // check if inner type is compatible with the other type
-    case (innerType1, ArrayType(innerType2)) =>
-      areTypesCompatible(innerType1, innerType2)
+    // case (ArrayType(innerType), innerType2) =>
+    //   areTypesCompatible(innerType, innerType2) // check if inner type is compatible with the other type
+    // case (innerType1, ArrayType(innerType2)) =>
+    //   areTypesCompatible(innerType1, innerType2)
 
     case (BaseType.IntType, BaseType.IntType) => true
     case (BaseType.BoolType, BaseType.BoolType) => true
@@ -608,7 +608,7 @@ object semanticChecker {
     case(PairKeyword, PairKeyword) => true
     // any type can be weaken to AnyType
     case (_, AnyType) => true
-    // I may regret this, but AnyType can be weakened to any type
+    // I may regret this, but AnyType can be weakened to any type. So ArrayType(AnyType) is compatible with ArrayType(IntType) in declaration
     case (AnyType, _) => true
     
 
