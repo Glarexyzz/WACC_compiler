@@ -570,7 +570,7 @@ object semanticChecker {
       checkExprType(expr, env) match {
         case Right(t) => 
           if (areTypesCompatible(BaseType.IntType, t)) 
-            Right(BaseType.IntType)
+            Right(BaseType.CharType)
           else Left(s"Semantic Error: `-` operator requires an integer operand but found $t") 
         case Left(error) => Left(error)
       }

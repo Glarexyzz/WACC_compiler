@@ -48,7 +48,7 @@ trait WACCTestUtils {
     // "print", //
     // "runtimeErr", //
     // "runtimeErr/arrayOutOfBounds", //
-    "runtimeErr/badChar", 
+    // "runtimeErr/badChar", //
     // "runtimeErr/divideByZero", //
     // "runtimeErr/integerOverflow", //
     "runtimeErr/nullDereference", // failed due to pair types
