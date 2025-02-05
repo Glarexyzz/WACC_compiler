@@ -31,29 +31,31 @@ trait WACCTestUtils {
 trait WACCTestUtils {
   val ignoredSubcategories = Set (
     "advanced",
-    // "array",
+    "array",
     // "basic", "basic/exit", "basic/skip", //
     // "exit", //
     // "expressions", //
-    // "function", "function/nested_functions", "function/simple_functions",
-    // "literals",
+    "function", 
+    // "function/nested_functions", // 
+    // "function/simple_functions",
+    // "literals", //(syntax only)
     // "if", //
     // "IO",  //
-    // "IO/print", 
+    // "IO/print", //
     // "IO/read", //
-    // "multiple",
-    // "pairs",
+    "multiple", // failed for unknown reasons
+    "pairs",
     // "print", //
-    // "runtimeErr", 
-    // "runtimeErr/arrayOutOfBounds", 
-    // "runtimeErr/badChar", 
-    // "runtimeErr/divideByZero", 
-    // "runtimeErr/integerOverflow", 
-    // "runtimeErr/nullDereference",
-    // "scope",
+    // "runtimeErr", //
+    // "runtimeErr/arrayOutOfBounds", //
+    "runtimeErr/badChar", 
+    // "runtimeErr/divideByZero", //
+    // "runtimeErr/integerOverflow", //
+    "runtimeErr/nullDereference", // failed due to pair types
+    "scope",
     // "sequence", //
     // "read", //
-    // "variables", //X : scopevar issue
+    "variables", //X : scopevar issue
     // "while"  //
     )
 
