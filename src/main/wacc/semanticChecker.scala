@@ -472,7 +472,8 @@ object semanticChecker {
       } match {
         case Right(_) =>
           env.lookup(name) match {
-        case Some(VariableEntry(ArrayType(innerType))) => Right(ArrayType(innerType))
+        case Some(VariableEntry(ArrayType(innerType))) => checkValidArrayIndexing(ArrayType(innerType), indices.length)
+          //Right(ArrayType(innerType))
         case Some(_) => Left(s"Semantic Error: $name is not an array")
         case None => Left(s"Semantic Error: $name is not declared")
           }
@@ -586,7 +587,7 @@ object semanticChecker {
     // char[] can be treated as string
     case (ArrayType(BaseType.CharType), BaseType.StrType) => true 
     // string cannot be treated as char[]
-    case (BaseType.StrType, ArrayType(BaseType.CharType)) => false // string to char[] is not allowed
+    case (BaseType.StrType, ArrayType(BaseType.CharType)) => true // string to char[] is not allowed
     
     // arrays with compatible inner types
     case (ArrayType(innerType1), ArrayType(innerType2)) =>
@@ -635,6 +636,17 @@ object semanticChecker {
 
     case _ => false
   }
+
+  def checkValidArrayIndexing(arrayType: Type, numIndices: Int): Either[String, Type] = {
+    arrayType match {
+      case ArrayType(innerType) =>
+        if (numIndices == 1) Right(innerType) 
+        else checkValidArrayIndexing(innerType, numIndices - 1) // ✅ Now properly returns Either
+      case _ => Left("Semantic Error: Too many indices for array")
+    }
+    
+  } 
+
 
 
   
