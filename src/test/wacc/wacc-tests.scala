@@ -37,25 +37,25 @@ trait WACCTestUtils {
     // "expressions", //
     "function", 
     // "function/nested_functions", // 
-    // "function/simple_functions",
+    "function/simple_functions",
     // "literals", //(syntax only)
     // "if", //
     // "IO",  //
     // "IO/print", //
     // "IO/read", //
     "multiple", // failed for unknown reasons
-    "pairs",
+    // "pairs",
     // "print", //
     // "runtimeErr", //
     // "runtimeErr/arrayOutOfBounds", //
     // "runtimeErr/badChar", //
     // "runtimeErr/divideByZero", //
     // "runtimeErr/integerOverflow", //
-    "runtimeErr/nullDereference", // failed due to pair types
+    // "runtimeErr/nullDereference", // failed due to pair types
     "scope",
     // "sequence", //
     // "read", //
-    "variables", //X : scopevar issue
+    // "variables", //X : scopevar issue
     // "while"  //
     )
 

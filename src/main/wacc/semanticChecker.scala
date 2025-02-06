@@ -177,6 +177,7 @@ object semanticChecker {
               case Some(_) => Some(s"Semantic Error in identifier: Incompatible types in assignment to $name")
               case None => Some(s"Semantic Errorin identifier: Variable $name not declared")
             }
+
             case LValue.LArray(ArrayElem(name, _)) => symbolTable.lookupVariable(name) match {
               case Some(VariableEntry(ArrayType(lType))) if isCompatibleTo(rType, lType) => None
               case Some(_) => Some(s"Semantic Error in array: Incompatible types in assignment to $name")
@@ -184,24 +185,27 @@ object semanticChecker {
             }
 
             case LValue.LPair(pairElem) => 
-            // Extract types from both LHS and RHS pairs
-              rvalue match {
-                case RValue.RPair(pairElemR) => 
-                  (checkPairElem(pairElem), checkPairElem(pairElemR)) match {
-                    case (Right(PairType(lLType, lRType)), Right(PairType(rLType, rRType))) =>
-                      // Check if types match
-                      if (isCompatibleTo(rLType, lLType) && isCompatibleTo(rRType, lRType)) {
-                        None // Types are compatible
-                      } else {
-                        Some(s"Semantic Error: $rLType is not compatible with $lLType or $rRType is not compatible with $lRType")
-                      }
-                    case (Left(error), _) => Some(error)  // Error in LHS pair element
-                    case (_, Left(error)) => Some(error)  // Error in RHS pair element
-                    case _ => Some("Semantic Error: Incompatible types between LHS and RHS pair elements")
-                  }
-                case _ => Some(s"Semantic Error: $rvalue must be a Rpair")
+            // Type of pairElem 
+            // Type of rValue
+              (checkPairElem(pairElem), checkRValue(rvalue)) match {
+                case (Right(PairKeyword), Right(PairKeyword)) => 
+                  None
+
+                // LHS is PairKeyword and RHS is a known type
+                case (Right(PairKeyword), Right(rType)) =>
+                  Some(s"Semantic Error in Pair: Cannot assign $rType to a pair of unknown type")
+
+                // LHS is a known type and RHS is a known type
+                case (Right(lType), Right(rType)) =>
+                  if (isCompatibleTo(rType, lType)) None 
+                  else Some(s"Semantic Error in Pair: $rType is not compatible to $lType")
+
+                // Error cases
+                case (Left(error1), Left(error2)) => Some(s"$error1,\n$error2")
+                case (Left(error), _) => Some(error)
+                case (_, Left(error)) => Some(error)
               }
-            }
+        }
       }
 
     // 'read' <lValue>
@@ -422,7 +426,19 @@ object semanticChecker {
           case Some(_) => Left(s"Error: $name is not an array")
           case None => Left(s"Error: $name is not declared")
       }
-      case PairElem.FstElem(LValue.LPair(_)) | PairElem.SndElem(LValue.LPair(_)) => Right(PairKeyword)
+      // there's something wrong here but I am too sleepy to see it
+      case PairElem.FstElem(LValue.LPair(pairElem)) => 
+        checkPairElem(pairElem) match {
+          case Right(PairType(leftType, _)) => Right(leftType)
+          case Right(_) => Left("Error: First element of $name is not a pair")
+          case Left(err) => Left(err)
+      }
+      case PairElem.SndElem(LValue.LPair(pairElem)) => 
+        checkPairElem(pairElem) match {
+          case Right(PairType(_, rightType)) => Right(rightType)
+          case Right(_) => Left("Error: Second element of $name is not a pair")
+          case Left(err) => Left(err)
+      }
       case _ => Left("Error: Invalid pair element")
     }
   
@@ -622,6 +638,8 @@ object semanticChecker {
     // any PairElemType can be weakened to a PairKeyword and vice versa
     case (PairType(_, _), PairKeyword) => true
     case (PairKeyword, PairType(_, _)) => true
+    // Assignment is legal when assigning array (even of unknown type) in nested pair extraction
+    // case (ArrayType(_), PairKeyword) => true
 
     // We can treat the wrapper and non-wrapper types as the same (can we?)
     case(BaseTElem(elem1), elem2) =>
