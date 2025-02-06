@@ -24,7 +24,7 @@ def main(args: Array[String]): Unit = {
                             exitCode = exitValid
                     }
                 case Left(error) =>
-                    println(s"Parsing failed: $error")
+                    println(s"Syntax Errors found: $error")
                     exitCode = exitInvalidSyntax
             }
     }

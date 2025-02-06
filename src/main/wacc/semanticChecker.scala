@@ -38,8 +38,6 @@ class SymbolTable {
         return false // Variable already declared in this scope
       }
       currentScope(name) = VariableEntry(varType) // Add variable
-      println(s"Added variable $name of type $varType at scope level ${scopeLevel}")
-      //println(variableScopes)
       return true
     }
     false // No active scope
@@ -55,13 +53,10 @@ class SymbolTable {
     true
   }
   def lookupVariable(name: String): Option[VariableEntry] = {
-    //println(s"🔍 Looking for variable '$name' starting from scope level $scopeLevel")
-
     val result = variableScopes.zipWithIndex.reverseIterator.toList.reverse.collectFirst {
       case (scope, index) if index >= (variableScopes.size - scopeLevel) && scope.contains(name) => 
         scope(name)
     }
-    printf("✅Lookup for variable '%s' at scope level %d: %s\n", name, scopeLevel, result)
     result
   
   }
@@ -113,10 +108,9 @@ object semanticChecker {
     symbolTable.enterScope()
     symbolTable.addFunction(func.name, func.t, func.paramList)
     symbolTable.setFunctionStatus(Some(func.t))
+
     checkStatement(func.stmt)
-    // Check function declarations
-    // def checkFunctionDeclaration(func: Func): Unit = {
-    //   println(s"Checking function: ${func.name}")
+
     symbolTable.setFunctionStatus(None) 
     symbolTable.exitScope()
     None
@@ -135,7 +129,6 @@ object semanticChecker {
         // Any is the broadest possible case?
         // can rType be weakened to t?
           if (isCompatibleTo(t, rType)) {
-            printf("Checking declaration of variable '%s' of type %s\n", name, t)
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate) 
               None
@@ -146,18 +139,14 @@ object semanticChecker {
       }
 
     case AssignStmt(lvalue, rvalue) => 
-      println("Checking assignment")
       (checkLValue(lvalue), checkRValue(rvalue)) match {
         case (Some(error), _) => Some(error)
         case (_, Left(error)) => Some(error)
         case (None, Right(rType)) => 
-          println(s"Matching lvalue: $lvalue and rvalue $rType")
-          // can rType be weakened to lType?
           lvalue match {
             case LValue.LName(name) => symbolTable.lookupVariable(name) match {
               case Some(VariableEntry(lType)) => 
                 if (isCompatibleTo(rType, lType)) {
-                  println(s"Assignment of $rType to $lType in $name")
                   None
                 } else {
                   Some(s"Semantic Error in identifier: $rType is not compatible to $lType")
@@ -238,7 +227,6 @@ object semanticChecker {
 
     // 'print' <expr>
     case PrintStmt(expr) => 
-      println(s"Checking print of $expr")
       checkExprType(expr, symbolTable) match {
         case Left(error) => Some(error)
         case Right(_) => None
@@ -246,7 +234,6 @@ object semanticChecker {
 
     // 'println' <expr>
     case PrintlnStmt(expr) => 
-      println(s"Checking println of $expr")
       checkExprType(expr, symbolTable) match {
         case Left(error) => Some(error)
         case Right(_) => None
