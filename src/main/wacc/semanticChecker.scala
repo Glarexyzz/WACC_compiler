@@ -58,6 +58,8 @@ class SymbolTable {
         return false // Variable already declared in this scope
       }
       currentScope(name) = VariableEntry(varType) // Add variable
+      println(s"Added variable $name of type $varType at scope level ${scopeLevel}")
+      //println(variableScopes)
       return true
     }
     false // No active scope
@@ -73,10 +75,13 @@ class SymbolTable {
     true
   }
   def lookupVariable(name: String): Option[VariableEntry] = {
-    val result = variableScopes.zipWithIndex.reverseIterator.collectFirst {
-      case (scope, level) if level <= scopeLevel && scope.contains(name) => scope(name)
+    //println(s"🔍 Looking for variable '$name' starting from scope level $scopeLevel")
+
+    val result = variableScopes.zipWithIndex.reverseIterator.toList.reverse.collectFirst {
+      case (scope, index) if index >= (variableScopes.size - scopeLevel) && scope.contains(name) => 
+        scope(name)
     }
-    printf("Lookup for variable '%s' at scope level %d: %s\n", name, scopeLevel, result)
+    printf("✅Lookup for variable '%s' at scope level %d: %s\n", name, scopeLevel, result)
     result
   
   }
@@ -153,8 +158,7 @@ object semanticChecker {
             printf("Checking declaration of variable '%s' of type %s\n", name, t)
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate) 
-             println(s"Added variable $name of type $rType at scope level ${symbolTable.scopeLevel}")
-             None
+              None
             else Some(s"Semantic Error in Declaration: Variable $name is already declared")
            }
           else Some(s"Semantic Error in Declaration: $rType is not compatible with $t for variable $name")
@@ -254,9 +258,11 @@ object semanticChecker {
     }
 
     // 'print' <expr>
-    case PrintStmt(expr) => checkExprType(expr, symbolTable) match {
-      case Left(error) => Some(error)
-      case Right(_) => None
+    case PrintStmt(expr) => 
+      println(s"Checking print of $expr")
+      checkExprType(expr, symbolTable) match {
+        case Left(error) => Some(error)
+        case Right(_) => None
     }
 
     // 'println' <expr>
@@ -272,7 +278,13 @@ object semanticChecker {
       checkExprType(cond, symbolTable) match {
         case Left(error) => Some(error)
         case Right(BaseType.BoolType) => 
-          checkStatement(thenStmt) ++ checkStatement(elseStmt)
+          symbolTable.enterScope()
+          val resultThenStmt: Option[String] = checkStatement(thenStmt)
+          symbolTable.exitScope()
+          symbolTable.enterScope()
+          val resultElseStmt: Option[String] = checkStatement(elseStmt)
+          symbolTable.exitScope()
+          resultThenStmt ++ resultElseStmt
         case Right(_) => Some("Semantic Error: If condition must be a boolean")
       }
 
@@ -291,7 +303,9 @@ object semanticChecker {
     // 'begin' <stmt> 'end'
     case BodyStmt(body) => 
       symbolTable.enterScope() // because some of our parsed output have a bodystmt wrapper
-      checkStatement(body)
+      val result: Option[String] = checkStatement(body)
+      symbolTable.exitScope()
+      result
 
     // <stmt> ';' <stmt>
     case SeqStmt(left, right) =>
