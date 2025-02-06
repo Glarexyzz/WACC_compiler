@@ -30,9 +30,8 @@ trait WACCTestUtils {
   
 trait WACCTestUtils {
   val ignoredSubcategories = Set (
-    /*
     "advanced",
-    "array",
+    // "array",
     // "basic", "basic/exit", "basic/skip", //
     // "exit", //
     // "expressions", //
@@ -44,7 +43,7 @@ trait WACCTestUtils {
     // "IO",  //
     // "IO/print", //
     // "IO/read", //
-    "multiple", // failed for unknown reasons
+    // "multiple", // failed for unknown reasons
     // "pairs",
     // "print", //
     // "runtimeErr", //
@@ -53,30 +52,11 @@ trait WACCTestUtils {
     // "runtimeErr/divideByZero", //
     // "runtimeErr/integerOverflow", //
     // "runtimeErr/nullDereference", // failed due to pair types
-    "scope",
+    // "scope",
     // "sequence", //
     // "read", //
     // "variables", //X : scopevar issue
     // "while"  //
-    */
-    "advanced",
-    //"array",
-    "basic", "basic/exit", "basic/skip",
-    "exit",
-    "expressions",
-    "function", "function/nested_functions", "function/simple_functions",
-    "if",
-    "literals",
-    "IO", "IO/print", "IO/read",
-    "multiple",
-    "pairs",
-    "print",
-    "runtimeErr", "runtimeErr/arrayOutOfBounds", "runtimeErr/badChar", "runtimeErr/divideByZero", "runtimeErr/integerOverflow", "runtimeErr/nullDereference",
-    "scope",
-    "sequence",
-    "read",
-    "variables",
-    "while"
     )
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {

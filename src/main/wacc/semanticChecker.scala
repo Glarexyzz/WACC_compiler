@@ -416,13 +416,13 @@ object semanticChecker {
       }
       case PairElem.FstElem(LValue.LArray(ArrayElem(name, _))) => 
         symbolTable.lookup(name) match {
-          case Some(VariableEntry(ArrayType(leftType))) => Right(leftType)
+          case Some(VariableEntry(ArrayType(PairType(leftType, _)))) => Right(leftType)
           case Some(_) => Left(s"Error: $name is not an array")
           case None => Left(s"Error: $name is not declared")
       }
       case PairElem.SndElem(LValue.LArray(ArrayElem(name, _))) => 
         symbolTable.lookup(name) match {
-          case Some(VariableEntry(ArrayType(leftType))) => Right(leftType)
+          case Some(VariableEntry(ArrayType(PairType(_, rightType)))) => Right(rightType)
           case Some(_) => Left(s"Error: $name is not an array")
           case None => Left(s"Error: $name is not declared")
       }
