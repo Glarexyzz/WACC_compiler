@@ -11,12 +11,9 @@ case class FunctionEntry(returnType: Type, params: Option[List[Param]]) extends 
 
 
 class SymbolTable {
-  //private val table: mutable.Map[String, mutable.Stack[SymbolEntry]] = mutable.Map()
-
   // Table to store symbol entries. 
   // Variables are stored in a mutable Stack (to handle scopes), while functions are stored directly.
   private val functionTable: mutable.Map[String, FunctionEntry] = mutable.Map()
-  //private val variableScopes: mutable.Map[String, mutable.Stack[VariableEntry]] = mutable.Map()
   private val variableScopes: mutable.Stack[mutable.Map[String, VariableEntry]] = mutable.Stack()
   var scopeLevel: Int = 0 // Tracks current scope depth
   private var functionStatus: Option[Type] = None // Tracks the return type of the current function
@@ -27,19 +24,6 @@ class SymbolTable {
     variableScopes.push(mutable.Map())
   }
 
-  /*
-  def exitScope(): Unit = {
-    // Remove all variables/functions declared at current scope level
-    table.keys.foreach { key =>
-      if (table(key).size > scopeLevel) {
-        table(key).pop()
-      }
-      if (table(key).isEmpty) table.remove(key) // Clean up empty entries
-    }
-    scopeLevel -= 1
-  }
-  */
-
   def exitScope(): Unit = {
     if (scopeLevel > 0) {
       variableScopes.pop()
@@ -48,10 +32,6 @@ class SymbolTable {
   }
   
   def addVariable(name: String, varType: Type): Boolean = {
-    // val entries = variableScopes.getOrElseUpdate(name, mutable.Stack())
-    // // Add the variable to the current scope
-    // entries.push(VariableEntry(varType))
-    // true
     if (variableScopes.nonEmpty) {
       val currentScope = variableScopes.top // Get current scope
       if (currentScope.contains(name)) {
