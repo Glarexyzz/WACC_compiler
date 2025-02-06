@@ -175,12 +175,8 @@ object semanticChecker {
             // Type of pairElem 
             // Type of rValue
               (checkPairElem(pairElem), checkRValue(rvalue)) match {
-                case (Right(PairKeyword), Right(PairKeyword)) => 
-                  None
-
-                // LHS is PairKeyword and RHS is a known type
-                // case (Right(PairKeyword), Right(rType)) =>
-                //   Some(s"Semantic Error in Pair: Cannot assign $rType to a pair of unknown type")
+                case (Right(AnyType), Right(AnyType)) => 
+                  Some(s"Semantic Error in Pair: Both PairTypes cannot be unknown")
 
                 // LHS is a known type and RHS is a known type
                 case (Right(lType), Right(rType)) =>
@@ -425,16 +421,14 @@ object semanticChecker {
       }
       case PairElem.FstElem(LValue.LPair(pairElem)) => 
         checkPairElem(pairElem) match {
-          case Right(PairType(leftType, _)) => Right(leftType)
           case Right(PairKeyword) => Right(AnyType)
-          case Right(t) => Left(s"Error: First element of $t is not a PairType")
+          case Right(t) => Right(PairKeyword)
           case Left(err) => Left(err)
       }
       case PairElem.SndElem(LValue.LPair(pairElem)) => 
         checkPairElem(pairElem) match {
-          case Right(PairType(_, rightType)) => Right(rightType)
           case Right(PairKeyword) => Right(AnyType)
-          case Right(t) => Left(s"Error: Second element of $t is not a pairPairType")
+          case Right(t) => Right(PairKeyword)
           case Left(err) => Left(err)
       }
 
@@ -602,7 +596,7 @@ object semanticChecker {
     // char[] can be treated as string
     case (ArrayType(BaseType.CharType), BaseType.StrType) => true 
     // string cannot be treated as char[]
-    case (BaseType.StrType, ArrayType(BaseType.CharType)) => true // string to char[] is not allowed
+    case (BaseType.StrType, ArrayType(BaseType.CharType)) => false // string to char[] is not allowed
     
     // arrays with compatible inner types
     case (ArrayType(innerType1), ArrayType(innerType2)) =>
@@ -617,7 +611,7 @@ object semanticChecker {
     case (BaseType.BoolType, BaseType.BoolType) => true
     case (BaseType.CharType, BaseType.CharType) => true
     case (BaseType.StrType, BaseType.StrType) => true
-
+    // pairs should not be covariant
     case (PairType(leftElem1, rightElem1), PairType(leftElem2, rightElem2)) =>
       isCompatibleTo(leftElem1, leftElem2) && isCompatibleTo(rightElem1, rightElem2)
     case(BaseTElem(elem1), BaseTElem(elem2)) => 
@@ -625,7 +619,8 @@ object semanticChecker {
     case(ArrayTElem(elem1), ArrayTElem(elem2)) => 
       isCompatibleTo(elem1, elem2)
     case(PairKeyword, PairKeyword) => true
-    // any type can be weaken to AnyType
+    // case(AnyType, AnyType) => false
+    // any other type can be weaken to AnyType
     case (_, AnyType) => true
     // I may regret this, but AnyType can be weakened to any type. So ArrayType(AnyType) is compatible with ArrayType(IntType) in declaration
     case (AnyType, _) => true
@@ -640,10 +635,7 @@ object semanticChecker {
     case (PairType(_, _), PairKeyword) => true
     case (PairKeyword, PairType(_, _)) => true
     case (NullType, PairKeyword) => true
-    // Assignment is legal when assigning array (even of unknown type) in nested pair extraction
-    // case (ArrayType(_), PairKeyword) => true
 
-    // We can treat the wrapper and non-wrapper types as the same (can we?)
     case(BaseTElem(elem1), elem2) =>
       isCompatibleTo(elem1, elem2)
     case(elem1, BaseTElem(elem2)) =>
@@ -652,7 +644,6 @@ object semanticChecker {
       isCompatibleTo(elem1, elem2)
     case(elem1, ArrayTElem(elem2)) =>
       isCompatibleTo(elem1, elem2)
-
     case _ => false
   }
 
@@ -663,20 +654,7 @@ object semanticChecker {
         else checkValidArrayIndexing(innerType, numIndices - 1) // ✅ Now properly returns Either
       case _ => Left("Semantic Error: Too many indices for array")
     }
-    
   } 
-
-
-
-  
-
-
-  // def checkArrayElementType(elementType: Type): Boolean = elementType match {
-  //   case PairKeyword => false // Arrays cannot hold pairs
-  //   case _ => true
-  // }
-
-
 }
 
 // override Option[String] addition method
