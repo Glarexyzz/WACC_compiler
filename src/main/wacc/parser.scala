@@ -12,38 +12,13 @@ import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
 
 object parser {
     def parse[Err >: ParserError: ErrorBuilder](prog: String): Either[Err, Any] = {
-        val parsers: List[(String, Parsley[Any])] = List(
-            "Expression" -> fully(expr),
-            "Statement"  -> fully(stmt),
-            "Function"   -> fully(func),
-            "Program"    -> fully(program)
-            
-        )
+        fully(program).parse(prog) match {
+            case parsley.Success(result) => 
+                Right(result)
 
-
-        var lastError: Option[Err] = None
-        parsers.foldLeft(Option.empty[Either[Err, Any]]) {
-            case (Some(result), _) => Some(result) // Parsing succeeded!
-            case (None, (name, parser)) => 
-                parser.parse(prog) match {
-                    case parsley.Success(result) => 
-                        println(s"Success! Parsed as: $name")
-                        Some(Right(result))
-                    case parsley.Failure(err) => 
-                        lastError = Some(err)
-                        None
-                        // None
-                        // currently it will keep trying to parse, but next time, 
-                        // we want it to fail the moment we find a syntax error, 
-                        // but continue for a semantic error (and report multiple semantic errors)
-                }
-        }.getOrElse{
-            Left(lastError.getOrElse{
-                ParserError((1,1), "<input>", ParserErrorLines.SpecialisedError(Set("All parsers failed"), 0))
-            })
-            // 
+            case parsley.Failure(err) => 
+                Left(err)
         }
-
     }
 
 
