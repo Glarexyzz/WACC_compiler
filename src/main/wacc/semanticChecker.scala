@@ -171,10 +171,13 @@ object semanticChecker {
           // can rType be weakened to lType?
           lvalue match {
             case LValue.LName(name) => symbolTable.lookupVariable(name) match {
-              case Some(VariableEntry(lType)) if isCompatibleTo(rType, lType) => 
-                println(s"Assignment of $rType to $lType in $name")
-                None
-              case Some(_) => Some(s"Semantic Error in identifier: Incompatible types in assignment to $name")
+              case Some(VariableEntry(lType)) => 
+                if (isCompatibleTo(rType, lType)) {
+                  println(s"Assignment of $rType to $lType in $name")
+                  None
+                } else {
+                  Some(s"Semantic Error in identifier: $rType is not compatible to $lType")
+                }
               case None => Some(s"Semantic Errorin identifier: Variable $name not declared")
             }
 
@@ -192,8 +195,8 @@ object semanticChecker {
                   None
 
                 // LHS is PairKeyword and RHS is a known type
-                case (Right(PairKeyword), Right(rType)) =>
-                  Some(s"Semantic Error in Pair: Cannot assign $rType to a pair of unknown type")
+                // case (Right(PairKeyword), Right(rType)) =>
+                //   Some(s"Semantic Error in Pair: Cannot assign $rType to a pair of unknown type")
 
                 // LHS is a known type and RHS is a known type
                 case (Right(lType), Right(rType)) =>
@@ -426,19 +429,21 @@ object semanticChecker {
           case Some(_) => Left(s"Error: $name is not an array")
           case None => Left(s"Error: $name is not declared")
       }
-      // there's something wrong here but I am too sleepy to see it
       case PairElem.FstElem(LValue.LPair(pairElem)) => 
         checkPairElem(pairElem) match {
           case Right(PairType(leftType, _)) => Right(leftType)
-          case Right(_) => Left("Error: First element of $name is not a pair")
+          case Right(PairKeyword) => Right(AnyType)
+          case Right(t) => Left(s"Error: First element of $t is not a PairType")
           case Left(err) => Left(err)
       }
       case PairElem.SndElem(LValue.LPair(pairElem)) => 
         checkPairElem(pairElem) match {
           case Right(PairType(_, rightType)) => Right(rightType)
-          case Right(_) => Left("Error: Second element of $name is not a pair")
+          case Right(PairKeyword) => Right(AnyType)
+          case Right(t) => Left(s"Error: Second element of $t is not a pairPairType")
           case Left(err) => Left(err)
       }
+
       case _ => Left("Error: Invalid pair element")
     }
   
@@ -637,8 +642,10 @@ object semanticChecker {
     case (ArrayTElem(_), NullType) => true
     case (PairKeyword, NullType) => true
     // any PairElemType can be weakened to a PairKeyword and vice versa
+    // this includes nulltype
     case (PairType(_, _), PairKeyword) => true
     case (PairKeyword, PairType(_, _)) => true
+    case (NullType, PairKeyword) => true
     // Assignment is legal when assigning array (even of unknown type) in nested pair extraction
     // case (ArrayType(_), PairKeyword) => true
 
