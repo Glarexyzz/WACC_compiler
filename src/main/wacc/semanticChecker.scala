@@ -185,49 +185,25 @@ object semanticChecker {
             }
 
             case LValue.LPair(pairElem) => 
-            // type of pairElem 
-            // type of rValue
+            // Type of pairElem 
+            // Type of rValue
               (checkPairElem(pairElem), checkRValue(rvalue)) match {
                 case (Right(PairKeyword), Right(PairKeyword)) => 
-                  Some("Semantic Error in Pair: Assignment is not legal when both sides type are unknown")
-                // nested pair assignments are legal as long as the right hand-side type is known
-                // Case 1. Bad: 
-                // begin
-                //   int c = 5;
-                //   pair(int, int) p = newpair(c, c);
-                //   pair(pair, int) oops = newpair(p, 0);
-                //   fst oops = c
-                // end
-                  //  idea: fst fst oops is accessing the fst type in a pair of a pair
-                  // while fst oops is accessing a the first type of a pair, which is a pair
-                  // so while fst fst oops is utterly unknown (type PairKeyword? fst of a pairkeyword?)
-                  // I still want first oops to be of type Pair(int, int). Can I do that?
-                // Case 2. Good: 
-                // # nested pair assignments are legal as long as the right hand-side type. or left hand-side is known
-                // begin
-                //   pair(int, int) p = newpair(2, 3) ;
-                //   pair(int, pair) q = newpair(1, p) ;
-                //   fst snd q = 7 ;
-                //   int x = fst p ;
-                //   println x
-                // end
-                // Case 3. Good
-                // # Assignment is legal when assigning array (even of unknown type) in nested pair extraction
-                // begin
-                //   pair(int, int) p = newpair(4, 5);
-                //   pair(pair, int) q = newpair(p, 6);
-                //   fst fst q = []
-                // end
-
-                case (Right(PairKeyword), Right(rType)) =>
-                  println(s"Right hand-side type $rType is defined, so nested pair is legal")
                   None
+
+                // LHS is PairKeyword and RHS is a known type
+                case (Right(PairKeyword), Right(rType)) =>
+                  Some(s"Semantic Error in Pair: Cannot assign $rType to a pair of unknown type")
+
+                // LHS is a known type and RHS is a known type
                 case (Right(lType), Right(rType)) =>
                   if (isCompatibleTo(rType, lType)) None 
                   else Some(s"Semantic Error in Pair: $rType is not compatible to $lType")
+
+                // Error cases
                 case (Left(error1), Left(error2)) => Some(s"$error1,\n$error2")
-                case (Left(error), _) => Some(error)  // Error in LHS pair element
-                case (_, Left(error)) => Some(error)  // Error in RHS pair element
+                case (Left(error), _) => Some(error)
+                case (_, Left(error)) => Some(error)
               }
         }
       }
@@ -448,8 +424,18 @@ object semanticChecker {
           case None => Left(s"Error: $name is not declared")
       }
       // there's something wrong here but I am too sleepy to see it
-
-      case PairElem.FstElem(LValue.LPair(elem1)) | PairElem.SndElem(LValue.LPair(elem2)) => Right(PairKeyword)
+      case PairElem.FstElem(LValue.LPair(pairElem)) => 
+        checkPairElem(pairElem) match {
+          case Right(PairType(leftType, _)) => Right(leftType)
+          case Right(_) => Left("Error: First element of $name is not a pair")
+          case Left(err) => Left(err)
+      }
+      case PairElem.SndElem(LValue.LPair(pairElem)) => 
+        checkPairElem(pairElem) match {
+          case Right(PairType(_, rightType)) => Right(rightType)
+          case Right(_) => Left("Error: Second element of $name is not a pair")
+          case Left(err) => Left(err)
+      }
       case _ => Left("Error: Invalid pair element")
     }
   
