@@ -40,10 +40,7 @@ class SymbolTable {
   def addVariable(name: String, varType: Type): Boolean = {
     if (variableScopes.nonEmpty) {
       val currentScope = variableScopes.top // Get current scope
-      if (functionStatus.isDefined && currentScope.contains(name)) {
-      // Allow shadowing inside a function by overwriting the variable in the same scope
-        println(s"⚠️ Shadowing function parameter '$name' with new type '$varType'")
-      } else if (currentScope.contains(name)) {
+      if (currentScope.contains(name) && !functionStatus.isDefined) {
         return false // Variable already declared in this scope
       }
       currentScope(name) = VariableEntry(varType) // Add variable
