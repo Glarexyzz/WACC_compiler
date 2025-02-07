@@ -181,7 +181,8 @@ object semanticChecker {
           if (isCompatibleTo(rType, t)) {
             printf("Checking declaration of variable '%s' of type %s\n", name, t)
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
-            if (can_add_if_no_duplicate) 
+            if (can_add_if_no_duplicate)
+              printf(s"$rType is compatible to $t\n")
               None
             else Some(s"Semantic Error in Declaration: Variable $name is already declared")
            }
@@ -651,7 +652,7 @@ object semanticChecker {
     
     // arrays with compatible inner types
     case (ArrayType(innerType1), ArrayType(innerType2)) =>
-      isCompatibleTo(innerType1, innerType2) // recursively check if inner types are compatible
+      isCompatibleTo(innerType2, innerType1) // recursively check if inner types are compatible
     // things in an array are compatible with things of the same type outside the array
     // case (ArrayType(innerType), innerType2) =>
     //   isCompatibleTo(innerType, innerType2) // check if inner type is compatible with the other type
