@@ -115,18 +115,16 @@ object semanticChecker {
   def checkProgram(program: Program): Option[String] = {
     symbolTable.enterScope()
     
-    // First, add all function declarations to the symbol table
+    // Adds all valid function declarations
     val funcDeclarationErrors = program.funcs.flatMap(addFuncDeclaration)
     
-    // Then, check the function bodies
+    // Checks function bodies
     val funcBodyErrors = program.funcs.flatMap(checkFunc)
     
-    // Check the main program statement
+    // Checks main program
     val stmtErrors = checkStatement(program.stmt).toList
-    
     symbolTable.exitScope()
     
-    // Combine all errors
     val errors = funcDeclarationErrors ++ funcBodyErrors ++ stmtErrors
     if (errors.isEmpty) None else Some(errors.mkString("\n"))
   }
@@ -153,24 +151,18 @@ object semanticChecker {
   def checkFunc(func: Func): Option[String] = {
     symbolTable.enterScope()
     
-    // Add parameters to the symbol table
+    // Add function parameters to the symbol table
     func.paramList.foreach { params =>
       params.foreach { param =>
         symbolTable.addVariable(param.name, param.t)
       }
     }
     
-    // Set the current function status
+    // Checks the function's body
     symbolTable.setFunctionStatus(Some(func.t))
-    
-    // Check the function body
     val bodyCheckResult = checkStatement(func.stmt)
-    
-    // Reset the function status
     symbolTable.setFunctionStatus(None)
-    
     symbolTable.exitScope()
-    
     bodyCheckResult
   }
 
