@@ -83,3 +83,16 @@ class WACCErrorBuilder extends ErrorBuilder[ParserError] {
         lexicalError: Boolean
       ): Token = ???
 }
+
+def generateSemanticError(pos: (Int, Int), unexpected: String, expected: String): ParserError = {
+    new WACCErrorBuilder().build(
+        pos,
+        "semantic check",
+        new WACCErrorBuilder().vanillaError(
+            Some(ParserRaw(s"unexpected $unexpected")),
+            Set(ParserRaw(s"expected $expected")),
+            Set(s"Expected $expected but found $unexpected at position $pos"),
+            0
+        )
+    )
+}

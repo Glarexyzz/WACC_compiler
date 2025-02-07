@@ -196,11 +196,6 @@ object semanticChecker {
     }
 
     // 'return' <expr>
-    // A return statement can only be present in the body of a function:
-    // When executed, it will evaluate its argument, and pass teh resulting value back to the caller
-    // of the function, exiting the current call immediately
-    // the return should be more specific than the outside
-    // so return can be weakened to function type
     case ReturnStmt(expr) => 
       checkExprType(expr, symbolTable) match {
         case Left(error) => Some(error)
@@ -239,6 +234,7 @@ object semanticChecker {
     case IfStmt(cond, thenStmt, elseStmt) => 
       checkExprType(cond, symbolTable) match {
         case Left(error) => Some(error)
+
         case Right(BaseType.BoolType) => 
           symbolTable.enterScope()
           val resultThenStmt: Option[String] = checkStatement(thenStmt)
@@ -247,7 +243,9 @@ object semanticChecker {
           val resultElseStmt: Option[String] = checkStatement(elseStmt)
           symbolTable.exitScope()
           resultThenStmt ++ resultElseStmt
-        case Right(_) => Some("Semantic Error: If condition must be a boolean")
+        
+        case Right(t) => println(generateSemanticError((1,1), t.toString, "boolean"))
+                         Some("Testing")
       }
 
     // 'while' <expr> 'do' <stmt> 'done'
