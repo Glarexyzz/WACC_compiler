@@ -221,6 +221,7 @@ object parser {
         case IfStmt(_, thenStmt, elseStmt) => 
             returningBlock(thenStmt) && returningBlock(elseStmt) 
         case SeqStmt(_, lastStmt) => returningBlock(lastStmt) 
+        case BodyStmt(innerStmt) => returningBlock(innerStmt)
         case _ => false  // Any other statement is invalid
     }
 
