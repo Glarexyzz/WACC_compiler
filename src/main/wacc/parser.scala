@@ -21,20 +21,6 @@ object parser {
         }
     }
 
-
-    // Individual parsing functions
-    def parseProgram(input: String): Either[String, Program] =
-        fully(program).parse(input).toEither
-
-    def parseFunc(input: String): Either[String, Func] =
-        fully(func).parse(input).toEither
-
-    def parseStmt(input: String): Either[String, Stmt] =
-        fully(stmt).parse(input).toEither
-
-    def parseExpr(input: String): Either[String, Expr] =
-        fully(expr).parse(input).toEither
-
     private lazy val symbol = lexer.lexeme.symbol  // shorten for hardKeyword & hardOps
     val softOp = lexer.lexeme.symbol.softOperator  // shorten for softOps
 
@@ -126,16 +112,6 @@ object parser {
             symbol("string").as(BaseType.StrType)
         )
 
-// private lazy val arrayType: Parsley[ArrayType] = 
-  // First, parse the inner type (either a pair type or a base type)
-//   (pairType <|> baseType)
-//     .flatMap { innerType =>
-//       // Then, apply the wrapping for arrays (repeated "[]" wrapping)
-//       some(softOp("[") *> softOp("]")).map { _ =>
-//         // Each "[]" wraps the current array type
-//         ArrayType(innerType)
-//       }
-//     }
     // Array type definition
     private lazy val arrayType: Parsley[ArrayType] =
         (pairType <|> baseType).flatMap { innerType =>
@@ -148,15 +124,6 @@ object parser {
                 }.asInstanceOf[ArrayType]
             }
         }
-            // flatMap { innerType =>
-            //     println(s"wrapping around $innerType")
-            //     // Then, apply the wrapping for arrays (repeated "[]" wrapping)
-            //     some(softOp("[") *> softOp("]")).map { _ =>
-            //         // Each "[]" wraps the current array type
-            //         ArrayType(innerType)
-            //     }
-            // }
-        
 
     // Pair definition
     private lazy val pairType: Parsley[PairType] = 
@@ -181,7 +148,6 @@ object parser {
     // Statements
 
     // Program definition
-
     private lazy val program: Parsley[Program] = 
         Program(
             (symbol("begin") *> many(atomic(func))), 
@@ -228,7 +194,6 @@ object parser {
     // ParamList definition
     private lazy val paramList: Parsley[List[Param]] = sepBy1(param, softOp(","))
     
-
     // Param definition
     private lazy val param: Parsley[Param] = Param(typeParser, ident)
 

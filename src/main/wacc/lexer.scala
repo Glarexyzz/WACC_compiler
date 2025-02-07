@@ -4,9 +4,7 @@ import parsley.quick.*
 import parsley.Parsley
 import parsley.token.{Lexer, Basic}
 import parsley.token.descriptions.*
-import parsley.character.{
-    char, crlf, endOfLine, item, satisfy
-}
+import parsley.character.{char, satisfy}
 
 object lexer {
 
@@ -43,8 +41,8 @@ object lexer {
     val lexeme = lexer.lexeme // For parser to use lexeme
 
     // Numbers
-    val digit: Parsley[Char] = digit                        // single digit '0'-'9'
-    val intSign: Parsley[Char] = char('+') <|> char('-')    // '+' or '-'
+    val digit: Parsley[Char] = digit                        // single digit '0'-'9' following spec
+    val intSign: Parsley[Char] = char('+') <|> char('-')    // '+' or '-' following spec
     val intLiter: Parsley[BigInt] = lexeme.signed.decimal32 // intSign with digits
     
     // Boolean
@@ -76,7 +74,6 @@ object lexer {
             c >= 0x00.toChar &&
             c <= 0x7F.toChar
         ) 
-        
     
     val charLiter: Parsley[Char] = //lexeme.character.ascii
         char('\'') *> character <* char('\'') <* 
@@ -91,10 +88,7 @@ object lexer {
 
     val ident: Parsley[String] = lexeme.names.identifier  //(letter | '_') (letter | digit | '_')*
 
-
     // Comments
-    val eol: Parsley[Char] = endOfLine <|> crlf
-    val eof: Parsley[Unit] = notFollowedBy(item)
     val comment: Parsley[Unit] = lexer.space.skipComments // '#'(any character except eol)* (<eol> | <eof>)
 
     val implicits = lexer.lexeme.symbol.implicits
