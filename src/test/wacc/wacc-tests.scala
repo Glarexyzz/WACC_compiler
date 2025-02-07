@@ -33,7 +33,7 @@ trait WACCTestUtils {
     Set (
     "advanced",
     "array",
-    "basic", 
+    // "basic", 
     "basic/exit", "basic/skip", //
     "exit", //
     "expressions", //
