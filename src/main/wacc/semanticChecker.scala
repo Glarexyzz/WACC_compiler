@@ -1,9 +1,6 @@
 package wacc
 import scala.collection.mutable
 
-case class SemanticError(message: String) extends Exception(message)
-
-
 sealed trait SymbolEntry
 
 case class VariableEntry(varType: Type) extends SymbolEntry
@@ -60,7 +57,6 @@ class SymbolTable {
   }
 
   def lookupVariable(name: String): Option[VariableEntry] = {
-    //println(s"🔍 Looking for variable '$name' starting from scope level $scopeLevel")
 
     val result = if (functionStatus.isDefined) {
     // Only check the most recent (innermost) scope
@@ -154,7 +150,10 @@ object semanticChecker {
     
     // Checks the function's body
     symbolTable.setFunctionStatus(Some(func.t))
-    val bodyCheckResult = checkStatement(func.stmt)
+    val bodyCheckResult = checkStatement(func.stmt) match {
+      case None => None
+      case Some(error) => Some(s"In function ${func.name},\n$error")
+    }
     symbolTable.setFunctionStatus(None)
     symbolTable.exitScope()
     bodyCheckResult
@@ -162,16 +161,12 @@ object semanticChecker {
 
   def checkStatement(stmt: Stmt): Option[String] = stmt match {
     case SkipStmt => None
-    // <type> <ident> '=' <rValue>
-    // No duplicate variable declarations in the same scope
+
     case DeclAssignStmt(t, name, value) => 
       checkRValue(value) match {
         case Left(error) => Some(error)
         case Right(rType) => 
-        // t name = (rType)
-        // so t is the more 'broad case', rType is the more 'specific case'
-        // Any is the broadest possible case?
-        // can rType be weakened to t?
+
           if (isCompatibleTo(rType, t)) {
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate)
@@ -193,28 +188,31 @@ object semanticChecker {
                 if (isCompatibleTo(rType, lType)) {
                   None
                 } else {
-                  Some(s"Semantic Error in identifier: $rType is not compatible to $lType")
+                  Some(s"Semantic Error in Assignment of identifier $name: $rType is not compatible to $lType identifier $name")
                 }
-              case None => Some(s"Semantic Error in identifier: Variable $name not declared")
+              case None => Some(s"Semantic Error in Assignment: Identifer $name not declared")
             }
 
             case LValue.LArray(ArrayElem(name, _)) => symbolTable.lookupVariable(name) match {
-              case Some(VariableEntry(ArrayType(lType))) if isCompatibleTo(rType, lType) => None
-              case Some(_) => Some(s"Semantic Error in array: Incompatible types in assignment to $name")
-              case None => Some(s"Semantic Error in array: Variable $name not declared")
+              case Some(VariableEntry(ArrayType(lType))) => 
+                if (isCompatibleTo(rType, lType)) {
+                  None
+                } else {
+                  Some(s"Semantic Error in Assignment of array $name: $rType is not compatible to $lType")
+                }
+              case Some(t) => Some(s"Semantic Error in Assignment of array $name: $rType is not compatible to $t")
+              case None => Some(s"Semantic Error in Assignment: Array $name not declared")
             }
 
             case LValue.LPair(pairElem) => 
-            // Type of pairElem 
-            // Type of rValue
               (checkPairElem(pairElem), checkRValue(rvalue)) match {
                 case (Right(AnyType), Right(AnyType)) => 
-                  Some(s"Semantic Error in Pair: Both PairTypes cannot be unknown")
+                  Some(s"Semantic Error in Assignment of pair $pairElem: Types of both pairs $pairElem and $rvalue cannot be unknown")
 
                 // LHS is a known type and RHS is a known type
                 case (Right(lType), Right(rType)) =>
                   if (isCompatibleTo(rType, lType)) None 
-                  else Some(s"Semantic Error in Pair: $rType is not compatible to $lType")
+                  else Some(s"Semantic Error in Assignment of pair $pairElem: $rType is not compatible to $lType")
 
                 // Error cases
                 case (Left(error1), Left(error2)) => Some(s"$error1,\n$error2")
@@ -230,40 +228,35 @@ object semanticChecker {
       case LValue.LName(name) => symbolTable.lookup(name) match {
         case Some(VariableEntry(BaseType.IntType)) => None
         case Some(VariableEntry(BaseType.CharType)) => None
-        case Some(_) => Some(s"Semantic Error: Variable $name must be of type int or char")
-        case None => Some(s"Semantic Error: Variable $name not declared")
+        case Some(t) => Some(s"Semantic Error in Read: Identifier $name must be of type int or char, but got $t instead")
+        case None => Some(s"Semantic Error in Read: Identifier $name not declared")
       }
       case LValue.LPair(pairElem) => 
         checkPairElem(pairElem) match {
           case Right(BaseTElem(BaseType.IntType)) => None
           case Right(BaseTElem(BaseType.CharType)) => None
-          case Right(_) => Some(s"Semantic Error: Invalid pair element type in read")
-          case Left(_) => Some(s"Semantic Error: Invalid lvalue in read statement")
+          case Right(t) => Some(s"Semantic Error in Read: Type of pair $pairElem must be type int or char, but got $t instead")
+          case Left(error) => Some(error)
         }
-      case _ => Some(s"Semantic Error: Invalid lvalue in read statement")
+      case _ => Some(s"Semantic Error in Read: Invalid lvalue in read statement")
     }
 
     // 'free' <expr>
     case FreeStmt(expr) => checkExprType(expr, symbolTable) match {
       case Left(error) => Some(error)
       case Right(ArrayType(_)) | Right(PairType(_, _)) => None // The ‘free’ statement takes an argument that must be of type 𝜏[] or pair(𝜏, 𝜎).
-      case Right(_) => Some("Semantic Error: `free` statement must be applied to an array or pair")
+      case Right(t) => Some(s"Semantic Error in Free: `free` statement must be applied to an array or pair, but got $t instead")
     }
 
     // 'return' <expr>
-    // A return statement can only be present in the body of a function:
-    // When executed, it will evaluate its argument, and pass teh resulting value back to the caller
-    // of the function, exiting the current call immediately
-    // the return should be more specific than the outside
-    // so return can be weakened to function type
     case ReturnStmt(expr) => 
       checkExprType(expr, symbolTable) match {
         case Left(error) => Some(error)
         case Right(retType) =>
           symbolTable.checkFunctionStatus() match {
             case Some(funcType) if isCompatibleTo(retType, funcType) => None
-            case Some(funcType) => Some(s"Semantic Error: $retType is incompatible to $funcType")
-            case None => Some("Semantic Error: Return statement must be inside a function")
+            case Some(funcType) => Some(s"Semantic Error in Return: Return type $retType of $expr is incompatible to function type $funcType")
+            case None => Some("Semantic Error in Return: Return statement must be inside a function")
           }
       }
 
@@ -273,8 +266,8 @@ object semanticChecker {
       checkExprType(expr, symbolTable) match {
         case Left(error) => Some(error) // Propagate any errors from checking the expression
         case Right(BaseType.IntType) => None // Valid type for exit (int)
-        case Right(_) => Some("Semantic Error: Exit statement must have an integer argument") // Invalid type
-    }
+        case Right(t) => Some(s"Semantic Error: Exit statement must have an integer argument, but got $t instead") // Invalid type
+      }
 
     // 'print' <expr>
     case PrintStmt(expr) => 
@@ -294,6 +287,7 @@ object semanticChecker {
     case IfStmt(cond, thenStmt, elseStmt) => 
       checkExprType(cond, symbolTable) match {
         case Left(error) => Some(error)
+
         case Right(BaseType.BoolType) => 
           symbolTable.enterScope()
           val resultThenStmt: Option[String] = checkStatement(thenStmt)
@@ -302,7 +296,8 @@ object semanticChecker {
           val resultElseStmt: Option[String] = checkStatement(elseStmt)
           symbolTable.exitScope()
           resultThenStmt ++ resultElseStmt
-        case Right(_) => Some("Semantic Error: If condition must be a boolean")
+        
+        case Right(t) => Some(s"Semantic Error in If: If condition must be a boolean, but got $t instead")
       }
 
     // 'while' <expr> 'do' <stmt> 'done'
@@ -314,7 +309,7 @@ object semanticChecker {
           val result: Option[String] = checkStatement(body)
           symbolTable.exitScope()
           result
-        case Right(_) => Some("Semantic Error: If condition must be a boolean")
+        case Right(t) => Some(s"Semantic Error in While: If condition must be a boolean, but got $t instead")
       }
 
     // 'begin' <stmt> 'end'
@@ -338,13 +333,13 @@ object semanticChecker {
   def checkLValue(lvalue: LValue): Option[String] = lvalue match {
     case LValue.LName(name) => symbolTable.lookup(name) match {
       case Some(VariableEntry(_)) => None
-      case Some(_) => Some(s"Error: $name is not a variable")
-      case None => Some(s"Error: $name is not declared")
+      case Some(_) => Some(s"Error in checking left value of $name: expected variable, but got function instead")
+      case None => Some(s"Error in checking left value: $name is not declared")
     }
-    case LValue.LArray(ArrayElem(name, indices)) => symbolTable.lookup(name) match {
+    case LValue.LArray(ArrayElem(name, indices)) => symbolTable.lookupVariable(name) match {
       case Some(VariableEntry(ArrayType(_))) => None
-      case Some(_) => Some(s"Error: $name is not an array")
-      case None => Some(s"Error: $name is not declared")
+      case Some(VariableEntry(t)) => Some(s"Error in checking left value of $name: expected array, but got $t instead")
+      case None => Some(s"Error in checking left value: $name is not declared")
     }
     case LValue.LPair(pair) => checkPairElem(pair) match {
       case Right(_) => None

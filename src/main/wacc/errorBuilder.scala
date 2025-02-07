@@ -83,3 +83,5 @@ class WACCErrorBuilder extends ErrorBuilder[ParserError] {
         lexicalError: Boolean
       ): Token = ???
 }
+
+def generateSemanticError(pos: (Int, Int), unexpected: String, expected: String): ParserError = ???

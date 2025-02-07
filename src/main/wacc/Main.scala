@@ -16,15 +16,14 @@ def main(args: Array[String]): Unit = {
                 case Right(parsed) =>
                     semanticChecker.checkSemantic(parsed) match {
                         case Some(errors) => 
-                            println(s"Semantic errors found:\n$errors")
-                            println(s"Parsed as:\n$parsed")
+                            println(s"Semantic errors found:\n$errors\n")
                             exitCode = exitInvalidSemantics
                         case None => 
-                            println(s"Successfully parsed:\n$parsed")
+                            println(s"Successfully parsed:\n$parsed\n")
                             exitCode = exitValid
                     }
                 case Left(error) =>
-                    println(s"Syntax Errors found: $error")
+                    println(s"Syntax Errors found: $error\n")
                     exitCode = exitInvalidSyntax
             }
     }

@@ -42,8 +42,8 @@ object lexer {
     val lexeme = lexer.lexeme // For parser to use lexeme
 
     // Numbers
-    val digit: Parsley[Char] = digit                        // single digit '0'-'9' following spec
-    val intSign: Parsley[Char] = char('+') <|> char('-')    // '+' or '-' following spec
+    val digit: Parsley[Char] = digit                        // single digit '0'-'9'
+    val intSign: Parsley[Char] = (char('+') <|> char('-')).label("sign")    // '+' or '-'
     val intLiter: Parsley[BigInt] = lexeme.signed.decimal32 // intSign with digits
     
     // Boolean
@@ -78,12 +78,12 @@ object lexer {
             .explain("Characters must be ASCII")
     
     val charLiter: Parsley[Char] = //lexeme.character.ascii
-        char('\'') *> character <* char('\'') <* 
-        lexer.space.whiteSpace
+        (char('\'') *> character <* char('\'') <* 
+        lexer.space.whiteSpace).label("char")
 
     val strLiter: Parsley[String] = //lexeme.string.ascii
-        (char('"') *> many(character) <* char('"'))
-        .map(_.mkString) <* lexer.space.whiteSpace
+        ((char('"') *> many(character) <* char('"'))
+        .map(_.mkString) <* lexer.space.whiteSpace).label("string")
 
     // Null
     val pairLiter: Parsley[Unit] = lexeme.symbol("null")  // 'null'

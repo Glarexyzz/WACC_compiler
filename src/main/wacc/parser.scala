@@ -106,12 +106,13 @@ object parser {
             Ops(InfixR)(orOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
                 .label("logical operator"))   // '||'
         )
+        ).label("expression")
     
     // Types
 
     // Type definition
     private lazy val typeParser: Parsley[Type] =
-        atomic(arrayType) <|> pairType <|> baseType 
+        (atomic(arrayType) <|> pairType <|> baseType).label("type") 
 
     // Base type definition
     private lazy val baseType: Parsley[BaseType] = 
@@ -126,7 +127,7 @@ object parser {
     private lazy val arrayType: Parsley[ArrayType] =
         (pairType <|> baseType).flatMap { innerType =>
             // Match one or more occurrences of []
-            some(softOp("[") *> softOp("]")).map { brackets =>
+            some(softOp("[") *> softOp("]").label("closing bracket for array")).map { brackets =>
                 // Start with innerType, and wrap it for each "[]"
                 brackets.foldLeft(innerType) { (acc, _) =>
                     // Ensure that the accumulator is always wrapped in ArrayType
@@ -139,7 +140,7 @@ object parser {
     private lazy val pairType: Parsley[PairType] = 
         PairType(
             (symbol("pair") *> softOp("(") *> pairElemType), 
-            (softOp(",") *> pairElemType <* softOp(")"))
+            (softOp(",") *> pairElemType <* softOp(")").label("closing bracket for pair"))
         )
 
     // Pair element type definition
@@ -171,8 +172,8 @@ object parser {
             ident, 
             (softOp("(") *> option(paramList) <* softOp(")")),
             (symbol("is") *> 
-                stmt.filter(returningBlock) <* 
-            symbol("end"))
+                stmt.filter(returningBlock).label("function body") <* 
+            symbol("end").label("end for function"))
         )
     
     // Returning statement definition
@@ -202,7 +203,7 @@ object parser {
     }
 
     // ParamList definition
-    private lazy val paramList: Parsley[List[Param]] = sepBy1(param, softOp(","))
+    private lazy val paramList: Parsley[List[Param]] = sepBy1(param, softOp(",").label("comma in parameters"))
     
     // Param definition
     private lazy val param: Parsley[Param] = Param(typeParser, ident)
@@ -265,7 +266,7 @@ object parser {
         ).label("function call")
     
     // Argument list definition
-    private lazy val argList: Parsley[List[Expr]] = sepBy1(expr, softOp(","))
+    private lazy val argList: Parsley[List[Expr]] = sepBy1(expr, softOp(",")).label("argument list")
 
     // Pair elem definition
     private lazy val pairElem: Parsley[PairElem] = fstElem <|> sndElem
