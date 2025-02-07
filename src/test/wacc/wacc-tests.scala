@@ -29,10 +29,12 @@ trait WACCTestUtils {
   */
   
 trait WACCTestUtils {
-  val ignoredSubcategories = Set (
-    "advanced"
+  val ignoredSubcategories = Set.empty[String]
+    // Set (
+    // "advanced",
     // "array",
-    // "basic", "basic/exit", "basic/skip", //
+    // "basic", 
+    // "basic/exit", "basic/skip", //
     // "exit", //
     // "expressions", //
     // "function", 
@@ -44,7 +46,7 @@ trait WACCTestUtils {
     // "IO/print", //
     // "IO/read", //
     // "multiple", // failed for unknown reasons
-    // // "pairs",
+    // "pairs",
     // "print", //
     // "runtimeErr", //
     // "runtimeErr/arrayOutOfBounds", //
@@ -57,7 +59,7 @@ trait WACCTestUtils {
     // "read", //
     // "variables", //X : scopevar issue
     // "while"  //
-    )
+    // )
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {
     def collectWaccFiles(currentDir: File): List[File] = {
@@ -110,7 +112,7 @@ class InvalidSyntaxTest extends AnyFlatSpec with Matchers with WACCTestUtils {
     if (ignoredSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {}
     } else {
-      ignore should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {
+      subcat should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {
         files.foreach { file =>
           val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
           withClue(s"File ${file.getName} failed: ") {

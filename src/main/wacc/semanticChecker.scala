@@ -1,9 +1,6 @@
 package wacc
 import scala.collection.mutable
 
-case class SemanticError(message: String) extends Exception(message)
-
-
 sealed trait SymbolEntry
 
 case class VariableEntry(varType: Type) extends SymbolEntry
@@ -97,7 +94,6 @@ object semanticChecker {
   def checkProgram(program: Program): Option[String] = {
     symbolTable.enterScope()
     val funcErrors = program.funcs.flatMap(checkFunc)
-    // val noFuncErrors = program.funcs.foreach(checkFunctionDeclaration)
     val stmtErrors = checkStatement(program.stmt).toList
     symbolTable.exitScope()
     val errors = funcErrors /*++ noFuncErrors*/ ++ stmtErrors

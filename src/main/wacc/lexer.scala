@@ -7,6 +7,7 @@ import parsley.token.descriptions.*
 import parsley.character.{
     char, crlf, endOfLine, item, satisfy
 }
+import parsley.errors.combinator.ErrorMethods
 
 object lexer {
 
@@ -44,17 +45,17 @@ object lexer {
 
     // Numbers
     val digit: Parsley[Char] = digit                        // single digit '0'-'9'
-    val intSign: Parsley[Char] = char('+') <|> char('-')    // '+' or '-'
+    val intSign: Parsley[Char] = (char('+') <|> char('-')).label("sign")    // '+' or '-'
     val intLiter: Parsley[BigInt] = lexeme.signed.decimal32 // intSign with digits
     
     // Boolean
     val boolLiter: Parsley[Boolean] =                     // 'true' or 'false'
-        lexeme.symbol("true").map(_ => true) <|>
-        lexeme.symbol("false").map(_ => false)
+        (lexeme.symbol("true").map(_ => true) <|>
+        lexeme.symbol("false").map(_ => false)).label("bool")
 
     // Char & String
     val escapedChar: Parsley[Char] =
-        char('0').as('\u0000') <|> // '0', 'b', 't', 'n', 'f', 'r', '\'', '"', '\\'
+        (char('0').as('\u0000') <|> // '0', 'b', 't', 'n', 'f', 'r', '\'', '"', '\\'
         char('b').as('\b') <|>
         char('t').as('\t') <|>
         char('n').as('\n') <|>
@@ -62,7 +63,8 @@ object lexer {
         char('r').as('\r') <|>
         char('\'') <|>
         char('"') <|>
-        char('\\')
+        char('\\')).label("escaped character")
+
 
     val character: Parsley[Char] = // any ACSII character except '\', ''' and '"' or '\'escapedChar
         char('\\') *> escapedChar <|>
@@ -75,16 +77,16 @@ object lexer {
             c != '\r' &&
             c >= 0x00.toChar &&
             c <= 0x7F.toChar
-        ) 
+        ).label("ACSII character")
         
     
     val charLiter: Parsley[Char] = //lexeme.character.ascii
-        char('\'') *> character <* char('\'') <* 
-        lexer.space.whiteSpace
+        (char('\'') *> character <* char('\'') <* 
+        lexer.space.whiteSpace).label("char")
 
     val strLiter: Parsley[String] = //lexeme.string.ascii
-        (char('"') *> many(character) <* char('"'))
-        .map(_.mkString) <* lexer.space.whiteSpace
+        ((char('"') *> many(character) <* char('"'))
+        .map(_.mkString) <* lexer.space.whiteSpace).label("string")
 
     // Null
     val pairLiter: Parsley[Unit] = lexeme.symbol("null")  // 'null'
