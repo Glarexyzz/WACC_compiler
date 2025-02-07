@@ -32,12 +32,12 @@ trait WACCTestUtils {
   val ignoredSubcategories =
     Set (
     "advanced",
-    "array",
+    // "array",
     "basic", 
     "basic/exit", "basic/skip", //
     "exit", //
     "expressions", //
-    // "function", 
+    "function", 
     "function/nested_functions", // 
     "function/simple_functions",
     "literals", //(syntax only)
@@ -46,8 +46,8 @@ trait WACCTestUtils {
     "IO/print", //
     "IO/read", //
     "multiple", // failed for unknown reasons
-    "pairs",
-    "print", //
+    // "pairs",
+    // "print", //
     "runtimeErr", //
     "runtimeErr/arrayOutOfBounds", //
     "runtimeErr/badChar", //
