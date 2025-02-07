@@ -110,7 +110,7 @@ class InvalidSyntaxTest extends AnyFlatSpec with Matchers with WACCTestUtils {
     if (ignoredSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {}
     } else {
-      ignore should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {
+      subcat should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {
         files.foreach { file =>
           val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
           withClue(s"File ${file.getName} failed: ") {
