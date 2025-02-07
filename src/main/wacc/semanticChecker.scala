@@ -664,11 +664,11 @@ object semanticChecker {
     case (BaseType.StrType, BaseType.StrType) => true
     // pairs should not be covariant
     case (PairType(leftElem1, rightElem1), PairType(leftElem2, rightElem2)) =>
-      isCompatibleTo(leftElem1, leftElem2) && isCompatibleTo(rightElem1, rightElem2)
+      isCompatibleTo(leftElem2, leftElem1) && isCompatibleTo(rightElem2, rightElem1)
     case(BaseTElem(elem1), BaseTElem(elem2)) => 
-      isCompatibleTo(elem1, elem2)
+      isCompatibleTo(elem2, elem1)
     case(ArrayTElem(elem1), ArrayTElem(elem2)) => 
-      isCompatibleTo(elem1, elem2)
+      isCompatibleTo(elem2, elem1)
     case(PairKeyword, PairKeyword) => true
     // case(AnyType, AnyType) => false
     // any other type can be weaken to AnyType
