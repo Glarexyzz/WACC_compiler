@@ -51,21 +51,30 @@ class SymbolTable {
     if (functionTable.contains(name)) return false
     // Add the function entry
     val functionEntry = FunctionEntry(returnType, params)
+    params.foreach { paramList =>
+      paramList.foreach { param =>
+        addVariable(param.name, param.t)  // Register parameter in the function scope
+      }
+    }
     functionTable(name) = functionEntry
     true
   }
+
   def lookupVariable(name: String): Option[VariableEntry] = {
     //println(s"🔍 Looking for variable '$name' starting from scope level $scopeLevel")
 
-    val result = variableScopes.zipWithIndex.reverseIterator.toList.reverse.collectFirst {
-      case (scope, index) if index >= (variableScopes.size - scopeLevel) && scope.contains(name) => 
-        scope(name)
+    val result = if (functionStatus.isDefined) {
+    // Only check the most recent (innermost) scope
+      variableScopes.headOption.flatMap(scope => scope.get(name))
+    } else {
+      variableScopes.zipWithIndex.reverseIterator.toList.reverse.collectFirst {
+        case (scope, index) if index >= (variableScopes.size - scopeLevel) && scope.contains(name) => 
+          scope(name)
+      }
     }
     printf("✅Lookup for variable '%s' at scope level %d: %s\n", name, scopeLevel, result)
     result
-  
   }
-  
 
   def lookupFunction(name: String): Option[FunctionEntry] = {
     functionTable.get(name)
@@ -112,18 +121,26 @@ object semanticChecker {
   def checkFunc(func: Func) : Option[String] =  {
     symbolTable.enterScope()
     val paramNames: List[String] = func.paramList.getOrElse(Nil).map(_.name)
+    val name: String = func.name
     if (paramNames.length != paramNames.toSet.size) {
-      val name: String = func.name
+      symbolTable.exitScope()
       return Some(s"Invalid parameters in function $name. Duplicate names for parameters is not allowed.")
     }
-    symbolTable.addFunction(func.name, func.t, func.paramList)
+    val added = symbolTable.addFunction(func.name, func.t, func.paramList)
+    if (!added) {
+      symbolTable.exitScope()
+      return Some(s"Invalid redeclaration of function $name.")
+    }
     symbolTable.setFunctionStatus(Some(func.t))
-    checkStatement(func.stmt)
+    val bodyCheckResult = checkStatement(func.stmt)
     // Check function declarations
     // def checkFunctionDeclaration(func: Func): Unit = {
     //   println(s"Checking function: ${func.name}")
     symbolTable.setFunctionStatus(None) 
     symbolTable.exitScope()
+    if (bodyCheckResult.isDefined) {
+      return bodyCheckResult
+    }
     None
   }
 
@@ -167,7 +184,7 @@ object semanticChecker {
                 } else {
                   Some(s"Semantic Error in identifier: $rType is not compatible to $lType")
                 }
-              case None => Some(s"Semantic Errorin identifier: Variable $name not declared")
+              case None => Some(s"Semantic Error in identifier: Variable $name not declared")
             }
 
             case LValue.LArray(ArrayElem(name, _)) => symbolTable.lookupVariable(name) match {
