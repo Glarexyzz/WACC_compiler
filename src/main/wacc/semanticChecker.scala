@@ -652,32 +652,29 @@ object semanticChecker {
     
     // arrays with compatible inner types
     case (ArrayType(innerType1), ArrayType(innerType2)) =>
-      isCompatibleTo(innerType2, innerType1) // recursively check if inner types are compatible
-    // things in an array are compatible with things of the same type outside the array
-    // case (ArrayType(innerType), innerType2) =>
-    //   isCompatibleTo(innerType, innerType2) // check if inner type is compatible with the other type
-    // case (innerType1, ArrayType(innerType2)) =>
-    //   isCompatibleTo(innerType1, innerType2)
+      nestedCompatibility(innerType1, innerType2) // recursively check if inner types are compatible
+    
 
+    case _ => nestedCompatibility(t1, t2)
+  }
+
+  def nestedCompatibility(t1: Type, t2: Type): Boolean = (t1, t2) match {
     case (BaseType.IntType, BaseType.IntType) => true
     case (BaseType.BoolType, BaseType.BoolType) => true
     case (BaseType.CharType, BaseType.CharType) => true
     case (BaseType.StrType, BaseType.StrType) => true
+    case (ArrayType(innerType1), ArrayType(innerType2)) =>
+      nestedCompatibility(innerType1, innerType2)
+    
     // pairs should not be covariant
     case (PairType(leftElem1, rightElem1), PairType(leftElem2, rightElem2)) =>
-      isCompatibleTo(leftElem1, leftElem2) && isCompatibleTo(rightElem1, rightElem2)
+      nestedCompatibility(leftElem1, leftElem2) && nestedCompatibility(rightElem1, rightElem2)
     case(BaseTElem(elem1), BaseTElem(elem2)) => 
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
     case(ArrayTElem(elem1), ArrayTElem(elem2)) => 
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
     case(PairKeyword, PairKeyword) => true
-    // case(AnyType, AnyType) => false
-    // any other type can be weaken to AnyType
-    case (_, AnyType) => true
-    // I may regret this, but AnyType can be weakened to any type. So ArrayType(AnyType) is compatible with ArrayType(IntType) in declaration
-    case (AnyType, _) => true
-    
-
+  
     // any PairElemType can be weakened to a Null Type
     case (NullType, BaseTElem(_)) => true
     case (NullType, ArrayTElem(_)) => true
@@ -689,16 +686,18 @@ object semanticChecker {
     case (PairKeyword, NullType) => true
 
     case(BaseTElem(elem1), elem2) =>
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
     case(elem1, BaseTElem(elem2)) =>
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
     case(ArrayTElem(elem1), elem2) =>
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
     case(elem1, ArrayTElem(elem2)) =>
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
+    // any other type can be weaken to AnyType
+    case (_, AnyType) => true
+    case (AnyType, _) => true
     case _ => false
   }
-
   def checkValidArrayIndexing(arrayType: Type, numIndices: Int): Either[String, Type] = {
     arrayType match {
       case ArrayType(innerType) =>
