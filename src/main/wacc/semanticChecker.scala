@@ -178,7 +178,7 @@ object semanticChecker {
         // so t is the more 'broad case', rType is the more 'specific case'
         // Any is the broadest possible case?
         // can rType be weakened to t?
-          if (isCompatibleTo(t, rType)) {
+          if (isCompatibleTo(rType, t)) {
             printf("Checking declaration of variable '%s' of type %s\n", name, t)
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate) 
@@ -678,14 +678,14 @@ object semanticChecker {
     
 
     // any PairElemType can be weakened to a Null Type
-    case (BaseTElem(_), NullType) => true
-    case (ArrayTElem(_), NullType) => true
-    case (PairKeyword, NullType) => true
+    case (NullType, BaseTElem(_)) => true
+    case (NullType, ArrayTElem(_)) => true
+    case (NullType, PairKeyword) => true
     // any PairElemType can be weakened to a PairKeyword and vice versa
     // this includes nulltype
     case (PairType(_, _), PairKeyword) => true
     case (PairKeyword, PairType(_, _)) => true
-    case (NullType, PairKeyword) => true
+    case (PairKeyword, NullType) => true
 
     case(BaseTElem(elem1), elem2) =>
       isCompatibleTo(elem1, elem2)
