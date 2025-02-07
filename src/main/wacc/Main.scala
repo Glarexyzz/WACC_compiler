@@ -17,7 +17,6 @@ def main(args: Array[String]): Unit = {
                     semanticChecker.checkSemantic(parsed) match {
                         case Some(errors) => 
                             println(s"Semantic errors found:\n$errors")
-                            println(s"Parsed as:\n$parsed")
                             exitCode = exitInvalidSemantics
                         case None => 
                             println(s"Successfully parsed:\n$parsed")

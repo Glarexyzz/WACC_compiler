@@ -5,6 +5,7 @@ import parsley.Parsley
 import parsley.token.{Lexer, Basic}
 import parsley.token.descriptions.*
 import parsley.character.{char, satisfy}
+import parsley.errors.combinator.ErrorMethods
 
 object lexer {
 
@@ -41,13 +42,8 @@ object lexer {
     val lexeme = lexer.lexeme // For parser to use lexeme
 
     // Numbers
-<<<<<<< HEAD
     val digit: Parsley[Char] = digit                        // single digit '0'-'9'
     val intSign: Parsley[Char] = (char('+') <|> char('-')).label("sign")    // '+' or '-'
-=======
-    val digit: Parsley[Char] = digit                        // single digit '0'-'9' following spec
-    val intSign: Parsley[Char] = char('+') <|> char('-')    // '+' or '-' following spec
->>>>>>> master
     val intLiter: Parsley[BigInt] = lexeme.signed.decimal32 // intSign with digits
     
     // Boolean

@@ -57,7 +57,6 @@ class SymbolTable {
   }
 
   def lookupVariable(name: String): Option[VariableEntry] = {
-    //println(s"🔍 Looking for variable '$name' starting from scope level $scopeLevel")
 
     val result = if (functionStatus.isDefined) {
     // Only check the most recent (innermost) scope
@@ -151,7 +150,10 @@ object semanticChecker {
     
     // Checks the function's body
     symbolTable.setFunctionStatus(Some(func.t))
-    val bodyCheckResult = checkStatement(func.stmt)
+    val bodyCheckResult = checkStatement(func.stmt) match {
+      case None => None
+      case Some(error) => Some(s"In function ${func.name},\n$error")
+    }
     symbolTable.setFunctionStatus(None)
     symbolTable.exitScope()
     bodyCheckResult
@@ -159,16 +161,12 @@ object semanticChecker {
 
   def checkStatement(stmt: Stmt): Option[String] = stmt match {
     case SkipStmt => None
-    // <type> <ident> '=' <rValue>
-    // No duplicate variable declarations in the same scope
+
     case DeclAssignStmt(t, name, value) => 
       checkRValue(value) match {
         case Left(error) => Some(error)
         case Right(rType) => 
-        // t name = (rType)
-        // so t is the more 'broad case', rType is the more 'specific case'
-        // Any is the broadest possible case?
-        // can rType be weakened to t?
+
           if (isCompatibleTo(rType, t)) {
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate)
