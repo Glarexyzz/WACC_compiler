@@ -244,6 +244,11 @@ object semanticChecker {
         case Some(_) => Some(s"Semantic Error: Variable $name must be of type int or char")
         case None => Some(s"Semantic Error: Variable $name not declared")
       }
+      case LValue.LPair(pairElem) => 
+        checkPairElem(pairElem) match {
+          case Right(_) => None
+          case Left(error) => Some(error)
+        }
       case _ => Some("Semantic Error: Invalid lvalue in read statement")
     }
 

@@ -17,8 +17,8 @@ object Func extends generic.ParserBridge4[
   Type, String, Option[List[Param]], Stmt, Func
 ]
 
-//  Param & Param list
-//  Param list no need AST because it can be in List[Param]
+// Param & Param list
+// Param list no need AST because it can be in List[Param]
 // <type> <ident>
 case class Param(t: Type, name: String)
 object Param extends generic.ParserBridge2[Type, String, Param]
@@ -86,7 +86,7 @@ object BodyStmt extends generic.ParserBridge1[Stmt, Stmt]
 case class SeqStmt(left: Stmt, right: Stmt) extends Stmt
 object SeqStmt extends generic.ParserBridge2[Stmt, Stmt, Stmt]
 
-//  Values
+// Values
 // <ident> | <arrayElem> | <pairElem>
 enum LValue extends Expr{
   case LName(name: String)
@@ -117,7 +117,7 @@ object RValue {
   object RCall extends generic.ParserBridge2[String, Option[List[Expr]], RValue]
 }
 
-//  Arg list no need AST, because it can be in List[Expr]
+// Arg list no need AST, because it can be in List[Expr]
 // 'fst' <lvalue> | 'snd' <lvalue>
 enum PairElem {
   case FstElem(value: LValue)
