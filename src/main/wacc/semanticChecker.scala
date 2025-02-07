@@ -21,7 +21,13 @@ class SymbolTable {
   
   def enterScope(): Unit = {
     scopeLevel += 1
-    variableScopes.push(mutable.Map())
+    val newScope = if (functionStatus.isDefined && variableScopes.nonEmpty) {
+      // If we're inside a function, copy the previous scope
+      variableScopes.top.clone()
+    } else {
+      mutable.Map[String, VariableEntry]()
+    }
+    variableScopes.push(newScope)
   }
 
   def exitScope(): Unit = {
