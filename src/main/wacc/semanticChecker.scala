@@ -246,10 +246,12 @@ object semanticChecker {
       }
       case LValue.LPair(pairElem) => 
         checkPairElem(pairElem) match {
-          case Right(_) => None
-          case Left(error) => Some(error)
+          case Right(BaseTElem(BaseType.IntType)) => None
+          case Right(BaseTElem(BaseType.CharType)) => None
+          case Right(_) => Some(s"Semantic Error: Invalid pair element type in read")
+          case Left(_) => Some(s"Semantic Error: Invalid lvalue in read statement")
         }
-      case _ => Some("Semantic Error: Invalid lvalue in read statement")
+      case _ => Some(s"Semantic Error: Invalid lvalue in read statement")
     }
 
     // 'free' <expr>
