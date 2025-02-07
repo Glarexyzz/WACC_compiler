@@ -5,6 +5,7 @@ import parsley.Parsley
 import parsley.token.{Lexer, Basic}
 import parsley.token.descriptions.*
 import parsley.character.{char, satisfy}
+import parsley.errors.combinator.ErrorMethods
 
 object lexer {
 
@@ -47,12 +48,12 @@ object lexer {
     
     // Boolean
     val boolLiter: Parsley[Boolean] =                     // 'true' or 'false'
-        lexeme.symbol("true").map(_ => true) <|>
-        lexeme.symbol("false").map(_ => false)
+        lexeme.symbol("true").map(_ => true).label("the boolean value 'true'") <|>
+        lexeme.symbol("false").map(_ => false).label("the boolean value 'false'")
 
     // Char & String
     val escapedChar: Parsley[Char] =
-        char('0').as('\u0000') <|> // '0', 'b', 't', 'n', 'f', 'r', '\'', '"', '\\'
+        (char('0').as('\u0000') <|> // '0', 'b', 't', 'n', 'f', 'r', '\'', '"', '\\'
         char('b').as('\b') <|>
         char('t').as('\t') <|>
         char('n').as('\n') <|>
@@ -60,7 +61,7 @@ object lexer {
         char('r').as('\r') <|>
         char('\'') <|>
         char('"') <|>
-        char('\\')
+        char('\\')).label("escaped character")
 
     val character: Parsley[Char] = // any ACSII character except '\', ''' and '"' or '\'escapedChar
         char('\\') *> escapedChar <|>
@@ -73,7 +74,8 @@ object lexer {
             c != '\r' &&
             c >= 0x00.toChar &&
             c <= 0x7F.toChar
-        ) 
+        ).label("a valid character enclosed in single quotes")
+            .explain("Characters must be ASCII")
     
     val charLiter: Parsley[Char] = //lexeme.character.ascii
         char('\'') *> character <* char('\'') <* 
@@ -87,6 +89,8 @@ object lexer {
     val pairLiter: Parsley[Unit] = lexeme.symbol("null")  // 'null'
 
     val ident: Parsley[String] = lexeme.names.identifier  //(letter | '_') (letter | digit | '_')*
+        .label("valid identifier")
+        .explain("must start with '_' or letter")
 
     // Comments
     val comment: Parsley[Unit] = lexer.space.skipComments // '#'(any character except eol)* (<eol> | <eof>)
