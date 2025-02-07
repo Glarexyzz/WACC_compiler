@@ -111,6 +111,11 @@ object semanticChecker {
 
   def checkFunc(func: Func) : Option[String] =  {
     symbolTable.enterScope()
+    val paramNames: List[String] = func.paramList.getOrElse(Nil).map(_.name)
+    if (paramNames.length != paramNames.toSet.size) {
+      val name: String = func.name
+      return Some(s"Invalid parameters in function $name. Duplicate names for parameters is not allowed.")
+    }
     symbolTable.addFunction(func.name, func.t, func.paramList)
     symbolTable.setFunctionStatus(Some(func.t))
     checkStatement(func.stmt)
