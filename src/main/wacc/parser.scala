@@ -105,7 +105,6 @@ object parser {
                 .label("logical operator")), // '&&'
             Ops(InfixR)(orOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
                 .label("logical operator"))   // '||'
-        )
         ).label("expression")
     
     // Types
