@@ -60,11 +60,6 @@ class SymbolTable {
     if (functionTable.contains(name)) return false
     // Add the function entry
     val functionEntry = FunctionEntry(returnType, params)
-    params.foreach { paramList =>
-      paramList.foreach { param =>
-        addVariable(param.name, param.t)  // Register parameter in the function scope
-      }
-    }
     functionTable(name) = functionEntry
     true
   }
@@ -119,38 +114,64 @@ object semanticChecker {
 
   def checkProgram(program: Program): Option[String] = {
     symbolTable.enterScope()
-    val funcErrors = program.funcs.flatMap(checkFunc)
-    // val noFuncErrors = program.funcs.foreach(checkFunctionDeclaration)
+    
+    // First, add all function declarations to the symbol table
+    val funcDeclarationErrors = program.funcs.flatMap(addFuncDeclaration)
+    
+    // Then, check the function bodies
+    val funcBodyErrors = program.funcs.flatMap(checkFunc)
+    
+    // Check the main program statement
     val stmtErrors = checkStatement(program.stmt).toList
+    
     symbolTable.exitScope()
-    val errors = funcErrors /*++ noFuncErrors*/ ++ stmtErrors
+    
+    // Combine all errors
+    val errors = funcDeclarationErrors ++ funcBodyErrors ++ stmtErrors
     if (errors.isEmpty) None else Some(errors.mkString("\n"))
   }
 
-  def checkFunc(func: Func) : Option[String] =  {
-    symbolTable.enterScope()
+  // Helper function to add function declarations to the symbol table
+  def addFuncDeclaration(func: Func): Option[String] = {
     val paramNames: List[String] = func.paramList.getOrElse(Nil).map(_.name)
     val name: String = func.name
+    
+    // Check for duplicate parameter names
     if (paramNames.length != paramNames.toSet.size) {
-      symbolTable.exitScope()
       return Some(s"Invalid parameters in function $name. Duplicate names for parameters is not allowed.")
     }
+    
+    // Add the function to the symbol table
     val added = symbolTable.addFunction(func.name, func.t, func.paramList)
     if (!added) {
-      symbolTable.exitScope()
       return Some(s"Invalid redeclaration of function $name.")
     }
-    symbolTable.setFunctionStatus(Some(func.t))
-    val bodyCheckResult = checkStatement(func.stmt)
-    // Check function declarations
-    // def checkFunctionDeclaration(func: Func): Unit = {
-    //   println(s"Checking function: ${func.name}")
-    symbolTable.setFunctionStatus(None) 
-    symbolTable.exitScope()
-    if (bodyCheckResult.isDefined) {
-      return bodyCheckResult
-    }
+    
     None
+  }
+
+  def checkFunc(func: Func): Option[String] = {
+    symbolTable.enterScope()
+    
+    // Add parameters to the symbol table
+    func.paramList.foreach { params =>
+      params.foreach { param =>
+        symbolTable.addVariable(param.name, param.t)
+      }
+    }
+    
+    // Set the current function status
+    symbolTable.setFunctionStatus(Some(func.t))
+    
+    // Check the function body
+    val bodyCheckResult = checkStatement(func.stmt)
+    
+    // Reset the function status
+    symbolTable.setFunctionStatus(None)
+    
+    symbolTable.exitScope()
+    
+    bodyCheckResult
   }
 
   def checkStatement(stmt: Stmt): Option[String] = stmt match {
