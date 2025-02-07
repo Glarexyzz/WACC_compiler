@@ -178,7 +178,7 @@ object semanticChecker {
         // so t is the more 'broad case', rType is the more 'specific case'
         // Any is the broadest possible case?
         // can rType be weakened to t?
-          if (isCompatibleTo(t, rType)) {
+          if (isCompatibleTo(rType, t)) {
             printf("Checking declaration of variable '%s' of type %s\n", name, t)
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate) 
