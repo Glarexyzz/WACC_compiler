@@ -72,49 +72,39 @@ object parser {
 
     // Atom definition
     private lazy val atom: Parsley[Expr] =
-        (IntLiteral(intLiter) <|>
-        BoolLiteral(boolLiter) <|>
-        CharLiteral(charLiter) <|>
-        StrLiteral(strLiter) <|>
-        pairLiter.as(PairLiteral) <|>
-        atomic(arrayElem) <|>
-        Identifier(ident) <|>
-        (softOp("(").hide *> expr <* softOp(")").label("closing bracket").explain("missing closing bracket"))).label("atom")
+        IntLiteral(intLiter).label("integer value") <|>
+        BoolLiteral(boolLiter).label("boolean value") <|>
+        CharLiteral(charLiter).label("char literal") <|>
+        StrLiteral(strLiter).label("string literal") <|>
+        pairLiter.as(PairLiteral).label("null pair value") <|>
+        atomic(arrayElem).label("array index") <|>
+        Identifier(ident).label("variable or function identifier") <|>
+        (softOp("(") *> expr <* softOp(")")
+            .label("closing bracket").explain("missing closing bracket")
+        )
 
     // Array element definition
     private lazy val arrayElem: Parsley[ArrayElem] =
-        ArrayElem(ident, some(softOp("[") *> expr <* softOp("]").label("closing bracket for array")))
+        ArrayElem(ident, some(softOp("[") *> expr <* softOp("]")
+            .label("closing bracket for array")))
 
     // Expression definition
     private lazy val expr: Parsley[Expr] = 
-        precedence(atom)(
-        Ops(Prefix)(
-        unaryOps.map(op => (expr: Expr) => UnaryOp(op, expr))
-            .label("unary expression")  // Apply label to the unary operator
-        ),
-        Ops(InfixL)(
-        mulOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
-            .label("multiplication or division operator")  // Apply label to multiplication operator
-        ),
-        Ops(InfixL)(
-        addOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
-            .label("addition or subtraction operator")  // Apply label to addition operator
-        ),
-        Ops(InfixN)(
-        relOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
-            .label("relational operator")  // Apply label to relational operator
-        ),
-        Ops(InfixN)(
-        eqOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
-            .label("equality operator")  // Apply label to equality operator
-        ),
-        Ops(InfixR)(
-        andOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
-            .label("logical AND operator")  // Apply label to AND operator
-        ),
-        Ops(InfixR)(
-        orOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
-            .label("logical OR operator")  // Apply label to OR operator
+        precedence(atom.label("an expression value"))(
+            Ops(Prefix)(unaryOps.map(op => (expr: Expr) => UnaryOp(op, expr))
+                .label("unary operator")), // '!' | '-' | 'len' | 'ord' | 'chr'
+            Ops(InfixL)(mulOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
+                .label("multiplication operator")), // '*' | '/' | '%'
+            Ops(InfixL)(addOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
+                .label("addition operator")), // '+' | '-'
+            Ops(InfixN)(relOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
+                .label("relational operator")), // '>' | '>=' | '<' | '<='
+            Ops(InfixN)(eqOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
+                .label("equality operator")),  // '==' | '!='
+            Ops(InfixR)(andOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
+                .label("logical operator")), // '&&'
+            Ops(InfixR)(orOps.map(op => (left: Expr, right: Expr) => BinaryOp(left, op, right))
+                .label("logical operator"))   // '||'
         )
         ).label("expression")
     
@@ -220,37 +210,38 @@ object parser {
 
     // Statement definition
     private lazy val stmtAtom: Parsley[Stmt] =
-        symbol("skip").as(SkipStmt) <|>
-        DeclAssignStmt(typeParser.label("type"), ident.label("identifier"), (softOp("=").label("declaration =") *> rValue)) <|>
-        AssignStmt(lValue, (softOp("=").label("assignment =") *> rValue)) <|>
-        ReadStmt(symbol("read") *> lValue) <|>
-        FreeStmt(symbol("free") *> expr) <|>
-        PrintStmt(symbol("print") *> expr) <|>
-        PrintlnStmt(symbol("println") *> expr) <|>
-        atomic(returningStmt) <|>
+        symbol("skip").as(SkipStmt).label("skip statement") <|>
+        DeclAssignStmt(typeParser, ident, (softOp("=") *> rValue))
+            .label("declaration") <|>
+        AssignStmt(lValue, (softOp("=") *> rValue)).label("assignment") <|>
+        ReadStmt(symbol("read") *> lValue).label("read statement") <|>
+        FreeStmt(symbol("free") *> expr).label("free statement") <|>
+        PrintStmt(symbol("print") *> expr).label("print statement") <|>
+        PrintlnStmt(symbol("println") *> expr).label("println statement") <|>
+        atomic(returningStmt).label("returning statement") <|>
         IfStmt(
             (symbol("if") *> expr), 
             (symbol("then") *> stmt), 
             (symbol("else") *> stmt <* symbol("fi"))
-        ) <|>
+        ).label("if-else statement") <|>
         WhileStmt(
             (symbol("while") *> expr),
             (symbol("do") *> stmt <* symbol("done"))
-        ) <|>
-        BodyStmt(symbol("begin") *> stmt.label("body").explain("missing body") <* symbol("end"))
+        ).label("while statement") <|>
+        BodyStmt(symbol("begin") *> stmt <* symbol("end")).label("block statement")
     
     private lazy val stmt: Parsley[Stmt] = 
-        precedence(stmtAtom)(
-            Ops(InfixL)(SeqStmt from symbol(";"))
-        ) 
+        precedence(stmtAtom.label("statement"))(
+            Ops(InfixL)(SeqStmt from symbol(";").label("statement separator"))
+        )
 
     // Left value definition
     private lazy val lValue: Parsley[LValue] = 
-        (atomic(lArray) <|> lName <|> lPair).label("left value")
+        (atomic(lArray) <|> lName <|> lPair).label("left-side value")
 
-    private lazy val lName: Parsley[LValue] = LValue.LName(ident)
-    private lazy val lArray: Parsley[LValue] = LValue.LArray(arrayElem)
-    private lazy val lPair: Parsley[LValue] = LValue.LPair(pairElem)
+    private lazy val lName: Parsley[LValue] = LValue.LName(ident).label("identifier")
+    private lazy val lArray: Parsley[LValue] = LValue.LArray(arrayElem).label("array index")
+    private lazy val lPair: Parsley[LValue] = LValue.LPair(pairElem).label("pair")
 
     // Right value definition
     private lazy val rValue: Parsley[RValue] =
@@ -258,21 +249,21 @@ object parser {
         rArrayLiter <|>
         rNewPair <|>
         rPair <|>
-        rCall).label("valid right value")
+        rCall).label("right-side value")
 
-    private lazy val rExpr: Parsley[RValue] = RValue.RExpr(expr)
-    private lazy val rArrayLiter: Parsley[RValue] = RValue.RArrayLiter(arrayLiter)
+    private lazy val rExpr: Parsley[RValue] = RValue.RExpr(expr).label("expression")
+    private lazy val rArrayLiter: Parsley[RValue] = RValue.RArrayLiter(arrayLiter).label("array")
     private lazy val rNewPair: Parsley[RValue] = 
         RValue.RNewPair(
             (symbol("newpair") *> softOp("(") *> expr),
             (softOp(",") *> expr <* softOp(")"))
-        )
-    private lazy val rPair: Parsley[RValue] = RValue.RPair(pairElem)
+        ).label("new pair")
+    private lazy val rPair: Parsley[RValue] = RValue.RPair(pairElem).label("pair")
     private lazy val rCall: Parsley[RValue] = 
         RValue.RCall(
             (symbol("call") *> ident),
             (softOp("(") *> option(argList) <* softOp(")"))
-        )
+        ).label("function call")
     
     // Argument list definition
     private lazy val argList: Parsley[List[Expr]] = sepBy1(expr, softOp(",")).label("argument list")
