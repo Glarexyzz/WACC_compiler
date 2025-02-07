@@ -18,7 +18,13 @@ class SymbolTable {
   
   def enterScope(): Unit = {
     scopeLevel += 1
-    variableScopes.push(mutable.Map())
+    val newScope = if (functionStatus.isDefined && variableScopes.nonEmpty) {
+      // If we're inside a function, copy the previous scope
+      variableScopes.top.clone()
+    } else {
+      mutable.Map[String, VariableEntry]()
+    }
+    variableScopes.push(newScope)
   }
 
   def exitScope(): Unit = {
@@ -31,7 +37,7 @@ class SymbolTable {
   def addVariable(name: String, varType: Type): Boolean = {
     if (variableScopes.nonEmpty) {
       val currentScope = variableScopes.top // Get current scope
-      if (currentScope.contains(name)) {
+      if (currentScope.contains(name) && !functionStatus.isDefined) {
         return false // Variable already declared in this scope
       }
       currentScope(name) = VariableEntry(varType) // Add variable
@@ -49,15 +55,21 @@ class SymbolTable {
     functionTable(name) = functionEntry
     true
   }
+
   def lookupVariable(name: String): Option[VariableEntry] = {
-    val result = variableScopes.zipWithIndex.reverseIterator.toList.reverse.collectFirst {
-      case (scope, index) if index >= (variableScopes.size - scopeLevel) && scope.contains(name) => 
-        scope(name)
+    //println(s"🔍 Looking for variable '$name' starting from scope level $scopeLevel")
+
+    val result = if (functionStatus.isDefined) {
+    // Only check the most recent (innermost) scope
+      variableScopes.headOption.flatMap(scope => scope.get(name))
+    } else {
+      variableScopes.zipWithIndex.reverseIterator.toList.reverse.collectFirst {
+        case (scope, index) if index >= (variableScopes.size - scopeLevel) && scope.contains(name) => 
+          scope(name)
+      }
     }
     result
-  
   }
-  
 
   def lookupFunction(name: String): Option[FunctionEntry] = {
     functionTable.get(name)
@@ -93,23 +105,56 @@ object semanticChecker {
 
   def checkProgram(program: Program): Option[String] = {
     symbolTable.enterScope()
-    val funcErrors = program.funcs.flatMap(checkFunc)
+    
+    // Adds all valid function declarations
+    val funcDeclarationErrors = program.funcs.flatMap(addFuncDeclaration)
+    
+    // Checks function bodies
+    val funcBodyErrors = program.funcs.flatMap(checkFunc)
+    
+    // Checks main program
     val stmtErrors = checkStatement(program.stmt).toList
     symbolTable.exitScope()
-    val errors = funcErrors /*++ noFuncErrors*/ ++ stmtErrors
+    
+    val errors = funcDeclarationErrors ++ funcBodyErrors ++ stmtErrors
     if (errors.isEmpty) None else Some(errors.mkString("\n"))
   }
 
-  def checkFunc(func: Func) : Option[String] =  {
-    symbolTable.enterScope()
-    symbolTable.addFunction(func.name, func.t, func.paramList)
-    symbolTable.setFunctionStatus(Some(func.t))
-
-    checkStatement(func.stmt)
-
-    symbolTable.setFunctionStatus(None) 
-    symbolTable.exitScope()
+  // Helper function to add function declarations to the symbol table
+  def addFuncDeclaration(func: Func): Option[String] = {
+    val paramNames: List[String] = func.paramList.getOrElse(Nil).map(_.name)
+    val name: String = func.name
+    
+    // Check for duplicate parameter names
+    if (paramNames.length != paramNames.toSet.size) {
+      return Some(s"Invalid parameters in function $name. Duplicate names for parameters is not allowed.")
+    }
+    
+    // Add the function to the symbol table
+    val added = symbolTable.addFunction(func.name, func.t, func.paramList)
+    if (!added) {
+      return Some(s"Invalid redeclaration of function $name.")
+    }
+    
     None
+  }
+
+  def checkFunc(func: Func): Option[String] = {
+    symbolTable.enterScope()
+    
+    // Add function parameters to the symbol table
+    func.paramList.foreach { params =>
+      params.foreach { param =>
+        symbolTable.addVariable(param.name, param.t)
+      }
+    }
+    
+    // Checks the function's body
+    symbolTable.setFunctionStatus(Some(func.t))
+    val bodyCheckResult = checkStatement(func.stmt)
+    symbolTable.setFunctionStatus(None)
+    symbolTable.exitScope()
+    bodyCheckResult
   }
 
   def checkStatement(stmt: Stmt): Option[String] = stmt match {
@@ -124,9 +169,9 @@ object semanticChecker {
         // so t is the more 'broad case', rType is the more 'specific case'
         // Any is the broadest possible case?
         // can rType be weakened to t?
-          if (isCompatibleTo(t, rType)) {
+          if (isCompatibleTo(rType, t)) {
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
-            if (can_add_if_no_duplicate) 
+            if (can_add_if_no_duplicate)
               None
             else Some(s"Semantic Error in Declaration: Variable $name is already declared")
            }
@@ -147,7 +192,7 @@ object semanticChecker {
                 } else {
                   Some(s"Semantic Error in identifier: $rType is not compatible to $lType")
                 }
-              case None => Some(s"Semantic Errorin identifier: Variable $name not declared")
+              case None => Some(s"Semantic Error in identifier: Variable $name not declared")
             }
 
             case LValue.LArray(ArrayElem(name, _)) => symbolTable.lookupVariable(name) match {
@@ -185,7 +230,14 @@ object semanticChecker {
         case Some(_) => Some(s"Semantic Error: Variable $name must be of type int or char")
         case None => Some(s"Semantic Error: Variable $name not declared")
       }
-      case _ => Some("Semantic Error: Invalid lvalue in read statement")
+      case LValue.LPair(pairElem) => 
+        checkPairElem(pairElem) match {
+          case Right(BaseTElem(BaseType.IntType)) => None
+          case Right(BaseTElem(BaseType.CharType)) => None
+          case Right(_) => Some(s"Semantic Error: Invalid pair element type in read")
+          case Left(_) => Some(s"Semantic Error: Invalid lvalue in read statement")
+        }
+      case _ => Some(s"Semantic Error: Invalid lvalue in read statement")
     }
 
     // 'free' <expr>
@@ -581,53 +633,52 @@ object semanticChecker {
     
     // arrays with compatible inner types
     case (ArrayType(innerType1), ArrayType(innerType2)) =>
-      isCompatibleTo(innerType1, innerType2) // recursively check if inner types are compatible
-    // things in an array are compatible with things of the same type outside the array
-    // case (ArrayType(innerType), innerType2) =>
-    //   isCompatibleTo(innerType, innerType2) // check if inner type is compatible with the other type
-    // case (innerType1, ArrayType(innerType2)) =>
-    //   isCompatibleTo(innerType1, innerType2)
+      nestedCompatibility(innerType1, innerType2) // recursively check if inner types are compatible
+    
 
+    case _ => nestedCompatibility(t1, t2)
+  }
+
+  def nestedCompatibility(t1: Type, t2: Type): Boolean = (t1, t2) match {
     case (BaseType.IntType, BaseType.IntType) => true
     case (BaseType.BoolType, BaseType.BoolType) => true
     case (BaseType.CharType, BaseType.CharType) => true
     case (BaseType.StrType, BaseType.StrType) => true
+    case (ArrayType(innerType1), ArrayType(innerType2)) =>
+      nestedCompatibility(innerType1, innerType2)
+    
     // pairs should not be covariant
     case (PairType(leftElem1, rightElem1), PairType(leftElem2, rightElem2)) =>
-      isCompatibleTo(leftElem1, leftElem2) && isCompatibleTo(rightElem1, rightElem2)
+      nestedCompatibility(leftElem1, leftElem2) && nestedCompatibility(rightElem1, rightElem2)
     case(BaseTElem(elem1), BaseTElem(elem2)) => 
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
     case(ArrayTElem(elem1), ArrayTElem(elem2)) => 
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
     case(PairKeyword, PairKeyword) => true
-    // case(AnyType, AnyType) => false
-    // any other type can be weaken to AnyType
-    case (_, AnyType) => true
-    // I may regret this, but AnyType can be weakened to any type. So ArrayType(AnyType) is compatible with ArrayType(IntType) in declaration
-    case (AnyType, _) => true
-    
-
+  
     // any PairElemType can be weakened to a Null Type
-    case (BaseTElem(_), NullType) => true
-    case (ArrayTElem(_), NullType) => true
-    case (PairKeyword, NullType) => true
+    case (NullType, BaseTElem(_)) => true
+    case (NullType, ArrayTElem(_)) => true
+    case (NullType, PairKeyword) => true
     // any PairElemType can be weakened to a PairKeyword and vice versa
     // this includes nulltype
     case (PairType(_, _), PairKeyword) => true
     case (PairKeyword, PairType(_, _)) => true
-    case (NullType, PairKeyword) => true
+    case (PairKeyword, NullType) => true
 
     case(BaseTElem(elem1), elem2) =>
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
     case(elem1, BaseTElem(elem2)) =>
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
     case(ArrayTElem(elem1), elem2) =>
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
     case(elem1, ArrayTElem(elem2)) =>
-      isCompatibleTo(elem1, elem2)
+      nestedCompatibility(elem1, elem2)
+    // any other type can be weaken to AnyType
+    case (_, AnyType) => true
+    case (AnyType, _) => true
     case _ => false
   }
-
   def checkValidArrayIndexing(arrayType: Type, numIndices: Int): Either[String, Type] = {
     arrayType match {
       case ArrayType(innerType) =>

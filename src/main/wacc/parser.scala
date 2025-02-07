@@ -145,9 +145,6 @@ object parser {
                 }.asInstanceOf[ArrayType]
             }
         }
-        
-
-        
 
     // Pair definition
     private lazy val pairType: Parsley[PairType] = 
@@ -172,7 +169,6 @@ object parser {
     // Statements
 
     // Program definition
-
     private lazy val program: Parsley[Program] = 
         Program(
             (symbol("begin") *> many(atomic(func))), 
@@ -212,13 +208,13 @@ object parser {
         case IfStmt(_, thenStmt, elseStmt) => 
             returningBlock(thenStmt) && returningBlock(elseStmt) 
         case SeqStmt(_, lastStmt) => returningBlock(lastStmt) 
+        case BodyStmt(innerStmt) => returningBlock(innerStmt)
         case _ => false  // Any other statement is invalid
     }
 
     // ParamList definition
     private lazy val paramList: Parsley[List[Param]] = sepBy1(param, softOp(",").label("comma in parameters"))
     
-
     // Param definition
     private lazy val param: Parsley[Param] = Param(typeParser, ident)
 
