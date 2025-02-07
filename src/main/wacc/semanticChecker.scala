@@ -371,7 +371,7 @@ object semanticChecker {
                           else Left(s"Semantic Error: Array elements $exprType must be compatible with $elementType") // Return error if types mismatch
                         case Left(error) => Left(error) // Propagate any errors from checkExprType
                       }
-                    case _ => Left("Semantic Error: Elements must be ArrayType in Array")
+                    case Right(t) => Left(s"Semantic Error: Elements must be ArrayType in Array, but got $t instead")
                   }
               }
           }
@@ -397,14 +397,14 @@ object semanticChecker {
             case None =>
               argList match {
                 case None => Right(returnType)
-                case Some(_) => Left("Semantic Error: Too many arguments in function call")
+                case Some(_) => Left(s"Semantic Error: Too many arguments in function call of $name")
               }
             case Some(paramList) =>
               argList match {
-                case None => Left("Semantic Error: Too few arguments in function call")
+                case None => Left(s"Semantic Error: Too few arguments in function call of $name")
                 case Some(args) =>
                   if (paramList.length != args.length) {
-                    Left("Semantic Error: Number of arguments does not match function definition")
+                    Left(s"Semantic Error: Number of arguments does not match function definition of $name")
                     } 
                   else {
                     paramList.zip(args).foldLeft[Either[String, Type]](Right(returnType)) {
@@ -416,7 +416,7 @@ object semanticChecker {
                             case Right(argType) =>
                             // can the parameter type be weakened to the argument type?
                             if (isCompatibleTo(param.t, argType)) Right(returnType) // Check if types are compatible
-                            else Left(s"Semantic Error: Argument type mismatch for parameter ${param.name}")
+                            else Left(s"Semantic Error: Argument type mismatch for parameter ${param.name} in $name")
                             case Left(error) => Left(error) // Propagate any errors from checking the argument
                           }
                       }
@@ -430,26 +430,26 @@ object semanticChecker {
   }
 
   def checkPairElem(pairElem: PairElem): Either[String, Type] = pairElem match {
-      case PairElem.FstElem(LValue.LName(p)) => symbolTable.lookup(p) match {
+      case PairElem.FstElem(LValue.LName(p)) => symbolTable.lookupVariable(p) match {
         case Some(VariableEntry(PairType(leftType, _))) => Right(leftType)
-        case Some(_) => Left(s"Error: $p is not a pair")
+        case Some(VariableEntry(t)) => Left(s"Error: $p should be a pair, got $t instead")
         case None => Left(s"Error: $p is not declared")
       }
-      case PairElem.SndElem(LValue.LName(p)) => symbolTable.lookup(p) match {
+      case PairElem.SndElem(LValue.LName(p)) => symbolTable.lookupVariable(p) match {
         case Some(VariableEntry(PairType(_, rightType))) => Right(rightType)
-        case Some(_) => Left(s"Error: $p is not a pair")
+        case Some(VariableEntry(t)) => Left(s"Error: $p should be a pair, got $t instead")
         case None => Left(s"Error: $p is not declared")
       }
       case PairElem.FstElem(LValue.LArray(ArrayElem(name, _))) => 
-        symbolTable.lookup(name) match {
+        symbolTable.lookupVariable(name) match {
           case Some(VariableEntry(ArrayType(PairType(leftType, _)))) => Right(leftType)
-          case Some(_) => Left(s"Error: $name is not an array")
+          case Some(VariableEntry(t)) => Left(s"Error: $name should be an array, got $t instead")
           case None => Left(s"Error: $name is not declared")
       }
       case PairElem.SndElem(LValue.LArray(ArrayElem(name, _))) => 
-        symbolTable.lookup(name) match {
+        symbolTable.lookupVariable(name) match {
           case Some(VariableEntry(ArrayType(PairType(_, rightType)))) => Right(rightType)
-          case Some(_) => Left(s"Error: $name is not an array")
+          case Some(VariableEntry(t)) => Left(s"Error: $name should be an array, got $t instead")
           case None => Left(s"Error: $name is not declared")
       }
       case PairElem.FstElem(LValue.LPair(pairElem)) => 
@@ -475,7 +475,7 @@ object semanticChecker {
     case BaseType.StrType => BaseTElem(BaseType.StrType)
     case ArrayType(innerType) => ArrayTElem(ArrayType(innerType))
     case PairType(leftElem, rightElem) => PairKeyword
-    case _ => NullType // a bit doubtful - does this cover all possible types?
+    case _ => NullType 
   }
 
   def checkExprType(expr: Expr, env: SymbolTable): Either[String, Type] = expr match {
@@ -490,7 +490,7 @@ object semanticChecker {
     case Identifier(name) => env.lookup(name) match {
       case Some(VariableEntry(t)) => Right(t)
       case Some(FunctionEntry(t, _)) => Right(t)
-      case None => Left(s"Semantic Error: $name is not declared")
+      case None => Left(s"Semantic Error in Expression: Identifier $name is not declared")
     }
 
     // // <ident> ('[ <expr> ']')+
@@ -506,18 +506,18 @@ object semanticChecker {
               // can int be weakened to the index type? (since int is the most specific type of element)
               case Right(t) => isCompatibleTo(BaseType.IntType, t) match {
                 case true => Right(BaseType.IntType) // Continue if index is of type int
-                case false => Left(s"Semantic Error: Array indices must be compatible with type int but are $t") // Error if index is not of type int
+                case false => Left(s"Semantic Error in Expression: Array indices must be compatible with type int but are $t") // Error if index is not of type int
               }
               case Left(error) => Left(error) // Propagate any errors from checkExprType
             }
           }
       } match {
         case Right(_) =>
-          env.lookup(name) match {
+          env.lookupVariable(name) match {
         case Some(VariableEntry(ArrayType(innerType))) => checkValidArrayIndexing(ArrayType(innerType), indices.length)
           //Right(ArrayType(innerType))
-        case Some(_) => Left(s"Semantic Error: $name is not an array")
-        case None => Left(s"Semantic Error: $name is not declared")
+        case Some(VariableEntry(t)) => Left(s"Semantic Error in Expression: $name should be an array, but got $t instead")
+        case None => Left(s"Semantic Error in Expression: array $name is not declared")
           }
         case Left(error) => Left(error)
       }
@@ -536,7 +536,7 @@ object semanticChecker {
           if (isCompatibleTo(BaseType.IntType, t1) && isCompatibleTo(BaseType.IntType, t2)) { 
             Right(BaseType.IntType) 
           } else { 
-            Left(s"Semantic Error: $t1 and $t2 are incompatible for arithmetic operation") 
+            Left(s"Semantic Error: $t1 and $t2 are incompatible for arithmetic operation $op") 
           }
         case (Left(error1), Left(error2)) => Left(s"$error1, $error2")
         case (Left(error), _) => Left(error)
@@ -552,7 +552,10 @@ object semanticChecker {
       (checkExprType(left, env), checkExprType(right, env)) match {
         case (Right(BaseType.IntType), Right(BaseType.IntType)) => Right(BaseType.BoolType) 
         case (Right(BaseType.CharType), Right(BaseType.CharType)) => Right(BaseType.BoolType) 
-        case _ => Left("Semantic Error: Incompatible types for comparison operation") 
+        case (Right(t1), Right(t2)) => Left(s"Semantic Error: Types should be int or char, but got $t1 and $t2 instead in operation $op") 
+        case (Left(error1), Left(error2)) => Left(s"$error1, $error2")
+        case (Left(error), _) => Left(error)
+        case (_, Left(error)) => Left(error)
       }
     
     case BinaryOp(left, op, right) if Set(
@@ -563,7 +566,7 @@ object semanticChecker {
         case (Right(t1), Right(t2)) => 
           if (isCompatibleTo(t1, t2) || isCompatibleTo(t2, t1)) 
             Right(BaseType.BoolType) 
-          else Left(s"Semantic Error: Incompatible types $t1, $t2 for equality comparison")
+          else Left(s"Semantic Error: Incompatible types $t1, $t2 for equality comparison of operation $op")
         case (Left(error1), Left(error2)) => Left(s"$error1, $error2")
         case (Left(error), _) => Left(error)
         case (_, Left(error)) => Left(error)
@@ -575,7 +578,7 @@ object semanticChecker {
     ).contains(op) =>
       (checkExprType(left, env), checkExprType(right, env)) match {
         case (Right(BaseType.BoolType), Right(BaseType.BoolType)) => Right(BaseType.BoolType) 
-        case (Right(t1), Right(t2)) => Left(s"Semantic Error: $t1 and $t2 are incompatible for logical operation")
+        case (Right(t1), Right(t2)) => Left(s"Semantic Error: $t1 and $t2 are incompatible for logical operation of $op")
         case (Left(error1), Left(error2)) => Left(s"$error1, $error2")
         case (Left(error), _) => Left(error)
         case (_, Left(error)) => Left(error)
