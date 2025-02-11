@@ -1,6 +1,7 @@
 package wacc
 
 import Constants._
+import CodeGen._
 import scala.io.Source
 
 def main(args: Array[String]): Unit = {
@@ -19,7 +20,8 @@ def main(args: Array[String]): Unit = {
                             println(s"Semantic errors found:\n$errors\n")
                             exitCode = exitInvalidSemantics
                         case None => 
-                            println(s"Successfully parsed:\n$parsed\n")
+                            compile(parsed, "temp")
+                            println(s"Successfully parsed & compiled:\n$parsed\n")
                             exitCode = exitValid
                     }
                 case Left(error) =>

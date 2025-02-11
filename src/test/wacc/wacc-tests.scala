@@ -33,32 +33,32 @@ trait WACCTestUtils {
     Set (
     "advanced",
     // "array",
-    "basic", 
-    "basic/exit", "basic/skip", //
-    "exit", //
-    "expressions", //
-    "function", 
-    "function/nested_functions", // 
-    "function/simple_functions",
-    "literals", //(syntax only)
-    "if", //
-    "IO",  //
-    "IO/print", //
-    "IO/read", //
-    "multiple", // failed for unknown reasons
+    // "basic", 
+    // "basic/exit", "basic/skip", //
+    // "exit", //
+    // "expressions", //
+    // "function", 
+    // "function/nested_functions", // 
+    // "function/simple_functions",
+    // "literals", //(syntax only)
+    // "if", //
+    // "IO",  //
+    // "IO/print", //
+    // "IO/read", //
+    // "multiple", // failed for unknown reasons
     // "pairs",
     // "print", //
-    "runtimeErr", //
-    "runtimeErr/arrayOutOfBounds", //
-    "runtimeErr/badChar", //
-    "runtimeErr/divideByZero", //
-    "runtimeErr/integerOverflow", //
-    "runtimeErr/nullDereference", // failed due to pair types
-    "scope",
-    "sequence", //
-    "read", //
-    "variables", //X : scopevar issue
-    "while"  //
+    // "runtimeErr", //
+    // "runtimeErr/arrayOutOfBounds", //
+    // "runtimeErr/badChar", //
+    // "runtimeErr/divideByZero", //
+    // "runtimeErr/integerOverflow", //
+    // "runtimeErr/nullDereference", // failed due to pair types
+    // "scope",
+    // "sequence", //
+    // "read", //
+    // "variables", //X : scopevar issue
+    // "while"  //
     )
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {
@@ -92,7 +92,7 @@ class ValidTest extends AnyFlatSpec with Matchers with WACCTestUtils {
     if (ignoredSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitValid for subcategory $subcat" in {}
     } else {
-      ignore should s"return exit code $exitValid for subcategory $subcat" in {
+      subcat should s"return exit code $exitValid for subcategory $subcat" in {
         files.foreach { file =>
           val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
           withClue(s"File ${file.getName} failed: ") {
@@ -112,7 +112,7 @@ class InvalidSyntaxTest extends AnyFlatSpec with Matchers with WACCTestUtils {
     if (ignoredSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {}
     } else {
-      ignore should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {
+      subcat should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {
         files.foreach { file =>
           val exitCode = runCompilerAndGetExitCode(file.getAbsolutePath)
           withClue(s"File ${file.getName} failed: ") {
