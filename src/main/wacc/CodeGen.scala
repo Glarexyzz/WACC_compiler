@@ -1,33 +1,36 @@
 package wacc
 
 import java.io.{File, PrintWriter}
+import scala.collection.mutable
 import scala.sys.process._
-import AArch64Gen._
+
 /*
 1. Define IR representations for AST
 2. Implement code generation for expressions and statements
 3. Write an AArch64 assembly backend (to plan in detail more later)
 */
 object CodeGen {
+  val stringLiterals: mutable.Map[String, String] = mutable.Map() // 🛠 Store unique string labels
+
   def compile(prog: Program, filepath: String): Unit = {
     println("Compiling...")
     // generating IR
     val ir = generateIR(prog)
 
     // AArch64 assembly conversion
-    val assembly = AArch64Gen.generateAssembly(ir)
+    val assembly = AArch64Gen.generateAssembly(ir, stringLiterals)
 
-    val asmFile = filepath.replace(".wacc", ".s")
+    val asmFile = filepath.replaceAll("\\.wacc$", "") + ".s"
     writeToFile(asmFile, assembly)
 
     // compile into binary and emulates it
-    val outputFile = filepath.replace(".wacc", "")
+    val outputFile = filepath.replaceAll("\\.wacc$", "")
     val compileCmd = s"aarch64-linux-gnu-gcc -o $outputFile $asmFile"
     if (compileCmd.! == 0) {
       val runCmd = s"qemu-aarch64 ./$outputFile"
       runCmd.!
     } else {
-      compileCmd.!
+      println(s"❌ Error: Compilation failed for $asmFile")
     }
 
   }
@@ -123,7 +126,10 @@ object CodeGen {
       case IntLiteral(value) => List(IRLoadImmediate("tmp", value))
       case BoolLiteral(value) => List(IRLoadImmediate("tmp", if (value) 1 else 0))
       case CharLiteral(value) => List(IRLoadImmediate("tmp", value.toInt))
-      case StrLiteral(value) => List(IRLoadImmediate("tmp", value))
+      case StrLiteral(value) =>
+        val label = s"str_${value.hashCode.abs}"
+        stringLiterals.getOrElseUpdate(label, value) // Store string in data section
+        List(IRLoadLabel("tmp", label)) // Load address of string into register
       case Identifier(name) => List(IRLoad("tmp", name))
       case PairLiteral => List(IRLoadImmediate("tmp", 0))
       case UnaryOp(op, expr) =>
