@@ -7,6 +7,7 @@ sealed trait IRInstr
 case class IRLoad(dest: String, src: String) extends IRInstr  // Load from memory
 case class IRStore(dest: String, src: String) extends IRInstr // Store to memory
 case class IRLoadImmediate(dest: String, value: BigInt) extends IRInstr // Load a constant value
+case class IRLoadLabel(dest: String, label: String) extends IRInstr // Load string label
 
 // 📌 Arithmetic & Boolean Operations (Typed for Safety)
 case class IRBinaryOp(op: BinaryOperator, dest: String, left: String, right: String) extends IRInstr
@@ -37,6 +38,3 @@ case class IRArrayStore(array: String, index: String, value: String) extends IRI
 // 📌 Pair Operations
 case class IRPairElem(dest: String, pair: String, isFirst: Boolean) extends IRInstr
 case class IRNewPair(dest: String, left: String, right: String) extends IRInstr
-
-// 📌 Debugging
-case class IRComment(comment: String) extends IRInstr
