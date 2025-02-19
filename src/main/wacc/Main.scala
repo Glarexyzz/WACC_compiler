@@ -2,6 +2,7 @@ package wacc
 
 import Constants._
 import CodeGen._
+import AArch64Gen._
 import scala.io.Source
 
 def main(args: Array[String]): Unit = {
@@ -20,9 +21,17 @@ def main(args: Array[String]): Unit = {
                             println(s"Semantic errors found:\n$errors\n")
                             exitCode = exitInvalidSemantics
                         case None => 
-                            compile(parsed, "temp")
-                            println(s"Successfully parsed & compiled:\n$parsed\n")
-                            exitCode = exitValid
+                            parsed match {
+                                case program: Program =>
+                                    compile(program, input)
+                                    println(s"Successfully parsed & compiled:\n$parsed\n")
+                                    exitCode = exitValid
+
+                                case _ =>
+                                    println(s"Parsed type unknown error.")
+                                    exitCode = exitInvalidSyntax
+                            }
+                            
                     }
                 case Left(error) =>
                     println(s"Syntax Errors found: $error\n")
