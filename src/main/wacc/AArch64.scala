@@ -23,7 +23,54 @@ object AArch64Gen {
     textSection.append("  mov x0, #0   // return code 0\n")
     textSection.append("  svc #0       // invoke syscall\n")
 
-    dataSection.toString() + "\n" + textSection.toString()
+    // helper function for print
+    val helperFunctions =
+      """
+// Print a string
+.global print_string
+print_string:
+  mov x8, #64  // syscall for write
+  mov x1, x0   // address of string
+  mov x2, #100 // max length (adjust as needed)
+  mov x0, #1   // stdout
+  svc #0
+  ret
+
+// Print a newline
+.global print_newline
+print_newline:
+  mov x0, #10  // ASCII newline '\n'
+  bl print_char
+  ret
+
+// Print a single character
+.global print_char
+print_char:
+  mov x8, #64
+  mov x1, sp
+  strb w0, [sp, #-1]!
+  mov x2, #1
+  svc #0
+  add sp, sp, #1
+  ret
+
+// Read an integer
+.global read_integer
+read_integer:
+  sub sp, sp, #16
+  mov x0, #0
+  mov x1, sp
+  mov x2, #16
+  mov x8, #63
+  svc #0
+  ldr x0, [sp]
+  add sp, sp, #16
+  ret
+
+// Memory Allocation (malloc)
+.extern malloc
+      """
+    dataSection.toString() + "\n" + textSection.toString() + "\n" + helperFunctions
   }
 
   private def translateInstr(instr: IRInstr): String = instr match {
@@ -84,13 +131,13 @@ object AArch64Gen {
     // ✅ Input & Output
     case IRPrint(value) =>
       if (value.startsWith("str_")) s"  adr x1, $value\n  mov x0, x1\n  bl print_string"
-      else s"  mov x0, $value\n  bl print_integer"
+      else s"  mov x0, $value\n  bl print_char"
 
     case IRPrintln(value) =>
       if (value.startsWith("str_")) s"  adr x1, $value\n  mov x0, x1\n  bl print_string\n  bl print_newline"
-      else s"  mov x0, $value\n  bl print_integer\n  bl print_newline"
+      else s"  mov x0, $value\n  bl print_char\n  bl print_newline"
 
-    case IRRead(dest) => s"  mov x0, $dest\n  bl read_integer"
+    case IRRead(dest) => s"  mov x0, $dest\n  bl read_char"
 
     // ✅ Pairs & Arrays
     case IRNewPair(dest, left, right) =>
