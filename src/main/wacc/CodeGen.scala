@@ -11,6 +11,11 @@ import scala.sys.process._
 */
 object CodeGen {
   val stringLiterals: mutable.Map[String, String] = mutable.Map() // 🛠 Store unique string labels
+  private val availableRegisters = mutable.Stack("x9", "x10", "x11", "x12", "x13") // Register pool
+  private def getRegister(): String = availableRegisters.pop() // Allocate
+  private def freeRegister(reg: String): Unit = availableRegisters.push(reg) // Free register
+
+
 
   def compile(prog: Program, filepath: String): Unit = {
     println("Compiling...")
@@ -42,6 +47,17 @@ object CodeGen {
       writer.close()
   }
 
+  private def getDestRegister(instrs: List[IRInstr]): String = {
+    instrs.collectFirst {
+      case IRLoad(dest, _) => dest
+      case IRLoadImmediate(dest, _) => dest
+      case IRLoadLabel(dest, _) => dest
+      case IRBinaryOp(_, dest, _, _) => dest
+      case IRUnaryOp(_, dest, _) => dest
+      case IRCall(_, args) if args.nonEmpty => args.head // Function return value
+    }.getOrElse(throw new RuntimeException("No destination register found in IR instructions"))
+  }
+
   def generateIR(prog: Program): List[IRInstr] = {
       val funcIRs = prog.funcs.flatMap(generateFunc)
       val stmtIRs = generateStmt(prog.stmt)
@@ -60,37 +76,65 @@ object CodeGen {
       case SkipStmt => List() 
 
       case DeclAssignStmt(t, name, value) =>
-          val rvalueIR = generateRValue(value)
-          rvalueIR :+ IRStore(name, rvalueIR.last.asInstanceOf[IRLoad].dest)
+        val rvalueIR = generateRValue(value)
+        val destReg = getDestRegister(rvalueIR)
+        freeRegister(destReg)
+        rvalueIR :+ IRStore(name, destReg)
 
       case AssignStmt(lvalue, rvalue) =>
-          val rvalueIR = generateRValue(rvalue)
-          lvalue match {
-              case LValue.LName(name) => rvalueIR :+ IRStore(name, rvalueIR.last.asInstanceOf[IRLoad].dest)
-              case LValue.LArray(arrayElem) =>
-                  val arrayIR = generateArrayElem(arrayElem)
-                  rvalueIR ++ arrayIR :+ IRArrayStore(arrayElem.name, arrayIR.last.asInstanceOf[IRLoad].dest, rvalueIR.last.asInstanceOf[IRLoad].dest)
-              case LValue.LPair(pairElem) =>
-                  val pairIR = generatePairElem(pairElem)
-                  rvalueIR ++ pairIR :+ IRStore(pairIR.last.asInstanceOf[IRLoad].dest, rvalueIR.last.asInstanceOf[IRLoad].dest)
-          }
+        val rvalueIR = generateRValue(rvalue)
+        val destReg = getDestRegister(rvalueIR)
+        val storeIR = lvalue match {
+          case LValue.LName(name) => List(IRStore(name, destReg))
+          case LValue.LArray(arrayElem) =>
+            val arrayIR = generateArrayElem(arrayElem)
+            arrayIR ++ List(IRArrayStore(arrayElem.name, getDestRegister(arrayIR), destReg))
+          case LValue.LPair(pairElem) =>
+            val pairIR = generatePairElem(pairElem)
+            pairIR ++ List(IRStore(getDestRegister(pairIR), destReg))
+        }
+        freeRegister(destReg)
+        rvalueIR ++ storeIR
 
       case ReadStmt(lvalue) =>
-          lvalue match {
-              case LValue.LName(name) => List(IRRead(name))
-              case LValue.LArray(arrayElem) =>
-                  val arrayIR = generateArrayElem(arrayElem)
-                  arrayIR :+ IRRead(arrayIR.last.asInstanceOf[IRLoad].dest)
-              case LValue.LPair(pairElem) =>
-                  val pairIR = generatePairElem(pairElem)
-                  pairIR :+ IRRead(pairIR.last.asInstanceOf[IRLoad].dest)
-          }
+        val reg = getRegister()
+        val readIR = lvalue match {
+          case LValue.LName(name) => List(IRRead(name))
+          case LValue.LArray(arrayElem) =>
+            val arrayIR = generateArrayElem(arrayElem)
+            arrayIR :+ IRRead(getDestRegister(arrayIR))
+          case LValue.LPair(pairElem) =>
+            val pairIR = generatePairElem(pairElem)
+            pairIR :+ IRRead(getDestRegister(pairIR))
+        }
+        freeRegister(reg)
+        readIR
 
-      case FreeStmt(expr) => generateExpr(expr) :+ IRFree(expr.toString)
-      case PrintStmt(expr) => generateExpr(expr) :+ IRPrint(expr.toString)
-      case PrintlnStmt(expr) => generateExpr(expr) :+ IRPrintln(expr.toString)
-      case ReturnStmt(expr) => generateExpr(expr) :+ IRReturn(Some(expr.toString))
-      case ExitStmt(expr) => generateExpr(expr) :+ IRReturn(Some(expr.toString))
+      case FreeStmt(expr) => 
+        val exprIR = generateExpr(expr)
+        val reg = getDestRegister(exprIR)
+        freeRegister(reg)
+        exprIR :+ IRFree(reg)
+      case PrintStmt(expr) => 
+        val exprIR = generateExpr(expr)
+        val reg = getDestRegister(exprIR)
+        freeRegister(reg)
+        exprIR :+ IRPrint(reg)
+      case PrintlnStmt(expr) => 
+        val exprIR = generateExpr(expr)
+        val reg = getDestRegister(exprIR)
+        freeRegister(reg)
+        exprIR :+ IRPrintln(reg)
+      case ReturnStmt(expr) => 
+        val exprIR = generateExpr(expr)
+        val reg = getDestRegister(exprIR)
+        freeRegister(reg)
+        exprIR :+ IRReturn(Some(reg))
+      case ExitStmt(expr) =>
+        val exprIR = generateExpr(expr)
+        val reg = getDestRegister(exprIR)
+        freeRegister(reg)
+        exprIR :+ IRReturn(Some(reg))
 
       case IfStmt(cond, thenStmt, elseStmt) =>
           val condIR = generateExpr(cond)
@@ -123,22 +167,35 @@ object CodeGen {
   }
 
   def generateExpr(expr: Expr): List[IRInstr] = expr match {
-      case IntLiteral(value) => List(IRLoadImmediate("tmp", value))
-      case BoolLiteral(value) => List(IRLoadImmediate("tmp", if (value) 1 else 0))
-      case CharLiteral(value) => List(IRLoadImmediate("tmp", value.toInt))
+      case IntLiteral(value) => 
+        val reg = getRegister()
+        List(IRLoadImmediate(reg, value))
+      case BoolLiteral(value) => 
+        val reg = getRegister()
+        List(IRLoadImmediate(reg, if (value) 1 else 0))
+      case CharLiteral(value) => 
+        val reg = getRegister()
+        List(IRLoadImmediate(reg, value.toInt))
       case StrLiteral(value) =>
         val label = s"str_${value.hashCode.abs}"
         stringLiterals.getOrElseUpdate(label, value) // Store string in data section
-        List(IRLoadLabel("tmp", label)) // Load address of string into register
-      case Identifier(name) => List(IRLoad("tmp", name))
-      case PairLiteral => List(IRLoadImmediate("tmp", 0))
+        val reg = getRegister()
+        List(IRLoadLabel(reg, label)) // Load address of string into register
+      case Identifier(name) => 
+        val reg = getRegister()
+        List(IRLoad(reg, name))
+      case PairLiteral => 
+        val reg = getRegister()
+        List(IRLoadImmediate(reg, 0))
       case UnaryOp(op, expr) =>
           val exprIR = generateExpr(expr)
-          exprIR :+ IRUnaryOp(op, "tmp", exprIR.last.asInstanceOf[IRLoad].dest)
+          val destReg = getRegister()
+          exprIR :+ IRUnaryOp(op, destReg, getDestRegister(exprIR))
       case BinaryOp(left, op, right) =>
           val leftIR = generateExpr(left)
           val rightIR = generateExpr(right)
-          leftIR ++ rightIR :+ IRBinaryOp(op, "tmp", leftIR.last.asInstanceOf[IRLoad].dest, rightIR.last.asInstanceOf[IRLoad].dest)
+          val destReg = getRegister()
+          leftIR ++ rightIR :+ IRBinaryOp(op, destReg, getDestRegister(leftIR), getDestRegister(rightIR))
       case ArrayElem(name, indices) =>
           val indexIRs = indices.flatMap(generateExpr)
           indexIRs :+ IRArrayLoad("tmp", name, indexIRs.last.asInstanceOf[IRLoad].dest)
@@ -148,28 +205,45 @@ object CodeGen {
       case RValue.RExpr(expr) => generateExpr(expr)
       case RValue.RArrayLiter(arrayLiter) =>
           val elementsIR = arrayLiter.elements.getOrElse(List()).flatMap(generateExpr)
-          elementsIR :+ IRAlloc("array", elementsIR.length * 8)
+          val arrayReg = getRegister()
+          elementsIR :+ IRAlloc(arrayReg, elementsIR.length * 8)
       case RValue.RNewPair(left, right) =>
-          val leftIR = generateExpr(left)
-          val rightIR = generateExpr(right)
-          leftIR ++ rightIR :+ IRNewPair("tmp", leftIR.last.asInstanceOf[IRLoad].dest, rightIR.last.asInstanceOf[IRLoad].dest)
+        val leftIR = generateExpr(left)
+        val rightIR = generateExpr(right)
+        val leftReg = getDestRegister(leftIR)
+        val rightReg = getDestRegister(rightIR)
+        val pairReg = getRegister()
+        freeRegister(leftReg)
+        freeRegister(rightReg)
+        leftIR ++ rightIR :+ IRNewPair(pairReg, leftReg, rightReg)
       case RValue.RPair(pairElem) => generatePairElem(pairElem)
       case RValue.RCall(name, args) =>
-          val argIRs = args.getOrElse(List()).flatMap(generateExpr)
-          argIRs :+ IRCall(name, argIRs.map(_.toString))
+        val argIRs = args.getOrElse(List()).map(generateExpr)
+        val argRegs = argIRs.map(getDestRegister) // Extract registers
+        argRegs.foreach(freeRegister) // Free registers correctly
+        argIRs.flatten :+ IRCall(name, argRegs) // Flatten instructions list before appending IRCall
   }
 
   def generateArrayElem(arrayElem: ArrayElem): List[IRInstr] = {
-      val indexIRs = arrayElem.indices.flatMap(generateExpr)
-      indexIRs :+ IRArrayLoad("tmp", arrayElem.name, indexIRs.last.asInstanceOf[IRLoad].dest)
+    val indexIRs = arrayElem.indices.flatMap(generateExpr)
+    val indexReg = getDestRegister(indexIRs)
+    val arrayReg = getRegister()
+    freeRegister(indexReg)
+    indexIRs :+ IRArrayLoad(arrayReg, arrayElem.name, indexReg)  
   }
 
   def generatePairElem(pairElem: PairElem): List[IRInstr] = pairElem match {
       case PairElem.FstElem(value) =>
-          val valueIR = generateExpr(value)
-          valueIR :+ IRPairElem("tmp", valueIR.last.asInstanceOf[IRLoad].dest, isFirst = true)
+        val valueIR = generateExpr(value)
+        val valueReg = getDestRegister(valueIR)
+        val pairReg = getRegister()
+        freeRegister(valueReg)
+        valueIR :+ IRPairElem(pairReg, valueReg, isFirst = true)
       case PairElem.SndElem(value) =>
-          val valueIR = generateExpr(value)
-          valueIR :+ IRPairElem("tmp", valueIR.last.asInstanceOf[IRLoad].dest, isFirst = false)
+        val valueIR = generateExpr(value)
+        val valueReg = getDestRegister(valueIR)
+        val pairReg = getRegister()
+        freeRegister(valueReg)
+        valueIR :+ IRPairElem(pairReg, valueReg, isFirst = false)
   }
 }
