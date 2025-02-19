@@ -2,7 +2,7 @@ package wacc
 
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
-import scala.sys.process._
+// import scala.sys.process._
 
 /*
 1. Define IR representations for AST
@@ -27,16 +27,6 @@ object CodeGen {
 
     val asmFile = filepath.replaceAll("\\.wacc$", "") + ".s"
     writeToFile(asmFile, assembly)
-
-    // compile into binary and emulates it
-    val outputFile = filepath.replaceAll("\\.wacc$", "")
-    val compileCmd = s"aarch64-linux-gnu-gcc -o $outputFile $asmFile"
-    if (compileCmd.! == 0) {
-      val runCmd = s"qemu-aarch64 ./$outputFile"
-      runCmd.!
-    } else {
-      println(s"❌ Error: Compilation failed for $asmFile")
-    }
 
   }
 
