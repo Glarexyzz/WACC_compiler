@@ -2,7 +2,6 @@ package wacc
 
 import Constants._
 import CodeGen._
-import AArch64Gen._
 import scala.io.Source
 
 def main(args: Array[String]): Unit = {
