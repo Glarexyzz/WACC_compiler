@@ -6,7 +6,7 @@ object AArch64Gen {
   
   def generateAssembly(irList: List[IRInstr], stringLiterals: mutable.Map[String, String]): String = {
     val dataSection = new StringBuilder(".data\n")
-    val textSection = new StringBuilder(".text\n.global _start\n_start:\n")
+    val textSection = new StringBuilder(".text\n.global main\nmain:\n")
 
     // Handle string literals stored in stringLiterals
     stringLiterals.foreach { case (label, value) =>
@@ -83,11 +83,11 @@ object AArch64Gen {
 
     // ✅ Input & Output
     case IRPrint(value) =>
-      if (value.startsWith("str_")) s"  adr x0, $value\n  bl print_string"
+      if (value.startsWith("str_")) s"  adr x1, $value\n  mov x0, x1\n  bl print_string"
       else s"  mov x0, $value\n  bl print_integer"
 
     case IRPrintln(value) =>
-      if (value.startsWith("str_")) s"  adr x0, $value\n  bl print_string\n  bl print_newline"
+      if (value.startsWith("str_")) s"  adr x1, $value\n  mov x0, x1\n  bl print_string\n  bl print_newline"
       else s"  mov x0, $value\n  bl print_integer\n  bl print_newline"
 
     case IRRead(dest) => s"  mov x0, $dest\n  bl read_integer"
