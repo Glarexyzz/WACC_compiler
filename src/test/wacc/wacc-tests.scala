@@ -6,7 +6,7 @@ import wacc.Constants._
 
 /* all possible subcategories: 
 trait WACCTestUtils {
-  val ignoredSubcategories =   Set (
+  val pendingSubcategories =   Set (
     "advanced",
     "array",
     "basic", "basic/exit", "basic/skip",
@@ -29,13 +29,13 @@ trait WACCTestUtils {
   */
   
 trait WACCTestUtils {
-  val ignoredSubcategories =
+  val pendingSubcategories =
     Set (
     "advanced",
     "array",
     "basic", 
-    // "basic/exit", "basic/skip", //
-    "exit", //
+    "basic/exit", "basic/skip", //
+    // "exit", //
     "expressions", //
     "function", 
     "function/nested_functions", // 
@@ -89,8 +89,8 @@ class ValidTest extends AnyFlatSpec with Matchers with WACCTestUtils {
   val testFiles = getListOfWaccFiles(testRootValid)
 
   for ((subcat, files) <- testFiles) {
-    if (ignoredSubcategories.contains(subcat)) {
-      ignore should s"return exit code $exitValid for subcategory $subcat" in {}
+    if (pendingSubcategories.contains(subcat)) {
+      subcat should s"return exit code $exitValid for subcategory $subcat" in pending
     } else {
       subcat should s"return exit code $exitValid for subcategory $subcat" in {
         files.foreach { file =>
@@ -109,7 +109,7 @@ class InvalidSyntaxTest extends AnyFlatSpec with Matchers with WACCTestUtils {
   val testFiles = getListOfWaccFiles(testRootSyntax)
 
   for ((subcat, files) <- testFiles) {
-    if (ignoredSubcategories.contains(subcat)) {
+    if (pendingSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {}
     } else {
       ignore should s"return exit code $exitInvalidSyntax for subcategory $subcat" in {
@@ -129,7 +129,7 @@ class InvalidSemanticsTest extends AnyFlatSpec with Matchers with WACCTestUtils 
   val testFiles = getListOfWaccFiles(testRootSemantics)
 
   for ((subcat, files) <- testFiles) {
-    if (ignoredSubcategories.contains(subcat)) {
+    if (pendingSubcategories.contains(subcat)) {
       ignore should s"return exit code $exitInvalidSemantics for subcategory $subcat" in {}
     } else {
       ignore should s"return exit code $exitInvalidSemantics for subcategory $subcat" in {
