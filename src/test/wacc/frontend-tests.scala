@@ -36,8 +36,8 @@ trait WACCTestUtils {
     "advanced",
     "array",
     "basic", 
-    "basic/exit", "basic/skip", //
-    // "exit", //
+    // "basic/exit", "basic/skip", //
+    "exit", //
     "expressions", //
     "function", 
     "function/nested_functions", // 
@@ -82,24 +82,25 @@ trait WACCTestUtils {
     val command = s"scala shebang . $filePath"
     val process = Process(command)
     val exitValue = process.!
-
     // Move the generated `.s` file to the correct test directory
     moveGeneratedSFile(filePath)
 
     exitValue
   } 
 
-    def moveGeneratedSFile(waccFilePath: String): Unit = {
-    val generatedSFile = Paths.get(waccFilePath.replace(".wacc", ".s")) // Original `.s` file
+  def moveGeneratedSFile(waccFilePath: String): Unit = {
+    val waccFileName = new File(waccFilePath).getName.replace(".wacc", ".s")
+    val generatedSFile = Paths.get(s"./$waccFileName")
+
     val testSFile = Paths.get(
       waccFilePath.replace("src/test/wacc/valid", "src/test/wacc/valid-assembly").replace(".wacc", ".s")
-    ) // Target `.s` file location
+    )
 
-    if (Files.exists(generatedSFile)) { // Ensure the `.s` file exists
-      Files.createDirectories(testSFile.getParent) // Create directories if needed
+    if (Files.exists(generatedSFile)) {
+      Files.createDirectories(testSFile.getParent)
       Files.move(generatedSFile, testSFile, StandardCopyOption.REPLACE_EXISTING)
     }
-  }
+  } 
 }
 
 class ValidTest extends AnyFlatSpec with Matchers with WACCTestUtils {
