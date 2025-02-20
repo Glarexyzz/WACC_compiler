@@ -33,31 +33,31 @@ trait WACCTestUtils {
     Set (
     "advanced",
     "array",
-    // "basic", 
+    "basic", 
     // "basic/exit", "basic/skip", //
-    // "exit", //
+    "exit", //
     "expressions", //
-    // "function", 
+    "function", 
     "function/nested_functions", // 
     "function/simple_functions",
-    // "literals", //(syntax only)
-    // "if", //
-    // "IO",  //
+    "literals", //(syntax only)
+    "if", //
+    "IO",  //
     "IO/print", //
-    // "IO/read", //
-    // "multiple", // failed for unknown reasons
+    "IO/read", //
+    "multiple", // failed for unknown reasons
     "pairs",
-    // "print", //
-    // "runtimeErr", //
+    "print", //
+    "runtimeErr", //
     "runtimeErr/arrayOutOfBounds", //
-    // "runtimeErr/badChar", //
-    // "runtimeErr/divideByZero", //
+    "runtimeErr/badChar", //
+    "runtimeErr/divideByZero", //
     "runtimeErr/integerOverflow", //
     "runtimeErr/nullDereference", 
     "scope",
-    // "sequence", //
-    // "read", //
-    // "variables", //X : scopevar issue
+    "sequence", //
+    "read", //
+    "variables", //X : scopevar issue
     "while"  //
     )
 

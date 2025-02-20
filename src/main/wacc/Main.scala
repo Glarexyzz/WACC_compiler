@@ -22,7 +22,7 @@ def main(args: Array[String]): Unit = {
                         case None => 
                             parsed match {
                                 case program: Program =>
-                                    // compile(program, input)
+                                    compile(program, input)
                                     println(s"Successfully parsed & compiled:\n$parsed\n")
                                     exitCode = exitValid
 

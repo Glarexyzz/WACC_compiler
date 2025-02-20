@@ -8,6 +8,9 @@ sealed trait IRInstr
 case class IRMov(dest: Register, value: Int) extends IRInstr {
     override def toString: String = s"mov $dest, #$value"
 }
+case class IRMovReg(dest: Register, src: Register) extends IRInstr {
+  override def toString: String = s"mov $dest, $src"
+}
 // Bitwise NOT (negates bits)	
 case class IRMvn(dest: Register, src: Register) extends IRInstr {
     override def toString: String = s"mvn $dest, $src"
@@ -25,12 +28,16 @@ case class IRStr(value: Register, addr: Register) extends IRInstr {
     override def toString: String = s"str $value, [$addr]"
 }
 // Store a pair of registers onto the stack	
-case class IRStp(reg1: Register, reg2: Register, offset: Int) extends IRInstr {
-    override def toString: String = s"stp $reg1, $reg2, [sp, #$offset]"
+case class IRStp(reg1: Register, reg2: Register, offset: Int, preDecrement: Boolean = false) extends IRInstr {
+  override def toString: String =
+    if (preDecrement) s"stp $reg1, $reg2, [sp, #-$offset]!"
+    else s"stp $reg1, $reg2, [sp], #$offset"
 }
 // Load a pair of registers from the stack
-case class IRLdp(reg1: Register, reg2: Register, offset: Int) extends IRInstr {
-    override def toString: String = s"ldp $reg1, $reg2, [sp, #$offset]"
+case class IRLdp(reg1: Register, reg2: Register, offset: Int, postIncrement: Boolean = false) extends IRInstr {
+  override def toString: String =
+    if (postIncrement) s"ldp $reg1, $reg2, [sp], #$offset" 
+    else s"ldp $reg1, $reg2, [sp]" 
 }
 
 // 📌 Arithmetic & Boolean Operations (Typed for Safety)
@@ -90,8 +97,39 @@ case class IRJumpCond(cond: Condition, label: String) extends IRInstr {
     override def toString: String = s"b.$cond $label"
 }
 
-// System calls
+// 📌 System calls
 case class IRSvc(syscallNum: Int) extends IRInstr {
     override def toString: String = s"svc $syscallNum"
 }
 
+// 📌 Functions and Comments
+// Function label
+case class IRLabel(name: String) extends IRInstr {
+    override def toString: String = s"$name"
+}
+
+// Function label with indented instructions
+case class IRFuncLabel(label: IRLabel, instr: List[IRInstr]) extends IRInstr {
+    override def toString: String = {
+        val instrStr = instr.map(instr => s"    $instr").mkString("\n")
+        s"${label.name}:\n$instrStr"
+  }
+}
+// Comment
+case class IRCmt(comment: String) extends IRInstr {
+    override def toString: String = s"// $comment"
+}
+
+// 📌 Specific Label Types
+case class IRWord(value: Int) extends IRInstr {
+  override def toString: String = s"    .word $value"
+}
+case class IRAsciz(value: String) extends IRInstr {
+  override def toString: String = s""".asciz "$value""""
+}
+case class IRAlign(value: Int) extends IRInstr {
+  override def toString: String = s".align $value"
+}
+case class IRGlobal(name: String) extends IRInstr {
+  override def toString: String = s".global $name"
+}
