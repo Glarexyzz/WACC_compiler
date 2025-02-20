@@ -32,7 +32,9 @@ object CodeGen {
     // val assembly = AArch64Gen.generateAssembly(ir, stringLiterals)
     val assembly = ir.map(_.toString).mkString("\n")
 
-    val asmFile = filepath.replaceAll("\\.wacc$", "") + ".s"
+    val asmFileName = new File(filepath).getName.replaceAll("\\.wacc$", ".s")
+    val asmFile = new File(asmFileName).getAbsolutePath
+
     writeToFile(asmFile, assembly)
 
   }

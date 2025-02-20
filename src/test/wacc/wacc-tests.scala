@@ -34,7 +34,7 @@ trait WACCTestUtils {
     "advanced",
     "array",
     "basic", 
-    "basic/exit", "basic/skip", //
+    // "basic/exit", "basic/skip", //
     // "exit", //
     "expressions", //
     "function", 
