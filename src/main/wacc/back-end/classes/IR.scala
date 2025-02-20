@@ -90,7 +90,7 @@ case class IRBl(func: String) extends IRInstr {
 }
 // Return from function	
 case class IRRet() extends IRInstr {
-    override def toString: String = "ret"
+    override def toString: String = "ret\n"
 }
 // Branch if condition 
 case class IRJumpCond(cond: Condition, label: String) extends IRInstr {
