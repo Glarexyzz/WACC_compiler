@@ -16,10 +16,29 @@ object CodeGen {
   private val stringLiterals: mutable.Map[String, String] = mutable.Map() // Store unique string labels
 
   // Register allocation
+  // We need to account for spill over registers
   // private val availableRegisters = mutable.Stack[Register](X9, X10, X11, X12, X13) // Register pool
-  // private def getRegister(): Register = availableRegisters.pop() // Allocate
-  // private def freeRegister(reg: Register): Unit = availableRegisters.push(reg) // Free register
-
+  // private def getRegister(): Register = {
+  //   if (availableRegisters.nonEmpty) {
+  //     return availableRegisters.pop()
+  //   }
+    
+  //   // No registers available → Spill an active register
+  //   // val regToSpill = activeRegisters.head // Choose a register to spill (simplified strategy)
+  //   // registerStack.push(regToSpill)        // Save spilled register
+  //   // activeRegisters -= regToSpill          // Remove from active set
+    
+  //   // instrBuffer += IRStr(regToSpill, SP)  // Spill register to stack
+  //   // regToSpill
+  // }
+  // private def freeRegister(reg: Register): Unit = {
+  //   if (registerStack.nonEmpty && registerStack.top == reg) {
+  //     instrBuffer += IRLdr(reg, SP)  // ✅ Restore spilled register
+  //     registerStack.pop()             // Remove from spill stack
+  //   } else {
+  //     availableRegisters.push(reg)
+  //   }
+  // }
   // Helper functions generated 
   private val helpers = mutable.Map[IRLabel, IRFuncLabel]()
 
@@ -196,7 +215,10 @@ object CodeGen {
 	      // statement primitives do not return results (but will clobber r0/rax)
 	      bl exit
     */
-      case ExitStmt(expr) => List()
+      case ExitStmt(expr) =>
+        val (exprIR, exprType) = generateExpr(expr)
+        exprIR :+ IRBl("exit")
+
         // val exprIR = generateExpr(expr)
         // val reg = getDestRegister(exprIR)
         // freeRegister(reg)
@@ -246,48 +268,52 @@ object CodeGen {
       case SeqStmt(left, right) => generateStmt(left) ++ generateStmt(right)
   }
 
-// will need to make irLoad helper functions instead
-  def generateExpr(expr: Expr): List[IRInstr] = expr match {
-      case IntLiteral(value) => List()
-        // val reg = getRegister()
-        // List(IRLoadImmediate(reg, value))
+  def generateExpr(expr: Expr): (List[IRInstr], Type) = expr match {
+    case IntLiteral(value) =>
+      (List(IRMov(W0, value.toInt)), BaseType.IntType)
 
-      case BoolLiteral(value) => List()
-        // val reg = getRegister()
-        // List(IRLoadImmediate(reg, if (value) 1 else 0))
+    case BoolLiteral(value) =>
+      (List(IRMov(W0, if (value) 1 else 0)), BaseType.BoolType)
 
-      case CharLiteral(value) => List()
-        // val reg = getRegister()
-        // List(IRLoadImmediate(reg, value.toInt))
+    case CharLiteral(value) =>
+      (List(IRMov(W0, value.toInt)), BaseType.CharType)
 
-      case StrLiteral(value) => List()
-        // val label = s"str_${value.hashCode.abs}"
-        // stringLiterals.getOrElseUpdate(label, value) // Store string in data section
-        // val reg = getRegister()
-        // List(IRLoadLabel(reg, label)) // Load address of string into register
+    // not complete
+    // 	adrp x0, .L.str0
+	// add x0, x0, :lo12:.L.str0
+    case StrLiteral(value) =>
+      // val label = s"str_${value.hashCode.abs}"
+      // stringLiterals.getOrElseUpdate(label, value) // Store string in .data
+      // val reg = getRegister()
+      (List(), BaseType.StrType)
 
-      case Identifier(name) => List()
-        // val reg = getRegister()
-        // List(IRLoad(reg, name))
+    // incomplete
+    case Identifier(name) =>
+      (List(), BaseType.IntType) // Assume IntType for simplicity
+    
+    case PairLiteral =>
+      (List(), BaseType.IntType) // Assume IntType for simplicity
+    
+    case _ => (List(), BaseType.IntType)
 
-      case PairLiteral => List()
-        // val reg = getRegister()
-        // List(IRLoadImmediate(reg, 0))
+      // case PairLiteral => List()
+      //   // val reg = getRegister()
+      //   // List(IRLoadImmediate(reg, 0))
 
-      case UnaryOp(op, expr) => List()
-          // val exprIR = generateExpr(expr)
-          // val destReg = getRegister()
-          // exprIR :+ IRUnaryOp(op, destReg, getDestRegister(exprIR))
+      // case UnaryOp(op, expr) => List()
+      //     // val exprIR = generateExpr(expr)
+      //     // val destReg = getRegister()
+      //     // exprIR :+ IRUnaryOp(op, destReg, getDestRegister(exprIR))
 
-      case BinaryOp(left, op, right) => List()
-          // val leftIR = generateExpr(left)
-          // val rightIR = generateExpr(right)
-          // val destReg = getRegister()
-          // leftIR ++ rightIR :+ IRBinaryOp(op, destReg, getDestRegister(leftIR), getDestRegister(rightIR))
+      // case BinaryOp(left, op, right) => List()
+      //     // val leftIR = generateExpr(left)
+      //     // val rightIR = generateExpr(right)
+      //     // val destReg = getRegister()
+      //     // leftIR ++ rightIR :+ IRBinaryOp(op, destReg, getDestRegister(leftIR), getDestRegister(rightIR))
 
-      case ArrayElem(name, indices) => List()
-          // val indexIRs = indices.flatMap(generateExpr)
-          // indexIRs :+ IRArrayLoad("tmp", name, indexIRs.last.asInstanceOf[IRLoad].dest)
+      // case ArrayElem(name, indices) => List()
+      //     // val indexIRs = indices.flatMap(generateExpr)
+      //     // indexIRs :+ IRArrayLoad("tmp", name, indexIRs.last.asInstanceOf[IRLoad].dest)
   }
 
   def generateRValue(rvalue: RValue): List[IRInstr] = List()
