@@ -53,9 +53,6 @@ object CodeGen {
     val asmFileName = new File(filepath).getName.replaceAll("\\.wacc$", ".s")
     val asmFile = new File(asmFileName).getAbsolutePath 
 
-    val asmFileName = new File(filepath).getName.replaceAll("\\.wacc$", ".s")
-    val asmFile = new File(asmFileName).getAbsolutePath
-
     writeToFile(asmFile, assembly)
 
   }
