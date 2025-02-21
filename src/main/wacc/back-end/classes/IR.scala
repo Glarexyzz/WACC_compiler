@@ -23,6 +23,10 @@ case class IRAdr(dest: Register, label: String) extends IRInstr {
 case class IRLdr(dest: Register, addr: Register) extends IRInstr {
     override def toString: String = s"ldr $dest, [$addr]"
 }
+// Load an unsigned register
+case class IRLdur(dest: Register, addr: Register, offset: Int) extends IRInstr {
+    override def toString: String = s"ldur $dest, [$addr, #$offset]"
+}
 // Store register value into memory	
 case class IRStr(value: Register, addr: Register) extends IRInstr {
     override def toString: String = s"str $value, [$addr]"
@@ -72,6 +76,10 @@ class IRNeg(dest: Register, src: Register) extends IRInstr {
 // Compare two registers and set flags
 case class IRCmp(left: Register, right: Register) extends IRInstr {
     override def toString: String = s"cmp $left, $right"
+}
+// Compare a register with an immediate value
+case class IRCmpImm(left: Register, imm: Int) extends IRInstr {
+    override def toString: String = s"cmp $left, #$imm"
 }
 // Set a register based on a condition flag
 case class IRCset(cond: String, condition: Condition) extends IRInstr {
