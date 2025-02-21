@@ -63,7 +63,7 @@ case object W0 extends Register
 // case object W16 extends Register
 // case object W17 extends Register
 // case object W18 extends Register
-// case object W19 extends Register
+case object W19 extends Register
 // case object W20 extends Register
 // case object W21 extends Register
 // case object W22 extends Register

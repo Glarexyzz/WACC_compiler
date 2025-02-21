@@ -225,25 +225,23 @@ object CodeGen {
         // exprIR :+ IRReturn(Some(reg))
 
       case IfStmt(cond, thenStmt, elseStmt) => List()
-          // val condIR = generateExpr(cond)
-          // val condReg = getDestRegister(condIR)
-          // val thenIR = generateStmt(thenStmt)
-          // val elseIR = generateStmt(elseStmt)
-          // val thenLabel = IRLabel("then_block")
-          // val elseLabel = IRLabel("else_block")
-          // val endLabel = IRLabel("end_if")
-          
-          // val condJump = IRCmp(condReg, 0) // Compare condition register to 0 (false)
-          // val branchIfTrue = IRJumpCond("ne", thenLabel.name) // Jump to then block if condition is not equal to 0 (true)
-          // val jumpToElse = IRJump(elseLabel.name) // Jump to else block
-  
-  
-          // val thenIR = generateStmt(thenStmt)
-          // val thenJump = IRJump(endLabel.name) // Jump to end after the 'then' block
-          // condIR ++ 
-          // List(condJump, branchIfTrue, jumpToElse) ++ 
-          // List(thenLabel) ++ thenIR :+ thenJump ++ 
-          // List(elseLabel) ++ elseIR :+ IRLabel(endLabel.name)
+          // val condIR = generateExpr(cond)  // Generate IR for condition evaluation
+          // val condMov = IRMovReg(W19, W0) // boolean is stored in W0 and then moved in W19?
+          // val thenIR = generateStmt(thenStmt)  
+          // val elseIR = generateStmt(elseStmt)  
+
+          // val thenLabel = IRLabel("then")
+          // val elseLabel = IRLabel("else")
+          // val endLabel  = IRLabel("endif")
+
+          // condIR ++
+          // List(condMov, IRCmp(W19, WZR), IRJumpCond(EQ, thenLabel.name)) ++
+          // elseIR ++
+          // List(IRJump(endLabel.name)) ++
+          // List(thenLabel) ++
+          // thenIR ++
+          // List(endLabel)
+
 // would this compile? I'm going to try compiling everything first to test my generateIR
 // .... could you help me comment out the stuff that doesn't compile? Especially in the generateExpr part. I'll fix the other issues
           // condIR ++ List(
