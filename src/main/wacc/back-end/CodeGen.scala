@@ -292,13 +292,15 @@ object CodeGen {
     case PairLiteral =>
       (List(), BaseType.IntType) // Assume IntType for simplicity
     
+    case UnaryOp(op, expr) => (List(), BaseType.IntType)
+    
     case _ => (List(), BaseType.IntType)
 
       // case PairLiteral => List()
       //   // val reg = getRegister()
       //   // List(IRLoadImmediate(reg, 0))
 
-      // case UnaryOp(op, expr) => List()
+      
       //     // val exprIR = generateExpr(expr)
       //     // val destReg = getRegister()
       //     // exprIR :+ IRUnaryOp(op, destReg, getDestRegister(exprIR))
