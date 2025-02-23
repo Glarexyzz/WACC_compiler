@@ -11,34 +11,48 @@ import wacc.Helpers._
 3. Write an AArch64 assembly backend (to plan in detail more later)
 */
 object CodeGen {
+
   // Global Variables stored in .data
   // val globalVariables: mutable.Map[Label, String] = mutable.Map() // this doesn't seem accurate, so I'll comment it out first
   private val stringLiterals: mutable.Map[String, String] = mutable.Map() // Store unique string labels
 
   // Register allocation
   // We need to account for spill over registers
-  // private val availableRegisters = mutable.Stack[Register](X9, X10, X11, X12, X13) // Register pool
-  // private def getRegister(): Register = {
-  //   if (availableRegisters.nonEmpty) {
-  //     return availableRegisters.pop()
-  //   }
+  private val availableRegisters = mutable.Stack[Register](X9, X10, X11, X12, X13) // Pool of free registers
+  private val activeRegisters = mutable.Set[Register]()  // Set of registers currently in use
+  private val registerStack = mutable.Stack[Register]()  // Stack for spilled registers
+  private val instrBuffer = mutable.ListBuffer[IRInstr]()
+
+  private def getRegister(): Register = {
+    if (availableRegisters.nonEmpty) {
+      val reg = availableRegisters.pop()
+      activeRegisters += reg
+      reg
+    }
+
+    // No registers available - Spill an active register
+    if (activeRegisters.nonEmpty) {
+      val regToSpill = activeRegisters.head // Choose an active register to spill
+      instrBuffer += IRStr(regToSpill, SP)  // Spill to stack
+      registerStack.push(regToSpill)        // Track it
+      activeRegisters -= regToSpill         // Remove from active
+      regToSpill
+    }
+
+    throw new Exception("No available registers and no registers to spill!")
+  }
+
+  def freeRegister(reg: Register): Unit = {
+    if (registerStack.nonEmpty && registerStack.top == reg) {
+      instrBuffer += IRLdr(reg, SP)  // Restore spilled register
+      registerStack.pop()
+    } else {
+      availableRegisters.push(reg)
+    }
+    activeRegisters -= reg
+  } 
     
-  //   // No registers available → Spill an active register
-  //   // val regToSpill = activeRegisters.head // Choose a register to spill (simplified strategy)
-  //   // registerStack.push(regToSpill)        // Save spilled register
-  //   // activeRegisters -= regToSpill          // Remove from active set
-    
-  //   // instrBuffer += IRStr(regToSpill, SP)  // Spill register to stack
-  //   // regToSpill
-  // }
-  // private def freeRegister(reg: Register): Unit = {
-  //   if (registerStack.nonEmpty && registerStack.top == reg) {
-  //     instrBuffer += IRLdr(reg, SP)  // ✅ Restore spilled register
-  //     registerStack.pop()             // Remove from spill stack
-  //   } else {
-  //     availableRegisters.push(reg)
-  //   }
-  // }
+
   // Helper functions generated 
   private val helpers = mutable.Map[IRLabel, IRFuncLabel]()
 
