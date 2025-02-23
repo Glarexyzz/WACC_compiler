@@ -306,7 +306,32 @@ object CodeGen {
     case PairLiteral =>
       (List(), BaseType.IntType) // Assume IntType for simplicity
     
-    case UnaryOp(op, expr) => (List(), BaseType.IntType)
+    case UnaryOp(op, expr) => 
+      val (exprIR, exprType) = generateExpr(expr)
+      val instrs = exprIR
+      op match {
+      case UnaryOperator.Negate =>
+        (instrs :+ IRNeg(W0, W0), BaseType.IntType) // Arithmetic negation (NEG W0, W0)
+
+      case UnaryOperator.Not =>
+        case UnaryOperator.Not =>
+        (instrs :+ IRCmp(W0, 1) :+ IRCset("w0", Condition.NE), BaseType.BoolType)
+
+
+      case UnaryOperator.Length =>
+        (instrs :+ IRLdr(W0, W0), BaseType.IntType) // Load array length
+
+      case UnaryOperator.Ord =>
+        (instrs, BaseType.IntType) // Char to Int (no instruction needed)
+
+      case UnaryOperator.Chr =>
+        (instrs, BaseType.CharType) // Int to Char (no instruction needed)
+
+      case _ =>
+        throw new RuntimeException(s"Unsupported unary operator: $op")
+    }
+
+
     
     case _ => (List(), BaseType.IntType)
 
