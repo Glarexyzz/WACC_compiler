@@ -311,21 +311,25 @@ object CodeGen {
       val instrs = exprIR
       op match {
       case UnaryOperator.Negate =>
-        (instrs :+ IRNeg(W0, W0), BaseType.IntType) // Arithmetic negation (NEG W0, W0)
-
+        (instrs :+ IRNeg(W0, W0), BaseType.IntType) 
       case UnaryOperator.Not =>
         case UnaryOperator.Not =>
         (instrs :+ IRCmp(W0, 1) :+ IRCset("w0", Condition.NE), BaseType.BoolType)
 
 
       case UnaryOperator.Length =>
-        (instrs :+ IRLdr(W0, W0), BaseType.IntType) // Load array length
+        (instrs :+ IRLdur(W0, W0, -4), BaseType.IntType) 
+
 
       case UnaryOperator.Ord =>
         (instrs, BaseType.IntType) // Char to Int (no instruction needed)
 
       case UnaryOperator.Chr =>
-        (instrs, BaseType.CharType) // Int to Char (no instruction needed)
+        (instrs :+ IRTst(W0, 0xffffff80)     // Test if value is within ASCII range (0-127)
+                :+ IRCsel(X1, X0, X1, "NE") // Conditional move if out of range
+                :+ IRJumpCond(NE , "_errBadChar") // Branch if invalid
+                :+ IRMov(W0, W0),           // Move the value into W0 (truncate to char)
+          BaseType.CharType)
 
       case _ =>
         throw new RuntimeException(s"Unsupported unary operator: $op")
