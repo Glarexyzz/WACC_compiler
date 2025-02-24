@@ -180,17 +180,17 @@ object CodeGen {
       case PrintStmt(expr) =>
         val (exprIR, exprType) = generateExpr(expr)
         if (exprType == BaseType.IntType) {
-          helpers.getOrElseUpdate(IRLabel("printi"), printi())
-          exprIR :+ IRBl("printi")
+          helpers.getOrElseUpdate(IRLabel("_printi"), printi())
+          exprIR :+ IRBl("_printi")
         } else if (exprType == BaseType.CharType) {
-          helpers.getOrElseUpdate(IRLabel("printc"), printc())
-          exprIR :+ IRBl("printc")
+          helpers.getOrElseUpdate(IRLabel("_printc"), printc())
+          exprIR :+ IRBl("_printc")
         } else if (exprType == BaseType.StrType) {
-          helpers.getOrElseUpdate(IRLabel("prints"), prints())
-          exprIR :+ IRBl("prints")
+          helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+          exprIR :+ IRBl("_prints")
         } else if (exprType == BaseType.BoolType) {
-          helpers.getOrElseUpdate(IRLabel("printb"), printb())
-          exprIR :+ IRBl("printb")
+          helpers.getOrElseUpdate(IRLabel("_printb"), printb())
+          exprIR :+ IRBl("_printb")
         } else {
           // we have not handled arrays and pairs yet
           exprIR
