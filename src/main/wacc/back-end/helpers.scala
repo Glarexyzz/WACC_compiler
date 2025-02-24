@@ -62,7 +62,7 @@ object Helpers{
     }
 
     def printb(): List[IRInstr] = {
-        val label = "printb"
+        val label = "_printb"
         val falseAsciz = "false"
         val trueAsciz = "true"
         val stringAsciz = "%.*s"
@@ -111,7 +111,7 @@ object Helpers{
 // 	ldp lr, xzr, [sp], #16
 // 	ret
     def printlnFunc(): List[IRInstr] = {
-        val str0label = strLabel("println", 0)
+        val str0label = strLabel("_println", 0)
         val instructions: List[IRInstr] = List(
             pushReg(LR, XZR),
             IRAdr(X0, str0label),
