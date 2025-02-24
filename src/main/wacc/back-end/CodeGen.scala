@@ -313,8 +313,7 @@ object CodeGen {
       case UnaryOperator.Negate =>
         (instrs :+ IRNeg(W0, W0), BaseType.IntType) 
       case UnaryOperator.Not =>
-        case UnaryOperator.Not =>
-        (instrs :+ IRCmp(W0, 1) :+ IRCset("w0", Condition.NE), BaseType.BoolType)
+        (instrs :+ IRCmp(W0, W0) :+ IRCset("w0", NE), BaseType.BoolType)
 
 
       case UnaryOperator.Length =>
@@ -326,9 +325,9 @@ object CodeGen {
 
       case UnaryOperator.Chr =>
         (instrs :+ IRTst(W0, 0xffffff80)     // Test if value is within ASCII range (0-127)
-                :+ IRCsel(X1, X0, X1, "NE") // Conditional move if out of range
+                :+ IRCsel(X1, X0, X1, NE) // Conditional move if out of range
                 :+ IRJumpCond(NE , "_errBadChar") // Branch if invalid
-                :+ IRMov(W0, W0),           // Move the value into W0 (truncate to char)
+                :+ IRMovReg(W0, W0),           // Move the value into W0 (truncate to char)
           BaseType.CharType)
 
       case _ =>

@@ -23,6 +23,10 @@ case class IRAdr(dest: Register, label: String) extends IRInstr {
 case class IRLdr(dest: Register, addr: Register) extends IRInstr {
     override def toString: String = s"ldr $dest, [$addr]"
 }
+case class IRLdur(dest: Register, addr: Register, offset: Int) extends IRInstr {
+  override def toString: String = s"ldur $dest, [$addr, #$offset]"
+}
+
 // Store register value into memory	
 case class IRStr(value: Register, addr: Register) extends IRInstr {
     override def toString: String = s"str $value, [$addr]"
@@ -77,6 +81,10 @@ case class IRCmp(left: Register, right: Register) extends IRInstr {
 case class IRCset(cond: String, condition: Condition) extends IRInstr {
     override def toString: String = s"cset $cond, $condition"
 }
+case class IRCsel(dest: Register, src1: Register, src2: Register, cond: Condition) extends IRInstr {
+  override def toString: String = s"csel $dest, $src1, $src2, $cond"
+}
+
 
 
 // 📌 Branching and Function calls
@@ -95,6 +103,10 @@ case class IRRet() extends IRInstr {
 // Branch if condition 
 case class IRJumpCond(cond: Condition, label: String) extends IRInstr {
     override def toString: String = s"b.$cond $label"
+}
+
+case class IRTst(reg: Register, value: Int) extends IRInstr {
+  override def toString: String = s"tst $reg, #$value"
 }
 
 // 📌 System calls
