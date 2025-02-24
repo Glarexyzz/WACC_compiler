@@ -42,10 +42,11 @@ case object X28 extends Register
 case object FP extends Register // X29 - Frame Pointer
 case object LR extends Register // X30 - Link Register
 case object SP extends Register // Stack Pointer
+case object XZR extends Register // Zero Register
 
 // 32-bit registers
 case object W0 extends Register
-// case object W1 extends Register
+case object W1 extends Register
 // case object W2 extends Register
 // case object W3 extends Register
 // case object W4 extends Register

@@ -54,7 +54,7 @@ object CodeGen {
     
 
   // Helper functions generated 
-  private val helpers = mutable.Map[IRLabel, IRFuncLabel]()
+  private val helpers = mutable.Map[IRLabel, List[IRInstr]]()
 
   def compile(prog: Program, filepath: String): Unit = {
     println("Compiling...")
@@ -149,7 +149,7 @@ object CodeGen {
   }
 
   def generateHelperIRs(): List[IRInstr] = {
-    helpers.values.toList
+    helpers.values.toList.flatten
   }
 
   def generateStmt(stmt: Stmt): List[IRInstr] = stmt match {
@@ -196,7 +196,24 @@ object CodeGen {
         // freeRegister(reg)
         // exprIR :+ IRFree(reg)
 
-      case PrintStmt(expr) => List()
+      case PrintStmt(expr) =>
+        val (exprIR, exprType) = generateExpr(expr)
+        if (exprType == BaseType.IntType) {
+          helpers.getOrElseUpdate(IRLabel("printi"), printi())
+          exprIR :+ IRBl("printi")
+        } else if (exprType == BaseType.CharType) {
+          helpers.getOrElseUpdate(IRLabel("printc"), printc())
+          exprIR :+ IRBl("printc")
+        } else if (exprType == BaseType.StrType) {
+          helpers.getOrElseUpdate(IRLabel("prints"), prints())
+          exprIR :+ IRBl("prints")
+        } else if (exprType == BaseType.BoolType) {
+          helpers.getOrElseUpdate(IRLabel("printb"), printb())
+          exprIR :+ IRBl("printb")
+        } else {
+          // we have not handled arrays and pairs yet
+          exprIR
+        }
         // behaviour differs depending on type expr
         // we have various print helper function (prints for string, printi for int)
 

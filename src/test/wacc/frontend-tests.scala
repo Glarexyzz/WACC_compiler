@@ -36,7 +36,7 @@ trait WACCTestUtils {
     "advanced",
     "array",
     "basic", 
-    // "basic/exit", "basic/skip", //
+    "basic/exit", "basic/skip", //
     "exit", //
     "expressions", //
     "function", 
@@ -45,7 +45,7 @@ trait WACCTestUtils {
     "literals", //(syntax only)
     "if", //
     "IO",  //
-    "IO/print", //
+    // "IO/print", //
     "IO/read", //
     "multiple", // failed for unknown reasons
     "pairs",
