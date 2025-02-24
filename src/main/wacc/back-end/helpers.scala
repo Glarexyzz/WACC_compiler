@@ -7,13 +7,12 @@ object Helpers{
     def popReg(reg1: Register, reg2: Register): IRInstr = IRLdp(reg1, reg2, 16, true) // also ooh magic numbers
 
     // Helpers for printing
-    private def strLabel(label: String, no: Int): String = s".L._${label}_str$no"
-    private def wordLabel(length: Int, label: String, asciz: String): List[IRInstr] = {
+    private def strLabel(label: String, no: Int): String = s".L.${label}_str$no"
+    def wordLabel(length: Int, label: String, asciz: String): List[IRInstr] = {
         List(
             IRCmt(s"length of ${label}"),
             IRWord(length), 
-            IRFuncLabel(IRLabel(label), List(
-            IRAsciz(asciz)))
+            IRFuncLabel(IRLabel(label), List(IRAsciz(asciz)))
         )
     }
 
@@ -30,54 +29,64 @@ object Helpers{
             IRRet()
         )
         IRFuncLabel(IRLabel(label), instructions)
-
     }
-    private def print(label: String, asciz: String): List[IRInstr] = {
+    private def print(label: String, asciz: String, func: IRFuncLabel): List[IRInstr] = {
         val str0label = strLabel(label, 0)
         val length = asciz.length
-        wordLabel(length, str0label, asciz) :+ IRAlign(4) :+ printFunc(label)
+        wordLabel(length, str0label, asciz) :+ IRAlign(4) :+ func
     }
 
     def printi(): List[IRInstr] = {
-        print("printi", "%d")
+        print("_printi", "%d", printFunc("_printi"))
     }
 
     def printc(): List[IRInstr] = {
-        print("printc", "%c")
+        print("_printc", "%c", printFunc("_printc"))
     }
 
     def prints(): List[IRInstr] = {
-        print("prints", "%.*s")
-
+        val label = "_prints"
+        val str0label = strLabel(label, 0)
+        val instructions: List[IRInstr] = List(
+            pushReg(LR, XZR),
+            IRMovReg(X2, X0),
+            IRLdur(W1, X0, -4),
+            IRAdr(X0, str0label),
+            IRBl("printf"),
+            IRMov(X0, 0),
+            IRBl("fflush"),
+            popReg(LR, XZR),
+            IRRet()
+        )
+        print(label, "%.*s", IRFuncLabel(IRLabel(label), instructions))
     }
 
-    // Oh print b works entirely differently
     def printb(): List[IRInstr] = {
-        val printB = "printb"
+        val label = "printb"
         val falseAsciz = "false"
         val trueAsciz = "true"
         val stringAsciz = "%.*s"
         val data = List (
-            wordLabel(falseAsciz.length, strLabel(printB, 0), falseAsciz),
-            wordLabel(trueAsciz.length, strLabel(printB, 1), trueAsciz),
-            wordLabel(stringAsciz.length, strLabel(printB, 2), stringAsciz),
+            wordLabel(falseAsciz.length, strLabel(label, 0), falseAsciz),
+            wordLabel(trueAsciz.length, strLabel(label, 1), trueAsciz),
+            wordLabel(stringAsciz.length, strLabel(label, 2), stringAsciz),
         ).flatten
 
         data ++ List (
             IRAlign(4),
-            IRFuncLabel(IRLabel(printB), List(
+            IRFuncLabel(IRLabel(label), List(
                 pushReg(LR, XZR),
                 IRCmpImm(W0, 0),
                 IRJumpCond(NE, ".L_printb0"),
-                IRAdr(X2, strLabel(printB, 0)),
+                IRAdr(X2, strLabel(label, 0)),
                 IRJump(".L_printb1"),
             )),
             IRFuncLabel(IRLabel(".L_printb0"), List(
-                IRAdr(X2, strLabel(printB, 1))
+                IRAdr(X2, strLabel(label, 1))
             )),
             IRFuncLabel(IRLabel(".L_printb1"), List(
                 IRLdur(W1, X2, -4),
-                IRAdr(X0, strLabel(printB, 2)),
+                IRAdr(X0, strLabel(label, 2)),
                 IRBl ("printf"),
                 IRMov(X0, 0),
                 IRBl("fflush"),
@@ -86,38 +95,34 @@ object Helpers{
             ))
         )
     }
-
-// // length of .L._printb_str0
-// 	.word 5
-// .L._printb_str0:
-// 	.asciz "false"
-// // length of .L._printb_str1
-// 	.word 4
-// .L._printb_str1:
-// 	.asciz "true"
-// // length of .L._printb_str2
-// 	.word 4
-// .L._printb_str2:
-// 	.asciz "%.*s"
-    // .align 4
-// _printb:
+// length of .L._println_str0
+// 	.word 0
+// .L._println_str0:
+// 	.asciz ""
+// .align 4
+// _println:
 // 	// push {lr}
 // 	stp lr, xzr, [sp, #-16]!
-// 	cmp w0, #0
-// 	b.ne .L_printb0
-// 	adr x2, .L._printb_str0
-// 	b .L_printb1
-// .L_printb0:
-// 	adr x2, .L._printb_str1
-// .L_printb1:
-// 	ldur w1, [x2, #-4]
-// 	adr x0, .L._printb_str2
-// 	bl printf
+// 	adr x0, .L._println_str0
+// 	bl puts
 // 	mov x0, #0
 // 	bl fflush
 // 	// pop {lr}
 // 	ldp lr, xzr, [sp], #16
 // 	ret
+    def printlnFunc(): List[IRInstr] = {
+        val str0label = strLabel("println", 0)
+        val instructions: List[IRInstr] = List(
+            pushReg(LR, XZR),
+            IRAdr(X0, str0label),
+            IRBl("puts"),
+            IRMov(X0, 0),
+            IRBl("fflush"),
+            popReg(LR, XZR),
+            IRRet()
+        )
+        wordLabel(0, str0label, "") :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_println"), instructions)
+    }
 
 
 }

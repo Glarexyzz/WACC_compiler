@@ -15,6 +15,8 @@ object CodeGen {
   // val globalVariables: mutable.Map[Label, String] = mutable.Map() // this doesn't seem accurate, so I'll comment it out first
   private val stringLiterals: mutable.Map[String, String] = mutable.Map() // Store unique string labels
 
+  def nextLabel(): String = s".L.str${stringLiterals.size}"
+
   // Register allocation
   // We need to account for spill over registers
   // private val availableRegisters = mutable.Stack[Register](X9, X10, X11, X12, X13) // Register pool
@@ -121,14 +123,7 @@ object CodeGen {
 
   def generateHeadIR(): List[IRInstr] = {
     val dataSection = stringLiterals.map { case (label, value) =>
-      List(
-        IRCmt(s"// length of $label"),
-        IRWord(value.length + 1), // Store string length (+1 for null terminator)
-        IRFuncLabel(
-          IRLabel(label),
-          List(IRAsciz(value))
-        )
-      )
+      wordLabel(value.length, label, value)
     }.flatten.toList
 
     List(IRLabel(".data")) ++ dataSection ++ List(IRAlign(4), IRLabel(".text"), IRGlobal("main"))
@@ -200,24 +195,12 @@ object CodeGen {
           // we have not handled arrays and pairs yet
           exprIR
         }
-        // behaviour differs depending on type expr
-        // we have various print helper function (prints for string, printi for int)
 
-        // val exprIR = generateExpr(expr)
-        // val reg = getDestRegister(exprIR)
-        // freeRegister(reg)
-        // exprIR :+ IRPrint(reg)
 
-      case PrintlnStmt(expr) => List()
-        // really annoying.
-        // logic works similarly to PrintStmt
-        // but we have an added helper function _println that helps to print a line
-        // helper functions can be found (soon) in helpers.scala
+      case PrintlnStmt(expr) => 
+        helpers.getOrElseUpdate(IRLabel("println"), printlnFunc())
+        generateStmt(PrintStmt(expr)) :+ IRBl("println")
 
-        // val exprIR = generateExpr(expr)
-        // val reg = getDestRegister(exprIR)
-        // freeRegister(reg)
-        // exprIR :+ IRPrintln(reg)
 
       case ReturnStmt(expr) => List()
         // val exprIR = generateExpr(expr)
@@ -299,10 +282,10 @@ object CodeGen {
     // 	adrp x0, .L.str0
 	// add x0, x0, :lo12:.L.str0
     case StrLiteral(value) =>
-      // val label = s"str_${value.hashCode.abs}"
-      // stringLiterals.getOrElseUpdate(label, value) // Store string in .data
+      val label = nextLabel()
+      stringLiterals.getOrElseUpdate(label, value) // Store string in .data
+      (List(IRAdrp(X0, label), IRAddImm(X0, X0, s":lo12:$label")), BaseType.StrType)
       // val reg = getRegister()
-      (List(), BaseType.StrType)
 
     // incomplete
     case Identifier(name) =>
