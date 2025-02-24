@@ -77,9 +77,13 @@ class IRNeg(dest: Register, src: Register) extends IRInstr {
 case class IRCmp(left: Register, right: Register) extends IRInstr {
     override def toString: String = s"cmp $left, $right"
 }
+
+case class IRCmpVal(reg: Register, value: Int) extends IRInstr {
+    override def toString: String = s"cmp $reg, #$value"
+}
 // Set a register based on a condition flag
-case class IRCset(cond: String, condition: Condition) extends IRInstr {
-    override def toString: String = s"cset $cond, $condition"
+case class IRCset(reg: Register, condition: Condition) extends IRInstr {
+    override def toString: String = s"cset $reg, $condition"
 }
 case class IRCsel(dest: Register, src1: Register, src2: Register, cond: Condition) extends IRInstr {
   override def toString: String = s"csel $dest, $src1, $src2, $cond"

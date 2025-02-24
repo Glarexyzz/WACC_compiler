@@ -280,15 +280,15 @@ object CodeGen {
       case SeqStmt(left, right) => generateStmt(left) ++ generateStmt(right)
   }
 
-  def generateExpr(expr: Expr): (List[IRInstr], Type) = expr match {
+  def generateExpr(expr: Expr, dest: Register = W0): (List[IRInstr], Type) = expr match {
     case IntLiteral(value) =>
-      (List(IRMov(W0, value.toInt)), BaseType.IntType)
+      (List(IRMov(dest, value.toInt)), BaseType.IntType)
 
     case BoolLiteral(value) =>
-      (List(IRMov(W0, if (value) 1 else 0)), BaseType.BoolType)
+      (List(IRMov(dest, if (value) 1 else 0)), BaseType.BoolType)
 
     case CharLiteral(value) =>
-      (List(IRMov(W0, value.toInt)), BaseType.CharType)
+      (List(IRMov(dest, value.toInt)), BaseType.CharType)
 
     // not complete
     // 	adrp x0, .L.str0
@@ -307,27 +307,26 @@ object CodeGen {
       (List(), BaseType.IntType) // Assume IntType for simplicity
     
     case UnaryOp(op, expr) => 
-      val (exprIR, exprType) = generateExpr(expr)
+      val srcReg = getRegister()
+      val (exprIR, exprType) = generateExpr(expr, srcReg)
       val instrs = exprIR
       op match {
         case UnaryOperator.Negate =>
-          (instrs :+ IRNeg(W0, W0), BaseType.IntType) 
+          (instrs :+ IRNeg(dest, srcReg), BaseType.IntType) 
         case UnaryOperator.Not =>
-          (instrs :+ IRCmp(W0, W0) :+ IRCset("w0", NE), BaseType.BoolType)
-
-
+          (instrs :+ IRCmpVal(srcReg, 1) :+ IRCset(dest, NE), BaseType.BoolType)
         case UnaryOperator.Length =>
-          (instrs :+ IRLdur(W0, W0, -4), BaseType.IntType) 
+          (instrs :+ IRLdur(dest, srcReg, -4), BaseType.IntType) 
 
 
         case UnaryOperator.Ord =>
           (instrs, BaseType.IntType) // Char to Int (no instruction needed)
 
         case UnaryOperator.Chr =>
-          (instrs :+ IRTst(W0, 0xffffff80)     // Test if value is within ASCII range (0-127)
+          (instrs :+ IRTst(srcReg, 0xffffff80)     // Test if value is within ASCII range (0-127)
                   :+ IRCsel(X1, X0, X1, NE) // Conditional move if out of range
                   :+ IRJumpCond(NE , "_errBadChar") // Branch if invalid
-                  :+ IRMovReg(W0, W0),           // Move the value into W0 (truncate to char)
+                  :+ IRMovReg(dest, srcReg),           // Move the value into W0 (truncate to char)
             BaseType.CharType)
 
         case _ =>
@@ -337,8 +336,8 @@ object CodeGen {
     // DO REGISTERS AS PARAMETER  
     /*  
     case BinaryOp(expr1, op, expr2) =>
-      val (instrs1, reg1) = generateExpr(expr1)  // Generate IR for expr1
-      val (instrs2, reg2) = generateExpr(expr2)  // Generate IR for expr2
+      val (instrs1,type1, reg1) = generateExpr(expr1)  // Generate IR for expr1
+      val (instrs2, type2, reg2) = generateExpr(expr2)  // Generate IR for expr2
 
       val instrs = instrs1 ++ instrs2  // Combine IR instructions for both expressions
       op match {
@@ -390,8 +389,9 @@ object CodeGen {
           throw new RuntimeException(s"Unsupported binary operator: $op")
 
       }
+    */      
 
-    */
+
       
     case _ => (List(), BaseType.IntType)
 
