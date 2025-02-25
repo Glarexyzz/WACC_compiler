@@ -157,6 +157,10 @@ object CodeGen {
         // freeRegister(destReg)
         // rvalueIR ++ storeIR
 
+      // 	// load the current value in the destination of the read so it supports defaults
+	// mov w0, w19
+	// bl _readi
+	// mov w19, w0
       case ReadStmt(lvalue) => List()
         // val reg = getRegister()
         // val readIR = lvalue match {
@@ -198,8 +202,8 @@ object CodeGen {
 
 
       case PrintlnStmt(expr) => 
-        helpers.getOrElseUpdate(IRLabel("println"), printlnFunc())
-        generateStmt(PrintStmt(expr)) :+ IRBl("println")
+        helpers.getOrElseUpdate(IRLabel("_println"), printlnFunc())
+        generateStmt(PrintStmt(expr)) :+ IRBl("_println")
 
 
       case ReturnStmt(expr) => List()
