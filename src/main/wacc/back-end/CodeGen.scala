@@ -18,7 +18,7 @@ object CodeGen {
 
   // Register allocation
   // We need to account for spill over registers
-  private val availableRegisters = mutable.Stack[Register](X9, X10, X11, X12, X13) // Pool of free registers
+  private val availableRegisters = mutable.Stack[Register](W8, W9, W10, W11, W12, W13, W14, W15, W16, W17, W18, W19, W20, W21, W22, W23, W24, W25, W26, W27, W28) // Pool of free registers
   private val activeRegisters = mutable.Set[Register]()  // Set of registers currently in use
   private val registerStack = mutable.Stack[Register]()  // Stack for spilled registers
   private val instrBuffer = mutable.ListBuffer[IRInstr]()
@@ -340,12 +340,11 @@ object CodeGen {
                   :+ IRMovReg(dest, srcReg),           // Move the value into W0 (truncate to char)
             BaseType.CharType)
 
-        case _ =>
-          throw new RuntimeException(s"Unsupported unary operator: $op")
+            
       }
 
     // DO REGISTERS AS PARAMETER  
-    /* 
+    
     case BinaryOp(expr1, op, expr2) =>
       val reg1 = getRegister()
       val reg2 = getRegister()
@@ -364,46 +363,46 @@ object CodeGen {
         case BinaryOperator.Multiply =>
           (instrs :+ IRMul(dest, reg1, reg2), BaseType.IntType) // MUL W0, reg1, reg2
 
-        case BinaryOperator.Divide => List()
+        case BinaryOperator.Divide => (List(), BaseType.IntType)
           // (instrs :+ IRSDiv(W0, reg1, reg2), BaseType.IntType) // SDIV W0, reg1, reg2
 
-        case BinaryOperator.Modulus =>
-          (instrs :+ IRSDiv(W1, reg1, reg2) :+ IRMSub(W0, W1, reg2, reg1), BaseType.IntType)
+        case BinaryOperator.Modulus => (List(), BaseType.IntType)
+          //(instrs :+ IRSDiv(W1, reg1, reg2) :+ IRMSub(W0, W1, reg2, reg1), BaseType.IntType)
           // SDIV W1, reg1, reg2 (W1 = reg1 / reg2)
           // MSUB W0, W1, reg2, reg1 (W0 = reg1 - W1 * reg2) → remainder
 
         case BinaryOperator.Greater =>
-          (instrs :+ IRCmp(reg1, reg2) :+ IRCSel(W0, 1, 0, Cond.GT), BaseType.BoolType)
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, GT), BaseType.BoolType)
           // CMP reg1, reg2
           // CSEL W0, 1, 0, GT (if reg1 > reg2, W0 = 1 else W0 = 0)
-
+        
+        case BinaryOperator.GreaterEqual =>
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, GE), BaseType.BoolType)
         case BinaryOperator.Less =>
-          (instrs :+ IRCmp(reg1, reg2) :+ IRCSel(W0, 1, 0, Cond.LT), BaseType.BoolType)
-          // CMP reg1, reg2
-          // CSEL W0, 1, 0, LT
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, LT), BaseType.BoolType)
+
+        case BinaryOperator.LessEqual =>
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, LE), BaseType.BoolType)
+          
 
         case BinaryOperator.Equal =>
-          (instrs :+ IRCmp(reg1, reg2) :+ IRCSel(W0, 1, 0, Cond.EQ), BaseType.BoolType)
-          // CMP reg1, reg2
-          // CSEL W0, 1, 0, EQ
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, EQ), BaseType.BoolType)
+          
 
         case BinaryOperator.NotEqual =>
-          (instrs :+ IRCmp(reg1, reg2) :+ IRCSel(W0, 1, 0, Cond.NE), BaseType.BoolType)
-          // CMP reg1, reg2
-          // CSEL W0, 1, 0, NE
-
-        case BinaryOperator.And =>
-          (instrs :+ IRAnd(W0, reg1, reg2), BaseType.BoolType) // AND W0, reg1, reg2
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, NE), BaseType.BoolType)
+          
 
         case BinaryOperator.Or =>
-          (instrs :+ IROr(W0, reg1, reg2), BaseType.BoolType) // ORR W0, reg1, reg2
+          (instrs1 ++ List(IRCmpVal(reg1, 1), IRJumpCond(EQ, ".L0")) ++ instrs2 ++ List(IRCmpVal(reg2, 1), 
+            IRCset(dest, EQ)), BaseType.BoolType) // AND W0, reg1, reg2
 
-        case _ =>
-          throw new RuntimeException(s"Unsupported binary operator: $op")
+        case BinaryOperator.And =>
+          (instrs :+ IROr(W0, reg1, reg2), BaseType.BoolType) // ORR W0, reg1, reg2
 
       }
          
-    */
+    
 
       
     case _ => (List(), BaseType.IntType)

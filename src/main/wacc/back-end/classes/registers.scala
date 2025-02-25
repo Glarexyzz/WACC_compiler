@@ -52,26 +52,26 @@ case object W0 extends Register
 // case object W5 extends Register
 // case object W6 extends Register
 // case object W7 extends Register
-// case object W8 extends Register
-// case object W9 extends Register
-// case object W10 extends Register
-// case object W11 extends Register
-// case object W12 extends Register
-// case object W13 extends Register
-// case object W14 extends Register
-// case object W15 extends Register
-// case object W16 extends Register
-// case object W17 extends Register
-// case object W18 extends Register
+case object W8 extends Register
+case object W9 extends Register
+case object W10 extends Register
+case object W11 extends Register
+case object W12 extends Register
+case object W13 extends Register
+case object W14 extends Register
+case object W15 extends Register
+case object W16 extends Register
+case object W17 extends Register
+case object W18 extends Register
 case object W19 extends Register
-// case object W20 extends Register
-// case object W21 extends Register
-// case object W22 extends Register
-// case object W23 extends Register
-// case object W24 extends Register
-// case object W25 extends Register
-// case object W26 extends Register
-// case object W27 extends Register
-// case object W28 extends Register
+case object W20 extends Register
+case object W21 extends Register
+case object W22 extends Register
+case object W23 extends Register
+case object W24 extends Register
+case object W25 extends Register
+case object W26 extends Register
+case object W27 extends Register
+case object W28 extends Register
 // case object W29 extends Register  // Frame Pointer
 // case object W30 extends Register  // Link Register
