@@ -24,14 +24,18 @@ case class IRMvn(dest: Register, src: Register) extends IRInstr {
 case class IRAdr(dest: Register, label: String) extends IRInstr {
     override def toString: String = s"adr $dest, $label"
 }
+// Load address of a label with offset into a register
+case class IRAdrp(dest: Register, label: String) extends IRInstr {
+    override def toString: String = s"adrp $dest, $label"
+}
 // Load from memory into a register	
 case class IRLdr(dest: Register, addr: Register) extends IRInstr {
     override def toString: String = s"ldr $dest, [$addr]"
 }
+// Load an unsigned register
 case class IRLdur(dest: Register, addr: Register, offset: Int) extends IRInstr {
-  override def toString: String = s"ldur $dest, [$addr, #$offset]"
+    override def toString: String = s"ldur $dest, [$addr, #$offset]"
 }
-
 // Store register value into memory	
 case class IRStr(value: Register, addr: Register) extends IRInstr {
     override def toString: String = s"str $value, [$addr]"
@@ -52,6 +56,10 @@ case class IRLdp(reg1: Register, reg2: Register, offset: Int, postIncrement: Boo
 // 📌 Arithmetic & Boolean Operations (Typed for Safety)
 case class IRAdd(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"add $dest, $left, $right"
+}
+// to handle immediate values derived from labels
+case class IRAddImm(dest: Register, left: Register, imm: String) extends IRInstr {
+    override def toString: String = s"add $dest, $left, $imm"
 }
 case class IRSub(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"sub $dest, $left, $right"
@@ -83,8 +91,9 @@ case class IRCmp(left: Register, right: Register) extends IRInstr {
     override def toString: String = s"cmp $left, $right"
 }
 
-case class IRCmpVal(reg: Register, value: Int) extends IRInstr {
-    override def toString: String = s"cmp $reg, #$value"
+// Compare a register with an immediate value
+case class IRCmpImm(left: Register, imm: Int) extends IRInstr {
+    override def toString: String = s"cmp $left, #$imm"
 }
 // Set a register based on a condition flag
 case class IRCset(reg: Register, condition: Condition) extends IRInstr {

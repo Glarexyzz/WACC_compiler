@@ -15,7 +15,7 @@ case object X6 extends Register
 case object X7 extends Register
 // Indirect Result Register
 case object X8 extends Register
-// General Purpose Registers
+// General Purpose Registers - Temporary Callee Saved
 case object X9 extends Register
 case object X10 extends Register
 case object X11 extends Register
@@ -28,7 +28,7 @@ case object X16 extends Register
 case object X17 extends Register
 // Platform Register
 case object X18 extends Register
-// General Purpose Registers
+// General Purpose Registers - Preserved Callee Saved
 case object X19 extends Register
 case object X20 extends Register
 case object X21 extends Register
@@ -42,16 +42,17 @@ case object X28 extends Register
 case object FP extends Register // X29 - Frame Pointer
 case object LR extends Register // X30 - Link Register
 case object SP extends Register // Stack Pointer
+case object XZR extends Register // Zero Register
 
 // 32-bit registers
 case object W0 extends Register
-// case object W1 extends Register
-// case object W2 extends Register
-// case object W3 extends Register
-// case object W4 extends Register
-// case object W5 extends Register
-// case object W6 extends Register
-// case object W7 extends Register
+case object W1 extends Register
+case object W2 extends Register
+case object W3 extends Register
+case object W4 extends Register
+case object W5 extends Register
+case object W6 extends Register
+case object W7 extends Register
 case object W8 extends Register
 case object W9 extends Register
 case object W10 extends Register
@@ -73,5 +74,5 @@ case object W25 extends Register
 case object W26 extends Register
 case object W27 extends Register
 case object W28 extends Register
-// case object W29 extends Register  // Frame Pointer
-// case object W30 extends Register  // Link Register
+case object W29 extends Register  // Frame Pointer
+case object W30 extends Register  // Link Register

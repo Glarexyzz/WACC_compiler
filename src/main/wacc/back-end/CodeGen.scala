@@ -16,6 +16,8 @@ object CodeGen {
   // val globalVariables: mutable.Map[Label, String] = mutable.Map() // this doesn't seem accurate, so I'll comment it out first
   private val stringLiterals: mutable.Map[String, String] = mutable.Map() // Store unique string labels
 
+  def nextLabel(): String = s".L.str${stringLiterals.size}"
+
   // Register allocation
   // We need to account for spill over registers
   private val availableRegisters = mutable.Stack[Register](W8, W9, W10, W11, W12, W13, W14, W15, W16, W17, W18, W19, W20, W21, W22, W23, W24, W25, W26, W27, W28) // Pool of free registers
@@ -54,7 +56,7 @@ object CodeGen {
     
 
   // Helper functions generated 
-  private val helpers = mutable.Map[IRLabel, IRFuncLabel]()
+  private val helpers = mutable.Map[IRLabel, List[IRInstr]]()
 
   def compile(prog: Program, filepath: String): Unit = {
     println("Compiling...")
@@ -135,21 +137,14 @@ object CodeGen {
 
   def generateHeadIR(): List[IRInstr] = {
     val dataSection = stringLiterals.map { case (label, value) =>
-      List(
-        IRCmt(s"// length of $label"),
-        IRWord(value.length + 1), // Store string length (+1 for null terminator)
-        IRFuncLabel(
-          IRLabel(label),
-          List(IRAsciz(value))
-        )
-      )
+      wordLabel(value.length, label, value)
     }.flatten.toList
 
     List(IRLabel(".data")) ++ dataSection ++ List(IRAlign(4), IRLabel(".text"), IRGlobal("main"))
   }
 
   def generateHelperIRs(): List[IRInstr] = {
-    helpers.values.toList
+    helpers.values.toList.flatten
   }
 
   def generateStmt(stmt: Stmt): List[IRInstr] = stmt match {
@@ -176,6 +171,10 @@ object CodeGen {
         // freeRegister(destReg)
         // rvalueIR ++ storeIR
 
+      // 	// load the current value in the destination of the read so it supports defaults
+	// mov w0, w19
+	// bl _readi
+	// mov w19, w0
       case ReadStmt(lvalue) => List()
         // val reg = getRegister()
         // val readIR = lvalue match {
@@ -196,25 +195,30 @@ object CodeGen {
         // freeRegister(reg)
         // exprIR :+ IRFree(reg)
 
-      case PrintStmt(expr) => List()
-        // behaviour differs depending on type expr
-        // we have various print helper function (prints for string, printi for int)
+      case PrintStmt(expr) =>
+        val (exprIR, exprType) = generateExpr(expr)
+        if (exprType == BaseType.IntType) {
+          helpers.getOrElseUpdate(IRLabel("_printi"), printi())
+          exprIR :+ IRBl("_printi")
+        } else if (exprType == BaseType.CharType) {
+          helpers.getOrElseUpdate(IRLabel("_printc"), printc())
+          exprIR :+ IRBl("_printc")
+        } else if (exprType == BaseType.StrType) {
+          helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+          exprIR :+ IRBl("_prints")
+        } else if (exprType == BaseType.BoolType) {
+          helpers.getOrElseUpdate(IRLabel("_printb"), printb())
+          exprIR :+ IRBl("_printb")
+        } else {
+          // we have not handled arrays and pairs yet
+          exprIR
+        }
 
-        // val exprIR = generateExpr(expr)
-        // val reg = getDestRegister(exprIR)
-        // freeRegister(reg)
-        // exprIR :+ IRPrint(reg)
 
-      case PrintlnStmt(expr) => List()
-        // really annoying.
-        // logic works similarly to PrintStmt
-        // but we have an added helper function _println that helps to print a line
-        // helper functions can be found (soon) in helpers.scala
+      case PrintlnStmt(expr) => 
+        helpers.getOrElseUpdate(IRLabel("_println"), printlnFunc())
+        generateStmt(PrintStmt(expr)) :+ IRBl("_println")
 
-        // val exprIR = generateExpr(expr)
-        // val reg = getDestRegister(exprIR)
-        // freeRegister(reg)
-        // exprIR :+ IRPrintln(reg)
 
       case ReturnStmt(expr) => List()
         // val exprIR = generateExpr(expr)
@@ -305,10 +309,10 @@ object CodeGen {
     // 	adrp x0, .L.str0
 	// add x0, x0, :lo12:.L.str0
     case StrLiteral(value) =>
-      // val label = s"str_${value.hashCode.abs}"
-      // stringLiterals.getOrElseUpdate(label, value) // Store string in .data
+      val label = nextLabel()
+      stringLiterals.getOrElseUpdate(label, value) // Store string in .data
+      (List(IRAdrp(X0, label), IRAddImm(X0, X0, s":lo12:$label")), BaseType.StrType)
       // val reg = getRegister()
-      (List(), BaseType.StrType)
 
     // incomplete
     case Identifier(name) =>
@@ -325,7 +329,7 @@ object CodeGen {
         case UnaryOperator.Negate =>
           (instrs :+ IRNeg(dest, srcReg), BaseType.IntType) 
         case UnaryOperator.Not =>
-          (instrs :+ IRCmpVal(srcReg, 1) :+ IRCset(dest, NE), BaseType.BoolType)
+          (instrs :+ IRCmpImm(srcReg, 1) :+ IRCset(dest, NE), BaseType.BoolType)
         case UnaryOperator.Length =>
           (instrs :+ IRLdur(dest, srcReg, -4), BaseType.IntType) 
 
@@ -394,11 +398,11 @@ object CodeGen {
           
 
         case BinaryOperator.Or =>
-          (instrs1 ++ List(IRCmpVal(reg1, 1), IRJumpCond(EQ, ".L0")) ++ instrs2 ++ List(IRCmpVal(reg2, 1), 
+          (instrs1 ++ List(IRCmpImm(reg1, 1), IRJumpCond(EQ, ".L0")) ++ instrs2 ++ List(IRCmpImm(reg2, 1), 
             IRCset(dest, EQ)), BaseType.BoolType) // AND W0, reg1, reg2
 
         case BinaryOperator.And =>
-          (instrs1 ++ List(IRCmpVal(reg1, 1), IRJumpCond(NE, ".L0")) ++ instrs2 ++ List(IRCmpVal(reg2, 1), 
+          (instrs1 ++ List(IRCmpImm(reg1, 1), IRJumpCond(NE, ".L0")) ++ instrs2 ++ List(IRCmpImm(reg2, 1), 
             IRCset(dest, EQ)), BaseType.BoolType)
 
       }
