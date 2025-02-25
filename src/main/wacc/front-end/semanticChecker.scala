@@ -15,6 +15,8 @@ class SymbolTable {
   var scopeLevel: Int = 0 // Tracks current scope depth
   private var functionStatus: Option[Type] = None // Tracks the return type of the current function
 
+  def getFunctionTable: Map[String, FunctionEntry] = functionTable.toMap
+  def getVariableScopes: List[Map[String, VariableEntry]] = variableScopes.toList.map(_.toMap)
   
   def enterScope(): Unit = {
     scopeLevel += 1

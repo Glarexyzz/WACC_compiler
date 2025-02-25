@@ -23,6 +23,7 @@ object CodeGen {
   private val activeRegisters = mutable.Set[Register]()  // Set of registers currently in use
   private val registerStack = mutable.Stack[Register]()  // Stack for spilled registers
   private val instrBuffer = mutable.ListBuffer[IRInstr]()
+  private val variableRegisters = mutable.Map[String, Register]()
 
   private def getRegister(): Register = {
     if (availableRegisters.nonEmpty) {
@@ -57,6 +58,7 @@ object CodeGen {
   // Helper functions generated 
   private val helpers = mutable.Map[IRLabel, List[IRInstr]]()
 
+  // Main function
   def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable): Unit = {
     println("Compiling...")
     // initialise symbol table
@@ -113,7 +115,20 @@ object CodeGen {
     prologue ++ bodyIR ++ epilogue
   }
 
-  
+  def initialiseVariables(symTab: SymbolTable): List[Register] = {
+    val allocatedRegs = mutable.ListBuffer[Register]()
+
+    // Iterate over variables in the current scope and allocate registers for them
+    symTab.getVariableScopes.headOption.foreach { currentScope =>
+      currentScope.foreach { case (varName, _) =>
+        val reg = getRegister()
+        variableRegisters(varName) = reg  // map variable names to allocated registers
+        allocatedRegs += reg              // track allocated register
+      }
+    }
+
+    allocatedRegs.toList
+  }
 
   def generateFunc(func: Func): List[IRInstr] = {
     List()
