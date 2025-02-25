@@ -105,12 +105,15 @@ object CodeGen {
     val epilogue = List(
       IRMov(X0, 0), // Default return code
       IRCmt("Function epilogue"),
+      // deallocate registers for variables
       popReg(FP, LR),
       IRRet()
     )
 
     prologue ++ bodyIR ++ epilogue
   }
+
+  
 
   def generateFunc(func: Func): List[IRInstr] = {
     List()

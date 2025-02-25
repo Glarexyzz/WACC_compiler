@@ -43,8 +43,12 @@ case class IRStr(value: Register, addr: Register) extends IRInstr {
 // Store a pair of registers onto the stack	
 case class IRStp(reg1: Register, reg2: Register, offset: Int, preDecrement: Boolean = false) extends IRInstr {
   override def toString: String =
-    if (preDecrement) s"stp $reg1, $reg2, [sp, #-$offset]!"
-    else s"stp $reg1, $reg2, [sp], #$offset"
+    if (preDecrement) s"stp $reg1, $reg2, [sp, #$offset]!"
+    else s"stp $reg1, $reg2, [sp, #$offset]"
+}
+// Store register value with offset into memory
+case class IRStur(reg: Register, base: Register, offset: Int) extends IRInstr {
+  override def toString: String = s"stur $reg, [$base, #$offset]"
 }
 // Load a pair of registers from the stack
 case class IRLdp(reg1: Register, reg2: Register, offset: Int, postIncrement: Boolean = false) extends IRInstr {
