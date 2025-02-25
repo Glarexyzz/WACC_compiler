@@ -29,7 +29,7 @@ object CodeGen {
     if (availableRegisters.nonEmpty) {
       val reg = availableRegisters.pop()
       activeRegisters += reg
-      reg
+      return reg
     }
 
     // No registers available - Spill an active register
@@ -38,7 +38,7 @@ object CodeGen {
       instrBuffer += IRStr(regToSpill, SP)  // Spill to stack
       registerStack.push(regToSpill)        // Track it
       activeRegisters -= regToSpill         // Remove from active
-      regToSpill
+      return regToSpill
     }
 
     throw new Exception("No available registers and no registers to spill!")
