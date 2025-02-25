@@ -12,11 +12,10 @@ import wacc.Helpers._
 */
 object CodeGen {
 
-  // Global Variables stored in .data
-  // val globalVariables: mutable.Map[Label, String] = mutable.Map() // this doesn't seem accurate, so I'll comment it out first
   private val stringLiterals: mutable.Map[String, String] = mutable.Map() // Store unique string labels
-
   def nextLabel(): String = s".L.str${stringLiterals.size}"
+
+  private var symbolTable = new SymbolTable()
 
   // Register allocation
   // We need to account for spill over registers
@@ -58,10 +57,11 @@ object CodeGen {
   // Helper functions generated 
   private val helpers = mutable.Map[IRLabel, List[IRInstr]]()
 
-  def compile(prog: Program, filepath: String, symbolTable: SymbolTable): Unit = {
+  def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable): Unit = {
     println("Compiling...")
-    // generating IR
-    val ir = generateIR(prog, symbolTable)
+    // initialise symbol table
+    symbolTable = newSymbolTable
+    val ir = generateIR(prog)
 
     // AArch64 assembly conversion
     // val assembly = AArch64Gen.generateAssembly(ir, stringLiterals)
@@ -80,26 +80,8 @@ object CodeGen {
       writer.close()
   }
 
-  // private def getDestRegister(instrs: List[IRInstr]): Option[Register] = {
-  //   instrs.collectFirst {
-  //     case IRMov(dest, _) => dest
-  //     case IRMvn(dest, _) => dest
-  //     case IRAdr(dest, _) => dest
-  //     case IRLdr(dest, _) => dest
-  //     case IRAdd(dest, _, _) => dest
-  //     case IRSub(dest, _, _) => dest
-  //     case IRMul(dest, _, _) => dest
-  //     case IRDiv(dest, _, _) => dest
-  //     case IRAnd(dest, _, _) => dest
-  //     case IROr(dest, _, _) => dest
-  //     case IRXor(dest, _, _) => dest
-  //     case IRNeg(dest, _) => dest
-  //     case IRCset(dest, _) => dest
-  //   }
-  // }
-
   // need to create generateMainIR, generateHeadIR, generateHelperIRs
-  def generateIR(prog: Program, symbolTable: SymbolTable): List[IRInstr] = {
+  def generateIR(prog: Program): List[IRInstr] = {
     // evaluate main and func first
     val mainIR = List(IRFuncLabel(IRLabel("main"), generateMainIR(prog.stmt))) // Handles main function
     val funcIRs = prog.funcs.flatMap(generateFunc) // Handles any wacc functions
@@ -113,6 +95,7 @@ object CodeGen {
   def generateMainIR(stmt: Stmt): List[IRInstr] = {
     val prologue = List(
       IRCmt("Function prologue"),
+      // allocate registers for variables
       pushReg(FP, LR),
       IRMovReg(FP, SP)
     )
