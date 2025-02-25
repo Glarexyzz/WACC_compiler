@@ -11,6 +11,11 @@ case class IRMov(dest: Register, value: Int) extends IRInstr {
 case class IRMovReg(dest: Register, src: Register) extends IRInstr {
   override def toString: String = s"mov $dest, $src"
 }
+
+case class IRMovk(dest: Register, immediate: Int, shift: Int) extends IRInstr {
+  override def toString: String = s"movk $dest, #$immediate, lsl #$shift"
+}
+
 // Bitwise NOT (negates bits)	
 case class IRMvn(dest: Register, src: Register) extends IRInstr {
     override def toString: String = s"mvn $dest, $src"
@@ -85,13 +90,14 @@ class IRNeg(dest: Register, src: Register) extends IRInstr {
 case class IRCmp(left: Register, right: Register) extends IRInstr {
     override def toString: String = s"cmp $left, $right"
 }
+
 // Compare a register with an immediate value
 case class IRCmpImm(left: Register, imm: Int) extends IRInstr {
     override def toString: String = s"cmp $left, #$imm"
 }
 // Set a register based on a condition flag
-case class IRCset(cond: String, condition: Condition) extends IRInstr {
-    override def toString: String = s"cset $cond, $condition"
+case class IRCset(reg: Register, condition: Condition) extends IRInstr {
+    override def toString: String = s"cset $reg, $condition"
 }
 case class IRCsel(dest: Register, src1: Register, src2: Register, cond: Condition) extends IRInstr {
   override def toString: String = s"csel $dest, $src1, $src2, $cond"

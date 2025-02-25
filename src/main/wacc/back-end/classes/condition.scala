@@ -15,3 +15,5 @@ case object LT extends Condition
 case object GE extends Condition 
 
 case object LE extends Condition 
+
+case object VS extends Condition

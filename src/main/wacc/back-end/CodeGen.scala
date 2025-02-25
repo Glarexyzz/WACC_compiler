@@ -20,7 +20,7 @@ object CodeGen {
 
   // Register allocation
   // We need to account for spill over registers
-  private val availableRegisters = mutable.Stack[Register](X9, X10, X11, X12, X13) // Pool of free registers
+  private val availableRegisters = mutable.Stack[Register](W8, W9, W10, W11, W12, W13, W14, W15, W16, W17, W18, W19, W20, W21, W22, W23, W24, W25, W26, W27, W28) // Pool of free registers
   private val activeRegisters = mutable.Set[Register]()  // Set of registers currently in use
   private val registerStack = mutable.Stack[Register]()  // Stack for spilled registers
   private val instrBuffer = mutable.ListBuffer[IRInstr]()
@@ -284,15 +284,26 @@ object CodeGen {
       case SeqStmt(left, right) => generateStmt(left) ++ generateStmt(right)
   }
 
-  def generateExpr(expr: Expr): (List[IRInstr], Type) = expr match {
+  def generateExpr(expr: Expr, dest: Register = W0): (List[IRInstr], Type) = expr match {
     case IntLiteral(value) =>
-      (List(IRMov(W0, value.toInt)), BaseType.IntType)
+      if (value.abs <= 65535) {
+        (List(IRMov(dest, value.toInt)), BaseType.IntType) 
+      } else {
+        val lower16 = (value & 0xFFFF).toInt          // Extract lower 16 bits
+        val upper16 = ((value >> 16) & 0xFFFF).toInt  // Extract upper 16 bits should be fine to use toInt since should be 16 bits anyway?
+
+        (List(
+          IRMov(dest, lower16),               // MOV dest, #lower16
+          IRMovk(dest, upper16, 16)   // MOVK dest, #upper16, LSL #16
+        ), BaseType.IntType)
+      }
+
 
     case BoolLiteral(value) =>
-      (List(IRMov(W0, if (value) 1 else 0)), BaseType.BoolType)
+      (List(IRMov(dest, if (value) 1 else 0)), BaseType.BoolType)
 
     case CharLiteral(value) =>
-      (List(IRMov(W0, value.toInt)), BaseType.CharType)
+      (List(IRMov(dest, value.toInt)), BaseType.CharType)
 
     // not complete
     // 	adrp x0, .L.str0
@@ -311,36 +322,96 @@ object CodeGen {
       (List(), BaseType.IntType) // Assume IntType for simplicity
     
     case UnaryOp(op, expr) => 
-      val (exprIR, exprType) = generateExpr(expr)
+      val srcReg = getRegister()
+      val (exprIR, exprType) = generateExpr(expr, srcReg)
       val instrs = exprIR
       op match {
-      case UnaryOperator.Negate =>
-        (instrs :+ IRNeg(W0, W0), BaseType.IntType) 
-      case UnaryOperator.Not =>
-        (instrs :+ IRCmp(W0, W0) :+ IRCset("w0", NE), BaseType.BoolType)
+        case UnaryOperator.Negate =>
+          (instrs :+ IRNeg(dest, srcReg), BaseType.IntType) 
+        case UnaryOperator.Not =>
+          (instrs :+ IRCmpImm(srcReg, 1) :+ IRCset(dest, NE), BaseType.BoolType)
+        case UnaryOperator.Length =>
+          (instrs :+ IRLdur(dest, srcReg, -4), BaseType.IntType) 
 
 
-      case UnaryOperator.Length =>
-        (instrs :+ IRLdur(W0, W0, -4), BaseType.IntType) 
+        case UnaryOperator.Ord =>
+          (instrs, BaseType.IntType) // Char to Int (no instruction needed)
 
+        case UnaryOperator.Chr =>
+          (instrs :+ IRTst(srcReg, 0xffffff80)     // Test if value is within ASCII range (0-127)
+                  :+ IRCsel(X1, X0, X1, NE) // Conditional move if out of range
+                  :+ IRJumpCond(NE , "_errBadChar") // Branch if invalid
+                  :+ IRMovReg(dest, srcReg),           // Move the value into W0 (truncate to char)
+            BaseType.CharType)
 
-      case UnaryOperator.Ord =>
-        (instrs, BaseType.IntType) // Char to Int (no instruction needed)
+            
+      }
 
-      case UnaryOperator.Chr =>
-        (instrs :+ IRTst(W0, 0xffffff80)     // Test if value is within ASCII range (0-127)
-                :+ IRCsel(X1, X0, X1, NE) // Conditional move if out of range
-                :+ IRJumpCond(NE , "_errBadChar") // Branch if invalid
-                :+ IRMovReg(W0, W0),           // Move the value into W0 (truncate to char)
-          BaseType.CharType)
-
-      case _ =>
-        throw new RuntimeException(s"Unsupported unary operator: $op")
-    }
-
-
+    // DO REGISTERS AS PARAMETER  
     
+    case BinaryOp(expr1, op, expr2) =>
+      val reg1 = getRegister()
+      val reg2 = getRegister()
+      val (instrs1, _) = generateExpr(expr1)  // Generate IR for expr1
+      val (instrs2, _) = generateExpr(expr2)  // Generate IR for expr2
+
+      val instrs = instrs1 ++ instrs2  // Combine IR instructions for both expressions
+      op match {
+        case BinaryOperator.Add =>
+          // for numbers greater than 65537 movk is used to store value in reg
+          (instrs :+ IRAdd(dest, reg1, reg2) :+ IRJumpCond(VS, "_errOverflow"), BaseType.IntType) // ADD W0, reg1, reg2
+        
+        case BinaryOperator.Subtract =>
+          (instrs :+ IRSub(dest, reg1, reg2), BaseType.IntType) // SUB W0, reg1, reg2
+
+        case BinaryOperator.Multiply =>
+          (instrs :+ IRMul(dest, reg1, reg2), BaseType.IntType) // MUL W0, reg1, reg2
+
+        case BinaryOperator.Divide => (List(), BaseType.IntType)
+          // (instrs :+ IRSDiv(W0, reg1, reg2), BaseType.IntType) // SDIV W0, reg1, reg2
+
+        case BinaryOperator.Modulus => (List(), BaseType.IntType)
+          //(instrs :+ IRSDiv(W1, reg1, reg2) :+ IRMSub(W0, W1, reg2, reg1), BaseType.IntType)
+          // SDIV W1, reg1, reg2 (W1 = reg1 / reg2)
+          // MSUB W0, W1, reg2, reg1 (W0 = reg1 - W1 * reg2) → remainder
+
+        case BinaryOperator.Greater =>
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, GT), BaseType.BoolType)
+          // CMP reg1, reg2
+          // CSEL W0, 1, 0, GT (if reg1 > reg2, W0 = 1 else W0 = 0)
+        
+        case BinaryOperator.GreaterEqual =>
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, GE), BaseType.BoolType)
+        case BinaryOperator.Less =>
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, LT), BaseType.BoolType)
+
+        case BinaryOperator.LessEqual =>
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, LE), BaseType.BoolType)
+          
+
+        case BinaryOperator.Equal =>
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, EQ), BaseType.BoolType)
+          
+
+        case BinaryOperator.NotEqual =>
+          (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, NE), BaseType.BoolType)
+          
+
+        case BinaryOperator.Or =>
+          (instrs1 ++ List(IRCmpImm(reg1, 1), IRJumpCond(EQ, ".L0")) ++ instrs2 ++ List(IRCmpImm(reg2, 1), 
+            IRCset(dest, EQ)), BaseType.BoolType) // AND W0, reg1, reg2
+
+        case BinaryOperator.And =>
+          (instrs1 ++ List(IRCmpImm(reg1, 1), IRJumpCond(NE, ".L0")) ++ instrs2 ++ List(IRCmpImm(reg2, 1), 
+            IRCset(dest, EQ)), BaseType.BoolType)
+
+      }
+         
+    
+
+      
     case _ => (List(), BaseType.IntType)
+
 
       // case PairLiteral => List()
       //   // val reg = getRegister()
