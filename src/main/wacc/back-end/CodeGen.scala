@@ -58,10 +58,10 @@ object CodeGen {
   // Helper functions generated 
   private val helpers = mutable.Map[IRLabel, List[IRInstr]]()
 
-  def compile(prog: Program, filepath: String): Unit = {
+  def compile(prog: Program, filepath: String, symbolTable: SymbolTable): Unit = {
     println("Compiling...")
     // generating IR
-    val ir = generateIR(prog)
+    val ir = generateIR(prog, symbolTable)
 
     // AArch64 assembly conversion
     // val assembly = AArch64Gen.generateAssembly(ir, stringLiterals)
@@ -99,7 +99,7 @@ object CodeGen {
   // }
 
   // need to create generateMainIR, generateHeadIR, generateHelperIRs
-  def generateIR(prog: Program): List[IRInstr] = {
+  def generateIR(prog: Program, symbolTable: SymbolTable): List[IRInstr] = {
     // evaluate main and func first
     val mainIR = List(IRFuncLabel(IRLabel("main"), generateMainIR(prog.stmt))) // Handles main function
     val funcIRs = prog.funcs.flatMap(generateFunc) // Handles any wacc functions

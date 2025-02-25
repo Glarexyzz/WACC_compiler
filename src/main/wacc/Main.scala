@@ -16,13 +16,13 @@ def main(args: Array[String]): Unit = {
             result match {
                 case Right(parsed) =>
                     semanticChecker.checkSemantic(parsed) match {
-                        case Some(errors) => 
+                        case Left(errors) => 
                             println(s"Semantic errors found:\n$errors\n")
                             exitCode = exitInvalidSemantics
-                        case None => 
+                        case Right(symbolTable) => 
                             parsed match {
                                 case program: Program =>
-                                    compile(program, input)
+                                    compile(program, input, symbolTable)
                                     println(s"Successfully parsed & compiled:\n$parsed\n")
                                     exitCode = exitValid
 

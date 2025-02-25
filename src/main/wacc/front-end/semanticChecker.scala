@@ -90,15 +90,9 @@ object semanticChecker {
 
   val symbolTable: SymbolTable = new SymbolTable
 
-  def checkSemantic(parsed: Any): Option[String] = parsed match {
-    case program: Program => checkProgram(program)
-    case stmt: Stmt => checkStatement(stmt)
-    case expr: Expr => checkExprType(expr, symbolTable) match {
-      case Left(error) => Some(error)
-      case Right(_) => None
-    }
-    case func: Func => checkFunc(func)
-    case _ => Some(s"Unknown parsed structure")
+  def checkSemantic(parsed: Any): Either[String, SymbolTable] = parsed match {
+    case program: Program => checkProgram(program).toLeft(symbolTable)
+    case _ => Left(s"Unknown parsed structure")
   }
   
 
