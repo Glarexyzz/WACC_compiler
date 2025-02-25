@@ -398,7 +398,8 @@ object CodeGen {
             IRCset(dest, EQ)), BaseType.BoolType) // AND W0, reg1, reg2
 
         case BinaryOperator.And =>
-          (instrs :+ IROr(W0, reg1, reg2), BaseType.BoolType) // ORR W0, reg1, reg2
+          (instrs1 ++ List(IRCmpVal(reg1, 1), IRJumpCond(NE, ".L0")) ++ instrs2 ++ List(IRCmpVal(reg2, 1), 
+            IRCset(dest, EQ)), BaseType.BoolType)
 
       }
          
