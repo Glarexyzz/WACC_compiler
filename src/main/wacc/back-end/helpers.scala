@@ -124,5 +124,15 @@ object Helpers{
         wordLabel(0, str0label, "") :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_println"), instructions)
     }
 
-
+    def errOverflow(): List[IRInstr] = {
+        val errStr = strLabel("errOverflow", 0)
+        val errWord = wordLabel(52, errStr, "fatal error: integer overflow or underflow occurred\n")
+        val instructions: List[IRInstr] = List(
+            IRAdr(X0, errStr),
+            IRBl("_prints"),
+            IRMov(W0, -1),
+            IRBl("exit")
+        )
+        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_errOverflow"), instructions)
+    }
 }
