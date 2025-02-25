@@ -16,6 +16,8 @@ object CodeGen {
   // val globalVariables: mutable.Map[Label, String] = mutable.Map() // this doesn't seem accurate, so I'll comment it out first
   private val stringLiterals: mutable.Map[String, String] = mutable.Map() // Store unique string labels
 
+  def nextLabel(): String = s".L.str${stringLiterals.size}"
+
   // Register allocation
   // We need to account for spill over registers
   private val availableRegisters = mutable.Stack[Register](X9, X10, X11, X12, X13) // Pool of free registers
@@ -135,14 +137,7 @@ object CodeGen {
 
   def generateHeadIR(): List[IRInstr] = {
     val dataSection = stringLiterals.map { case (label, value) =>
-      List(
-        IRCmt(s"// length of $label"),
-        IRWord(value.length + 1), // Store string length (+1 for null terminator)
-        IRFuncLabel(
-          IRLabel(label),
-          List(IRAsciz(value))
-        )
-      )
+      wordLabel(value.length, label, value)
     }.flatten.toList
 
     List(IRLabel(".data")) ++ dataSection ++ List(IRAlign(4), IRLabel(".text"), IRGlobal("main"))
@@ -176,6 +171,10 @@ object CodeGen {
         // freeRegister(destReg)
         // rvalueIR ++ storeIR
 
+      // 	// load the current value in the destination of the read so it supports defaults
+	// mov w0, w19
+	// bl _readi
+	// mov w19, w0
       case ReadStmt(lvalue) => List()
         // val reg = getRegister()
         // val readIR = lvalue match {
@@ -199,39 +198,27 @@ object CodeGen {
       case PrintStmt(expr) =>
         val (exprIR, exprType) = generateExpr(expr)
         if (exprType == BaseType.IntType) {
-          helpers.getOrElseUpdate(IRLabel("printi"), printi())
-          exprIR :+ IRBl("printi")
+          helpers.getOrElseUpdate(IRLabel("_printi"), printi())
+          exprIR :+ IRBl("_printi")
         } else if (exprType == BaseType.CharType) {
-          helpers.getOrElseUpdate(IRLabel("printc"), printc())
-          exprIR :+ IRBl("printc")
+          helpers.getOrElseUpdate(IRLabel("_printc"), printc())
+          exprIR :+ IRBl("_printc")
         } else if (exprType == BaseType.StrType) {
-          helpers.getOrElseUpdate(IRLabel("prints"), prints())
-          exprIR :+ IRBl("prints")
+          helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+          exprIR :+ IRBl("_prints")
         } else if (exprType == BaseType.BoolType) {
-          helpers.getOrElseUpdate(IRLabel("printb"), printb())
-          exprIR :+ IRBl("printb")
+          helpers.getOrElseUpdate(IRLabel("_printb"), printb())
+          exprIR :+ IRBl("_printb")
         } else {
           // we have not handled arrays and pairs yet
           exprIR
         }
-        // behaviour differs depending on type expr
-        // we have various print helper function (prints for string, printi for int)
 
-        // val exprIR = generateExpr(expr)
-        // val reg = getDestRegister(exprIR)
-        // freeRegister(reg)
-        // exprIR :+ IRPrint(reg)
 
-      case PrintlnStmt(expr) => List()
-        // really annoying.
-        // logic works similarly to PrintStmt
-        // but we have an added helper function _println that helps to print a line
-        // helper functions can be found (soon) in helpers.scala
+      case PrintlnStmt(expr) => 
+        helpers.getOrElseUpdate(IRLabel("_println"), printlnFunc())
+        generateStmt(PrintStmt(expr)) :+ IRBl("_println")
 
-        // val exprIR = generateExpr(expr)
-        // val reg = getDestRegister(exprIR)
-        // freeRegister(reg)
-        // exprIR :+ IRPrintln(reg)
 
       case ReturnStmt(expr) => List()
         // val exprIR = generateExpr(expr)
@@ -311,10 +298,10 @@ object CodeGen {
     // 	adrp x0, .L.str0
 	// add x0, x0, :lo12:.L.str0
     case StrLiteral(value) =>
-      // val label = s"str_${value.hashCode.abs}"
-      // stringLiterals.getOrElseUpdate(label, value) // Store string in .data
+      val label = nextLabel()
+      stringLiterals.getOrElseUpdate(label, value) // Store string in .data
+      (List(IRAdrp(X0, label), IRAddImm(X0, X0, s":lo12:$label")), BaseType.StrType)
       // val reg = getRegister()
-      (List(), BaseType.StrType)
 
     // incomplete
     case Identifier(name) =>

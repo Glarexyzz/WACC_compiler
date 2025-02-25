@@ -19,6 +19,10 @@ case class IRMvn(dest: Register, src: Register) extends IRInstr {
 case class IRAdr(dest: Register, label: String) extends IRInstr {
     override def toString: String = s"adr $dest, $label"
 }
+// Load address of a label with offset into a register
+case class IRAdrp(dest: Register, label: String) extends IRInstr {
+    override def toString: String = s"adrp $dest, $label"
+}
 // Load from memory into a register	
 case class IRLdr(dest: Register, addr: Register) extends IRInstr {
     override def toString: String = s"ldr $dest, [$addr]"
@@ -47,6 +51,10 @@ case class IRLdp(reg1: Register, reg2: Register, offset: Int, postIncrement: Boo
 // 📌 Arithmetic & Boolean Operations (Typed for Safety)
 case class IRAdd(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"add $dest, $left, $right"
+}
+// to handle immediate values derived from labels
+case class IRAddImm(dest: Register, left: Register, imm: String) extends IRInstr {
+    override def toString: String = s"add $dest, $left, $imm"
 }
 case class IRSub(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"sub $dest, $left, $right"
