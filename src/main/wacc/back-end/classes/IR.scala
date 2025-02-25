@@ -11,6 +11,11 @@ case class IRMov(dest: Register, value: Int) extends IRInstr {
 case class IRMovReg(dest: Register, src: Register) extends IRInstr {
   override def toString: String = s"mov $dest, $src"
 }
+
+case class IRMovk(dest: Register, immediate: Int, shift: Int) extends IRInstr {
+  override def toString: String = s"movk $dest, #$immediate, lsl #$shift"
+}
+
 // Bitwise NOT (negates bits)	
 case class IRMvn(dest: Register, src: Register) extends IRInstr {
     override def toString: String = s"mvn $dest, $src"

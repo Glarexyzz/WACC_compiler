@@ -282,7 +282,18 @@ object CodeGen {
 
   def generateExpr(expr: Expr, dest: Register = W0): (List[IRInstr], Type) = expr match {
     case IntLiteral(value) =>
-      (List(IRMov(dest, value.toInt)), BaseType.IntType)
+      if (value.abs <= 65535) {
+        (List(IRMov(dest, value.toInt)), BaseType.IntType) 
+      } else {
+        val lower16 = (value & 0xFFFF).toInt          // Extract lower 16 bits
+        val upper16 = ((value >> 16) & 0xFFFF).toInt  // Extract upper 16 bits should be fine to use toInt since should be 16 bits anyway?
+
+        (List(
+          IRMov(dest, lower16),               // MOV dest, #lower16
+          IRMovk(dest, upper16, 16)   // MOVK dest, #upper16, LSL #16
+        ), BaseType.IntType)
+      }
+
 
     case BoolLiteral(value) =>
       (List(IRMov(dest, if (value) 1 else 0)), BaseType.BoolType)
@@ -334,22 +345,24 @@ object CodeGen {
       }
 
     // DO REGISTERS AS PARAMETER  
-    /*  
+    /* 
     case BinaryOp(expr1, op, expr2) =>
-      val (instrs1,type1, reg1) = generateExpr(expr1)  // Generate IR for expr1
-      val (instrs2, type2, reg2) = generateExpr(expr2)  // Generate IR for expr2
+      val reg1 = getRegister()
+      val reg2 = getRegister()
+      val (instrs1, _) = generateExpr(expr1)  // Generate IR for expr1
+      val (instrs2, _) = generateExpr(expr2)  // Generate IR for expr2
 
       val instrs = instrs1 ++ instrs2  // Combine IR instructions for both expressions
       op match {
         case BinaryOperator.Add =>
           // for numbers greater than 65537 movk is used to store value in reg
-          (instrs :+ IRAdd(W0, reg1, reg2) :+ IRJumpCond(VS, "_errOverflow"), BaseType.IntType) // ADD W0, reg1, reg2
+          (instrs :+ IRAdd(dest, reg1, reg2) :+ IRJumpCond(VS, "_errOverflow"), BaseType.IntType) // ADD W0, reg1, reg2
         
         case BinaryOperator.Subtract =>
-          (instrs :+ IRSub(W0, reg1, reg2), BaseType.IntType) // SUB W0, reg1, reg2
+          (instrs :+ IRSub(dest, reg1, reg2), BaseType.IntType) // SUB W0, reg1, reg2
 
         case BinaryOperator.Multiply =>
-          (instrs :+ IRMul(W0, reg1, reg2), BaseType.IntType) // MUL W0, reg1, reg2
+          (instrs :+ IRMul(dest, reg1, reg2), BaseType.IntType) // MUL W0, reg1, reg2
 
         case BinaryOperator.Divide => List()
           // (instrs :+ IRSDiv(W0, reg1, reg2), BaseType.IntType) // SDIV W0, reg1, reg2
@@ -389,8 +402,8 @@ object CodeGen {
           throw new RuntimeException(s"Unsupported binary operator: $op")
 
       }
-    */      
-
+         
+    */
 
       
     case _ => (List(), BaseType.IntType)
