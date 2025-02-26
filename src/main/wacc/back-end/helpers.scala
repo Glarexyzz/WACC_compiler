@@ -202,15 +202,30 @@ object Helpers{
         wordLabel(0, str0label, "") :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_println"), instructions)
     }
 
-    def errOverflow(): List[IRInstr] = {
-        val errStr = strLabel("errOverflow", 0)
-        val errWord = wordLabel(52, errStr, "fatal error: integer overflow or underflow occurred\n")
-        val instructions: List[IRInstr] = List(
+    def errGen(errStr: String): List[IRInstr] = {
+        List(
             IRAdr(X0, errStr),
             IRBl("_prints"),
             IRMov(W0, -1),
             IRBl("exit")
         )
-        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_errOverflow"), instructions)
+    }
+
+    def errOverflow(): List[IRInstr] = {
+        val errStr = strLabel("errOverflow", 0)
+        val errWord = wordLabel(52, errStr, "fatal error: integer overflow or underflow occurred\\n")
+        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_errOverflow"), errGen(errStr))
+    }
+
+    def errOutOfMemory(): List[IRInstr] = {
+        val errStr = strLabel("errOutOfMemory", 0)
+        val errWord = wordLabel(27, errStr, "fatal error: out of memory\\n")
+        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_errOutOfMemory"), errGen(errStr))
+    }
+
+    def errOutOfBounds(): List[IRInstr] = {
+        val errStr = strLabel("errOutOfBounds", 0)
+        val errWord = wordLabel(42, errStr, "fatal error: array index %d out of bounds\\n")
+        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_errOutOfBounds"), errGen(errStr))
     }
 }
