@@ -45,7 +45,7 @@ trait WACCTestUtils {
     "literals", //(syntax only)
     "if", //
     "IO",  //
-    // "IO/print", //
+    "IO/print", //
     "IO/read", //
     "multiple", // failed for unknown reasons
     "pairs",
@@ -59,7 +59,7 @@ trait WACCTestUtils {
     "scope",
     "sequence", //
     "read", //
-    "variables", 
+    // "variables", 
     "while"  //
     )
 
