@@ -23,7 +23,7 @@ object CodeGen {
   private val activeRegisters = mutable.Set[Register]()  // Set of registers currently in use
   private val registerStack = mutable.Stack[Register]()  // Stack for spilled registers
   private val instrBuffer = mutable.ListBuffer[IRInstr]()
-  private val variableRegisters = mutable.Map[String, Register]()
+  private val variableRegisters = mutable.Map[String, (Register, Type)]()
 
   private def getRegister(): Register = {
     if (availableRegisters.nonEmpty) {
@@ -95,19 +95,25 @@ object CodeGen {
 
 
   def generateMainIR(stmt: Stmt): List[IRInstr] = {
-    val prologue = List(
-      IRCmt("Function prologue"),
-      // allocate registers for variables
+    println(s"Variables: ${symbolTable.getVariableScopes.mkString(", ")}")
+    val allocatedRegs = initialiseVariables(symbolTable) // Get allocated registers
+
+    val prologue = 
+      List(IRCmt("Function prologue")) ++
+      pushRegs(allocatedRegs) ++
+      List(
       pushReg(FP, LR),
       IRMovReg(FP, SP)
     )
 
     val bodyIR = generateStmt(stmt)
 
+    uninitialiseVariables() // Free allocated registers
+
     val epilogue = List(
       IRMov(X0, 0), // Default return code
-      IRCmt("Function epilogue"),
-      // deallocate registers for variables
+      IRCmt("Function epilogue")) ++
+      popRegs(allocatedRegs) ++ List( // Pop all allocated registers
       popReg(FP, LR),
       IRRet()
     )
@@ -120,13 +126,22 @@ object CodeGen {
 
     // Iterate over variables in the current scope and allocate registers for them
     symTab.getVariableScopes.headOption.foreach { currentScope =>
-      currentScope.foreach { case (varName, _) =>
+      currentScope.foreach { case (varName,  VariableEntry(t)) =>
         val reg = getRegister()
-        variableRegisters(varName) = reg  // map variable names to allocated registers
+        variableRegisters(varName) = (reg, t)  // map variable names to allocated registers and type
         allocatedRegs += reg              // track allocated register
       }
     }
+    allocatedRegs.toList
+  }
 
+  def uninitialiseVariables(): List[Register] = {
+    val allocatedRegs = mutable.ListBuffer[Register]()
+    // Iterate over variables in the variableRegisters and free registers for them
+    variableRegisters.foreach { case (varName, (reg, _)) =>
+      freeRegister(reg)
+      allocatedRegs += reg
+      }
     allocatedRegs.toList
   }
 
@@ -151,11 +166,12 @@ object CodeGen {
   def generateStmt(stmt: Stmt): List[IRInstr] = stmt match {
       case SkipStmt => List() 
 
-      case DeclAssignStmt(t, name, value) => List()
-        // val rvalueIR = generateRValue(value)
-        // val destReg = getDestRegister(rvalueIR)
-        // freeRegister(destReg)
-        // rvalueIR :+ IRStore(name, destReg)
+      // All declared variables are initialised at the start from the symbol table
+      case DeclAssignStmt(t, name, value) =>
+        println(s"Variable Registers: ${variableRegisters.mkString(", ")}")
+        val (reg, t) = variableRegisters(name)
+        val (valueIR, _) = generateRValue(value, reg)
+        valueIR
 
       case AssignStmt(lvalue, rvalue) => List()
         // val rvalueIR = generateRValue(rvalue)
@@ -315,9 +331,10 @@ object CodeGen {
       (List(IRAdrp(X0, label), IRAddImm(X0, X0, s":lo12:$label")), BaseType.StrType)
       // val reg = getRegister()
 
-    // incomplete
+    // move the identifier into the destination register
     case Identifier(name) =>
-      (List(), BaseType.IntType) // Assume IntType for simplicity
+      val (reg, t) = variableRegisters(name)
+      (List(IRMovReg(dest, reg)), t)
     
     case PairLiteral =>
       (List(), BaseType.IntType) // Assume IntType for simplicity
@@ -406,8 +423,7 @@ object CodeGen {
           (instrs1 ++ List(IRCmpImm(reg1, 1), IRJumpCond(NE, ".L0")) ++ instrs2 ++ List(IRCmpImm(reg2, 1), 
             IRCset(dest, EQ)), BaseType.BoolType)
 
-      }
-         
+      }         
     
 
       
@@ -434,7 +450,16 @@ object CodeGen {
       //     // indexIRs :+ IRArrayLoad("tmp", name, indexIRs.last.asInstanceOf[IRLoad].dest)
   }
 
-  def generateRValue(rvalue: RValue): List[IRInstr] = List()
+  def generateRValue(rvalue: RValue, reg: Register): (List[IRInstr], Type) = {
+    rvalue match {
+      case RValue.RExpr(expr) => generateExpr(expr, reg)
+      // unimplemented
+      case RValue.RArrayLiter(arrayLiter) => (List(), BaseType.IntType)
+      case RValue.RNewPair(left, right) => (List(), BaseType.IntType)
+      case RValue.RPair(pairElem) => (List(), BaseType.IntType)
+      case RValue.RCall(name, args) => (List(), BaseType.IntType)
+    }
+  }
   // rvalue match {
   //     case RValue.RExpr(expr) => generateExpr(expr)
   //     case RValue.RArrayLiter(arrayLiter) =>

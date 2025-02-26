@@ -109,7 +109,6 @@ object semanticChecker {
     
     // Checks main program
     val stmtErrors = checkStatement(program.stmt).toList
-    symbolTable.exitScope()
     
     val errors = funcDeclarationErrors ++ funcBodyErrors ++ stmtErrors
     if (errors.isEmpty) None else Some(errors.mkString("\n"))
