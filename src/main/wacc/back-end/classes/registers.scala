@@ -2,8 +2,20 @@ package wacc
 
 sealed trait Register {
   override def toString: String = this.getClass.getSimpleName.toLowerCase.stripSuffix("$")
+  def asW: Register = Register.xToWRegister.getOrElse(this, this)
 }
 
+object Register {
+  // Mapping from X-registers to W-registers
+  private val xToWRegister: Map[Register, Register] = Map(
+    X0 -> W0, X1 -> W1, X2 -> W2, X3 -> W3, X4 -> W4, X5 -> W5, X6 -> W6, X7 -> W7,
+    X8 -> W8, X9 -> W9, X10 -> W10, X11 -> W11, X12 -> W12, X13 -> W13, X14 -> W14, X15 -> W15,
+    X16 -> W16, X17 -> W17, X18 -> W18, X19 -> W19, X20 -> W20, X21 -> W21, X22 -> W22,
+    X23 -> W23, X24 -> W24, X25 -> W25, X26 -> W26, X27 -> W27, X28 -> W28, XZR -> WZR
+  )
+}
+
+// 64-bit registers
 // Argument registers
 case object X0 extends Register
 case object X1 extends Register

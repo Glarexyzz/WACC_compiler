@@ -19,7 +19,7 @@ object CodeGen {
 
   // Register allocation
   // We need to account for spill over registers
-  private val availableRegisters = mutable.Stack[Register](W8, W9, W10, W11, W12, W13, W14, W15, W16, W17, W18, W19, W20, W21, W22, W23, W24, W25, W26, W27, W28) // Pool of free registers
+  private val availableRegisters = mutable.Stack[Register](X8, X9, X10, X11, X12, X13, X14, X15, X16, X17, X18, X19, X20, X21, X22, X23, X24, X25, X26, X27, X28) // Pool of free registers
   private val activeRegisters = mutable.Set[Register]()  // Set of registers currently in use
   private val registerStack = mutable.Stack[Register]()  // Stack for spilled registers
   private val instrBuffer = mutable.ListBuffer[IRInstr]()
@@ -95,14 +95,14 @@ object CodeGen {
 
 
   def generateMainIR(stmt: Stmt): List[IRInstr] = {
-    println(s"Variables: ${symbolTable.getVariableScopes.mkString(", ")}")
     val allocatedRegs = initialiseVariables(symbolTable) // Get allocated registers
 
     val prologue = 
-      List(IRCmt("Function prologue")) ++
+      List(
+        IRCmt("Function prologue"),
+        pushReg(FP, LR)) ++
       pushRegs(allocatedRegs) ++
       List(
-      pushReg(FP, LR),
       IRMovReg(FP, SP)
     )
 
@@ -168,9 +168,8 @@ object CodeGen {
 
       // All declared variables are initialised at the start from the symbol table
       case DeclAssignStmt(t, name, value) =>
-        println(s"Variable Registers: ${variableRegisters.mkString(", ")}")
         val (reg, t) = variableRegisters(name)
-        val (valueIR, _) = generateRValue(value, reg)
+        val (valueIR, _) = generateRValue(value, reg.asW)
         valueIR
 
       case AssignStmt(lvalue, rvalue) => List()
@@ -322,14 +321,10 @@ object CodeGen {
     case CharLiteral(value) =>
       (List(IRMov(dest, value.toInt)), BaseType.CharType)
 
-    // not complete
-    // 	adrp x0, .L.str0
-	// add x0, x0, :lo12:.L.str0
     case StrLiteral(value) =>
       val label = nextLabel()
       stringLiterals.getOrElseUpdate(label, value) // Store string in .data
       (List(IRAdrp(X0, label), IRAddImm(X0, X0, s":lo12:$label")), BaseType.StrType)
-      // val reg = getRegister()
 
     // move the identifier into the destination register
     case Identifier(name) =>
@@ -368,8 +363,8 @@ object CodeGen {
     // DO REGISTERS AS PARAMETER  
     
     case BinaryOp(expr1, op, expr2) =>
-      val reg1 = getRegister()
-      val reg2 = getRegister()
+      val reg1 = getRegister().asW
+      val reg2 = getRegister().asW
       val (instrs1, _) = generateExpr(expr1)  // Generate IR for expr1
       val (instrs2, _) = generateExpr(expr2)  // Generate IR for expr2
 

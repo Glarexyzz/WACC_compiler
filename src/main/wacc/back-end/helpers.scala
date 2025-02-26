@@ -13,7 +13,7 @@ object Helpers{
         val totalRegs = registers.length
 
         if (totalRegs == 1) {
-            return List(pushReg(registers.head, WZR))
+            return List(pushReg(registers.head, XZR))
         }
         // Calculate total stack space needed
         val totalStackSpace: Int = ((totalRegs + 1) / 2) * 16
@@ -44,7 +44,7 @@ object Helpers{
         val totalRegs = registers.length
 
         if (totalRegs == 1) {
-            return List(popReg(registers.head, WZR))
+            return List(popReg(registers.head, XZR))
         }
 
         val totalStackSpace = ((totalRegs + 1) / 2) * 16 // total stack space to restore at the end
