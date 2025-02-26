@@ -228,4 +228,17 @@ object Helpers{
         val errWord = wordLabel(42, errStr, "fatal error: array index %d out of bounds\\n")
         errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_errOutOfBounds"), errGen(errStr))
     }
+
+    def errBadChar(): List[IRInstr] = {
+        val errStr = strLabel("errBadChar", 0)
+        val errWord = wordLabel(50, errStr, "fatal error: int %d is not ascii character 0-127 \\n")
+        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_errBadChar"), List(
+            IRAdr(X0, errStr),
+            IRBl("printf"),
+            IRMov(X0, 0),
+            IRBl("fflush"),
+            IRMov(W0, -1),
+            IRBl("exit")
+        ))
+    }
 }
