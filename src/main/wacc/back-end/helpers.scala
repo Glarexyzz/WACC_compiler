@@ -1,10 +1,88 @@
 package wacc
+import scala.collection.mutable
+// import wacc.Constants._
 
 // I really need a better name
 object Helpers{
     // Helpers for setting up
-    def pushReg(reg1: Register, reg2: Register): IRInstr = IRStp(reg1, reg2, 16, true) // negated in toString
+    def pushReg(reg1: Register, reg2: Register): IRInstr = IRStp(reg1, reg2, -16, true) // negated in toString
     def popReg(reg1: Register, reg2: Register): IRInstr = IRLdp(reg1, reg2, 16, true) // also ooh magic numbers
+
+    def pushRegs(registers: List[Register]): List[IRInstr] = {
+        val instrs = mutable.ListBuffer[IRInstr]()
+        val totalRegs = registers.length
+
+        if (totalRegs == 1) {
+            return List(pushReg(registers.head, XZR))
+        }
+        // Calculate total stack space needed
+        val totalStackSpace: Int = ((totalRegs + 1) / 2) * 16
+
+        val pairs = registers.grouped(2).toList
+        var offset = -totalStackSpace
+
+        // Push pairs first
+        pairs.zipWithIndex.foreach {
+            case (List(reg1, reg2), index) =>
+                if (index == 0) {
+                    // First pair moves the stack pointer
+                    instrs += IRStp(reg1, reg2, offset, preDecrement = true)
+                    offset = 16 // Subsequent offsets start at +16 from SP
+                } else {
+                    instrs += IRStp(reg1, reg2, offset, preDecrement = false)
+                    offset += 16
+                }
+            case (List(reg), _) => // Odd register remaining
+                instrs += IRStur(reg, SP, offset)
+            case(_, _) => // No registers remaining
+        }
+        instrs.toList
+    }
+
+    def popRegs(registers: List[Register]): List[IRInstr] = {
+        val instrs = mutable.ListBuffer[IRInstr]()
+        val totalRegs = registers.length
+
+        if (totalRegs == 1) {
+            return List(popReg(registers.head, XZR))
+        }
+
+        val totalStackSpace = ((totalRegs + 1) / 2) * 16 // total stack space to restore at the end
+
+        val pairs = registers.grouped(2).toList
+        var offset = 16
+
+        if (totalRegs % 2 == 1) { 
+            // Handle single register (odd case) first
+            instrs += IRLdur(pairs.last.head, SP, offset)
+            pairs.dropRight(1).reverse.zipWithIndex.foreach {
+            case (List(reg1, reg2), index) =>
+                val isLast = index == pairs.length - 2
+                if (isLast) {
+                    instrs += IRLdp(reg1, reg2, totalStackSpace, postIncrement = true)
+                } else {
+                    instrs += IRLdp(reg1, reg2, offset, postIncrement = false)
+                    offset += 16
+                }
+            case (_, _) => // No registers remaining
+            }
+        } else {
+            // Even number of registers
+            pairs.reverse.zipWithIndex.foreach {
+            case (List(reg1, reg2), index) =>
+                val isLast = index == pairs.length - 1
+                if (isLast) {
+                    instrs += IRLdp(reg1, reg2, totalStackSpace, postIncrement = true)
+                } else {
+                    instrs += IRLdp(reg1, reg2, offset, postIncrement = false)
+                    offset += 16
+                }
+            case (_, _) => // No registers remaining
+            }
+        }
+        instrs.toList
+    }
+
 
     // Helpers for printing
     private def strLabel(label: String, no: Int): String = s".L.${label}_str$no"

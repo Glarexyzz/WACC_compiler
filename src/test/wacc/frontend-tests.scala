@@ -59,7 +59,7 @@ trait WACCTestUtils {
     "scope",
     "sequence", //
     "read", //
-    "variables", //X : scopevar issue
+    "variables", 
     "while"  //
     )
 
