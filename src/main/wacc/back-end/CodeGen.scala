@@ -360,8 +360,8 @@ object CodeGen {
       (List(), BaseType.IntType) // Assume IntType for simplicity
     
     case UnaryOp(op, expr) => 
-      val srcReg = getRegister()
-      val (exprIR, exprType) = generateExpr(expr, srcReg.asW)
+      val srcReg = getRegister().asW
+      val (exprIR, exprType) = generateExpr(expr, srcReg)
       val instrs = exprIR
       op match {
         case UnaryOperator.Negate =>
