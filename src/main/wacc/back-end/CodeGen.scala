@@ -85,7 +85,7 @@ object CodeGen {
   // need to create generateMainIR, generateHeadIR, generateHelperIRs
   def generateIR(prog: Program): List[IRInstr] = {
     // evaluate main and func first
-    val mainIR = List(IRFuncLabel(IRLabel("main"), generateMainIR(prog.stmt))) // Handles main function
+    val mainIR = generateMainIR(prog.stmt) // Handles main function
     val funcIRs = prog.funcs.flatMap(generateFunc) // Handles any wacc functions
     val headIR = generateHeadIR()      // Handles .data and .text sections
     val helperIRs = generateHelperIRs() // Handles any _helper functions
@@ -93,32 +93,46 @@ object CodeGen {
     headIR ++ mainIR ++ funcIRs ++ helperIRs
   }
 
+  // Branches for main function
+  private var nBranch = 0 // Track number of branching sections
+  private val branches = mutable.ListBuffer[IRInstr]() // Store branches as IRFuncLabels
+  private var currentBranch = mutable.ListBuffer[IRInstr]() // The working branch
+  private def currentBranchLabel(): String = if nBranch == 0 then "main" else s".L${nBranch-1}"
+  private def addBranch(): Unit = {
+    branches += IRFuncLabel(IRLabel(currentBranchLabel()), currentBranch.toList)
+    currentBranch = mutable.ListBuffer[IRInstr]() // Reset for next branch
+    nBranch += 1
+  }
 
   def generateMainIR(stmt: Stmt): List[IRInstr] = {
-    val allocatedRegs = initialiseVariables(symbolTable) // Get allocated registers
-
-    val prologue = 
-      List(
-        IRCmt("Function prologue"),
-        pushReg(FP, LR)) ++
-      pushRegs(allocatedRegs) ++
-      List(
+    val allocatedRegs = initialiseVariables(symbolTable)
+    // Generate prologue (Add to first branch)
+    val prologue = List(
+      IRCmt("Function prologue"),
+      pushReg(FP, LR)
+    ) ++ pushRegs(allocatedRegs) ++ List(
       IRMovReg(FP, SP)
     )
 
-    val bodyIR = generateStmt(stmt)
+    currentBranch ++= prologue
 
-    uninitialiseVariables() // Free allocated registers
+    generateStmt(stmt) // Generate IR for main function body
 
+    // Add function epilogue (add to last branch)
     val epilogue = List(
       IRMov(X0, 0), // Default return code
-      IRCmt("Function epilogue")) ++
-      popRegs(allocatedRegs) ++ List( // Pop all allocated registers
+      IRCmt("Function epilogue")
+    ) ++ popRegs(allocatedRegs) ++ List(
       popReg(FP, LR),
       IRRet()
     )
 
-    prologue ++ bodyIR ++ epilogue
+    currentBranch ++= epilogue
+
+    addBranch() // Save last branch
+
+    branches.toList
+    
   }
 
   def initialiseVariables(symTab: SymbolTable): List[Register] = {
