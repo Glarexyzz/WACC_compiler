@@ -67,7 +67,7 @@ object CodeGen {
 
     // AArch64 assembly conversion
     // val assembly = AArch64Gen.generateAssembly(ir, stringLiterals)
-    val assembly = ir.map(_.toString).mkString("\n")
+    val assembly = ir.map(_.toString).mkString("\n") + "\n"
     val asmFileName = new File(filepath).getName.replaceAll("\\.wacc$", ".s")
     val asmFile = new File(asmFileName).getAbsolutePath 
 
@@ -398,10 +398,12 @@ object CodeGen {
           (instrs :+ IRSMull(dest, reg1, reg2) :+ IRCmpExt(dest, reg1) :+ IRJumpCond(NE, "_errOverflow"), BaseType.IntType) // MUL W0, reg1, reg2
 
         case BinaryOperator.Divide => 
+          helpers.getOrElseUpdate(IRLabel("_prints"), prints())
           helpers.getOrElseUpdate(IRLabel("_errDivZero"), errDivZero())
           (instrs :+ IRCmpImm(reg2, 0) :+ IRJumpCond(EQ, "_errDivZero") :+ IRSDiv(dest, reg1, reg2), BaseType.IntType) // SDIV W0, reg1, reg2
 
         case BinaryOperator.Modulus => 
+          helpers.getOrElseUpdate(IRLabel("_prints"), prints())
           helpers.getOrElseUpdate(IRLabel("_errDivZero"), errDivZero())
           (instrs :+ IRCmpImm(reg2, 0) :+ IRJumpCond(EQ, "_errDivZero") :+ IRSDiv(W1, reg1, reg2) :+ IRMSub(dest, W1, reg2, reg1), BaseType.IntType)
 

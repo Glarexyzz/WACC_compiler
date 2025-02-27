@@ -227,7 +227,7 @@ object Helpers{
     }
 
     def errDivZero(): List[IRInstr] = {
-        errGen("errDivZero", "fatal error: division or modulo by zero\\n")
+        errGen("_errDivZero", "fatal error: division or modulo by zero\\n")
     }
 
     // Out of Bounds and Bad Char errors require "_prints" to be defined in CodeGen
