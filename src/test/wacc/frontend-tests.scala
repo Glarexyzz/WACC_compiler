@@ -36,31 +36,31 @@ trait WACCTestUtils {
     "advanced",
     "array",
     "basic", 
-    "basic/exit", "basic/skip", //
-    "exit", //
-    "expressions", //
+    "basic/exit", "basic/skip", 
+    "exit", 
+    // "expressions", 
     "function", 
-    "function/nested_functions", // 
+    "function/nested_functions",  
     "function/simple_functions",
-    "literals", //(syntax only)
-    "if", //
-    "IO",  //
-    "IO/print", //
-    // "IO/read", //
-    "multiple", // failed for unknown reasons
+    "literals", 
+    "if", 
+    "IO",  
+    "IO/print", 
+    "IO/read", 
+    "multiple",
     "pairs",
-    "print", //
-    "runtimeErr", //
-    "runtimeErr/arrayOutOfBounds", //
-    "runtimeErr/badChar", //
-    "runtimeErr/divideByZero", //
-    "runtimeErr/integerOverflow", //
+    "print", 
+    "runtimeErr", 
+    "runtimeErr/arrayOutOfBounds", 
+    "runtimeErr/badChar", 
+    "runtimeErr/divideByZero", 
+    "runtimeErr/integerOverflow", 
     "runtimeErr/nullDereference", 
     "scope",
-    "sequence", //
-    "read", //
+    "sequence", 
+    "read", 
     "variables", 
-    "while"  //
+    "while" 
     )
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {
