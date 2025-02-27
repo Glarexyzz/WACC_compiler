@@ -345,11 +345,11 @@ object CodeGen {
     case BinaryOp(expr1, op, expr2) =>
       val reg1 = getRegister().asW
       val reg2 = getRegister().asW
-      val (instrs1, _) = generateExpr(expr1)  // Generate IR for expr1
-      val (instrs2, _) = generateExpr(expr2)  // Generate IR for expr2
+      val (instrs1, _) = generateExpr(expr1, reg1)  // Generate IR for expr1
+      val (instrs2, _) = generateExpr(expr2, reg2)  // Generate IR for expr2
 
       val instrs = instrs1 ++ instrs2  // Combine IR instructions for both expressions
-      op match {
+      val binaryInstrs = op match {
         case BinaryOperator.Add =>
           // for numbers greater than 65537 movk is used to store value in reg
           helpers.getOrElseUpdate(IRLabel("_prints"), prints())
@@ -406,7 +406,10 @@ object CodeGen {
           (instrs1 ++ List(IRCmpImm(reg1, 1), IRJumpCond(NE, ".L0")) ++ instrs2 ++ List(IRCmpImm(reg2, 1), 
             IRCset(dest, EQ)), BaseType.BoolType)
 
-      }         
+      }
+      freeRegister(reg1)
+      freeRegister(reg2)
+      binaryInstrs  
     
 
       
