@@ -397,14 +397,17 @@ object CodeGen {
       op match {
         case BinaryOperator.Add =>
           // for numbers greater than 65537 movk is used to store value in reg
+          helpers.getOrElseUpdate(IRLabel("_prints"), prints())
           helpers.getOrElseUpdate(IRLabel("_errOverflow"), errOverflow())
           (instrs :+ IRAdd(dest, reg1, reg2) :+ IRJumpCond(VS, "_errOverflow"), BaseType.IntType) // ADD W0, reg1, reg2
         
         case BinaryOperator.Subtract =>
+          helpers.getOrElseUpdate(IRLabel("_prints"), prints())
           helpers.getOrElseUpdate(IRLabel("_errOverflow"), errOverflow())
           (instrs :+ IRSub(dest, reg1, reg2) :+ IRJumpCond(VS, "_errOverflow"), BaseType.IntType) // SUB W0, reg1, reg2
 
         case BinaryOperator.Multiply =>
+          helpers.getOrElseUpdate(IRLabel("_prints"), prints())
           helpers.getOrElseUpdate(IRLabel("_errOverflow"), errOverflow())
           (instrs :+ IRSMull(dest, reg1, reg2) :+ IRCmpExt(dest, reg1) :+ IRJumpCond(NE, "_errOverflow"), BaseType.IntType) // MUL W0, reg1, reg2
 
