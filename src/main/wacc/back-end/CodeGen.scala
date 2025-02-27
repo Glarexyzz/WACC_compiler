@@ -366,7 +366,9 @@ object CodeGen {
           case BinaryOperator.Multiply =>
             helpers.getOrElseUpdate(IRLabel("_prints"), prints())
             helpers.getOrElseUpdate(IRLabel("_errOverflow"), errOverflow())
-            (instrs :+ IRSMull(destX, reg1, reg2) :+ IRCmpExt(destW, reg1) :+ IRJumpCond(NE, "_errOverflow"), BaseType.IntType) // MUL W0, reg1, reg2
+            val xreg = getRegister()
+            freeRegister(xreg)
+            (instrs :+ IRSMull(xreg, reg1, reg2) :+ IRCmpExt(xreg, xreg.asW) :+ IRJumpCond(NE, "_errOverflow") :+ IRMovReg(destW, xreg.asW), BaseType.IntType) // MUL W0, reg1, reg2
 
           case BinaryOperator.Divide => 
             helpers.getOrElseUpdate(IRLabel("_prints"), prints())
