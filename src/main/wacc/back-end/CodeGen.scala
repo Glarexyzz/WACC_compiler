@@ -19,7 +19,7 @@ object CodeGen {
 
   // Register allocation
   // We need to account for spill over registers
-  private val availableRegisters = mutable.Stack[Register](X8, X9, X10, X11, X12, X13, X14, X15, X16, X17, X18, X19, X20, X21, X22, X23, X24, X25, X26, X27, X28) // Pool of free registers
+  private val availableRegisters = mutable.Stack[Register](X18, X19, X20, X21, X22, X23, X24, X25, X26, X27, X28) // Pool of free registers
   private val activeRegisters = mutable.Set[Register]()  // Set of registers currently in use
   private val registerStack = mutable.Stack[Register]()  // Stack for spilled registers
   private val instrBuffer = mutable.ListBuffer[IRInstr]()
