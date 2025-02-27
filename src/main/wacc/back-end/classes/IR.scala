@@ -61,6 +61,9 @@ case class IRLdp(reg1: Register, reg2: Register, offset: Int, postIncrement: Boo
 case class IRAdd(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"add $dest, $left, $right"
 }
+case class IRAdds(dest: Register, left: Register, right: Register) extends IRInstr {
+    override def toString: String = s"adds $dest, $left, $right"
+}
 // to handle immediate values derived from labels
 case class IRAddImm(dest: Register, left: Register, imm: String) extends IRInstr {
     override def toString: String = s"add $dest, $left, $imm"

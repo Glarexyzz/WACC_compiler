@@ -242,6 +242,10 @@ object Helpers{
         errGen("_errDivZero", "fatal error: division or modulo by zero\\n")
     }
 
+    def errNull(): List[IRInstr] = {
+        errGen("_errNull", "fatal error: null pair dereferenced or freed\\n")
+    }
+
     // Out of Bounds and Bad Char errors require "_prints" to be defined in CodeGen
     def errOutOfBounds(): List[IRInstr] = {
         errGen("_errOutOfBounds", "fatal error: array index %d out of bounds\\n", true)
