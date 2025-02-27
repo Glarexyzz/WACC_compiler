@@ -372,21 +372,24 @@ object CodeGen {
       op match {
         case BinaryOperator.Add =>
           // for numbers greater than 65537 movk is used to store value in reg
+          helpers.getOrElseUpdate(IRLabel("_errOverflow"), errOverflow())
           (instrs :+ IRAdd(dest, reg1, reg2) :+ IRJumpCond(VS, "_errOverflow"), BaseType.IntType) // ADD W0, reg1, reg2
         
         case BinaryOperator.Subtract =>
-          (instrs :+ IRSub(dest, reg1, reg2), BaseType.IntType) // SUB W0, reg1, reg2
+          helpers.getOrElseUpdate(IRLabel("_errOverflow"), errOverflow())
+          (instrs :+ IRSub(dest, reg1, reg2) :+ IRJumpCond(VS, "_errOverflow"), BaseType.IntType) // SUB W0, reg1, reg2
 
         case BinaryOperator.Multiply =>
-          (instrs :+ IRMul(dest, reg1, reg2), BaseType.IntType) // MUL W0, reg1, reg2
+          helpers.getOrElseUpdate(IRLabel("_errOverflow"), errOverflow())
+          (instrs :+ IRSMull(dest, reg1, reg2) :+ IRCmpExt(dest, reg1) :+ IRJumpCond(NE, "_errOverflow"), BaseType.IntType) // MUL W0, reg1, reg2
 
-        case BinaryOperator.Divide => (List(), BaseType.IntType)
-          // (instrs :+ IRSDiv(W0, reg1, reg2), BaseType.IntType) // SDIV W0, reg1, reg2
+        case BinaryOperator.Divide => 
+          helpers.getOrElseUpdate(IRLabel("_errDivZero"), errDivZero())
+          (instrs :+ IRCmpImm(reg2, 0) :+ IRJumpCond(EQ, "_errDivZero") :+ IRSDiv(dest, reg1, reg2), BaseType.IntType) // SDIV W0, reg1, reg2
 
-        case BinaryOperator.Modulus => (List(), BaseType.IntType)
-          //(instrs :+ IRSDiv(W1, reg1, reg2) :+ IRMSub(W0, W1, reg2, reg1), BaseType.IntType)
-          // SDIV W1, reg1, reg2 (W1 = reg1 / reg2)
-          // MSUB W0, W1, reg2, reg1 (W0 = reg1 - W1 * reg2) → remainder
+        case BinaryOperator.Modulus => 
+          helpers.getOrElseUpdate(IRLabel("_errDivZero"), errDivZero())
+          (instrs :+ IRCmpImm(reg2, 0) :+ IRJumpCond(EQ, "_errDivZero") :+ IRSDiv(W1, reg1, reg2) :+ IRMSub(dest, W1, reg2, reg1), BaseType.IntType)
 
         case BinaryOperator.Greater =>
           (instrs :+ IRCmp(reg1, reg2) :+ IRCset(dest, GT), BaseType.BoolType)
