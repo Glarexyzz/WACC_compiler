@@ -352,10 +352,14 @@ object CodeGen {
         val wreg1 = xreg1.asW
         val xreg2 = getRegister()
         val wreg2 = xreg2.asW
-        val (instrs1, _) = generateExpr(expr1, xreg1)  // Generate IR for expr1
+        val csetRegW = getRegister().asW
+        val (instrs1, t1) = generateExpr(expr1, xreg1)  // Generate IR for expr1
         val (instrs2, _) = generateExpr(expr2, xreg2)  // Generate IR for expr2
-
         val instrs = instrs1 ++ instrs2  // Combine IR instructions for both expressions
+        // 📌 Helpers for comparisons:
+        def compareFunc(cond:Condition): (List[IRInstr], Type) = {
+          (instrs :+ IRCmp(wreg1, wreg2) :+ IRCset(csetRegW, cond) :+ IRMovReg(destW, csetRegW), t1)
+        }
         val binaryInstrs = op match {
           case BinaryOperator.Add =>
             // for numbers greater than 65537 movk is used to store value in reg
@@ -389,25 +393,17 @@ object CodeGen {
             (instrs :+ IRCmpImm(wreg2, 0) :+ IRJumpCond(EQ, "_errDivZero") :+ IRSDiv(W1, wreg1, wreg2) :+ IRMSub(destW, W1, wreg2, wreg1), BaseType.IntType)
 
           case BinaryOperator.Greater =>
-            (instrs :+ IRCmp(wreg1, wreg2) :+ IRCset(destW, GT), BaseType.BoolType)
-            // CMP reg1, reg2
-            // CSEL W0, 1, 0, GT (if reg1 > reg2, W0 = 1 else W0 = 0)
-          
+            compareFunc(GT)
           case BinaryOperator.GreaterEqual =>
-            (instrs :+ IRCmp(wreg1, wreg2) :+ IRCset(destW, GE), BaseType.BoolType)
+            compareFunc(GE)
           case BinaryOperator.Less =>
-            (instrs :+ IRCmp(wreg1, wreg2) :+ IRCset(destW, LT), BaseType.BoolType)
-
+            compareFunc(LT)
           case BinaryOperator.LessEqual =>
-            (instrs :+ IRCmp(wreg1, wreg2) :+ IRCset(destW, LE), BaseType.BoolType)
-            
-
+            compareFunc(LE)
           case BinaryOperator.Equal =>
-            (instrs :+ IRCmp(wreg1, wreg2) :+ IRCset(destW, EQ), BaseType.BoolType)
-            
-
+            compareFunc(EQ)
           case BinaryOperator.NotEqual =>
-            (instrs :+ IRCmp(wreg1, wreg2) :+ IRCset(destW, NE), BaseType.BoolType)
+            compareFunc(NE)
             
 
           case BinaryOperator.Or =>
@@ -420,6 +416,7 @@ object CodeGen {
         }
         freeRegister(xreg1)
         freeRegister(xreg2)
+        freeRegister(csetRegW)
         binaryInstrs  
       
 

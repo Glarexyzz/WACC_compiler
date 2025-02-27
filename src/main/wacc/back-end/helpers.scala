@@ -2,9 +2,8 @@ package wacc
 import scala.collection.mutable
 // import wacc.Constants._
 
-// I really need a better name
 object Helpers{
-    // Helpers for setting up
+    // 📌 Helpers for Pushing and Popping
     def pushReg(reg1: Register, reg2: Register): IRInstr = IRStp(reg1, reg2, -16, true) // negated in toString
     def popReg(reg1: Register, reg2: Register): IRInstr = IRLdp(reg1, reg2, 16, true) // also ooh magic numbers
 
@@ -84,7 +83,7 @@ object Helpers{
     }
 
 
-    // General Helpers
+    // 📌 Helpers for Labels
     private def strLabel(label: String, no: Int): String = s".L.${label}_str$no"
     def wordLabel(length: Int, label: String, asciz: String): List[IRInstr] = {
         List(
@@ -228,7 +227,7 @@ object Helpers{
     }
 
 
-
+    // 📌 Error Handling
     // Overflow, Out of Memory and Division by Zero errors do not require any additional helpers
     def errOverflow(): List[IRInstr] = {
         errGen("_errOverflow", "fatal error: integer overflow or underflow occurred\\n")
