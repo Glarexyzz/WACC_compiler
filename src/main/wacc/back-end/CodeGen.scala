@@ -357,9 +357,10 @@ object CodeGen {
         val instrs = instrs1 ++ instrs2  // Combine IR instructions for both expressions
         // 📌 Helpers for comparisons:
         def compareFunc(cond:Condition): (List[IRInstr], Type) = {
-          val csetRegW = getRegister().asW
-          val compInstrs = (instrs :+ IRCmp(wreg1, wreg2) :+ IRCset(csetRegW, cond) :+ IRMovReg(destW, csetRegW), t1)
-          freeRegister(csetRegW)
+          val csetRegX = getRegister()
+          val csetRegW = csetRegX.asW
+          val compInstrs = (instrs :+ IRCmp(wreg1, wreg2) :+ IRCset(csetRegW, cond) :+ IRMovReg(destW, csetRegW), BaseType.BoolType)
+          freeRegister(csetRegX)
           compInstrs
         }
         val binaryInstrs = op match {
