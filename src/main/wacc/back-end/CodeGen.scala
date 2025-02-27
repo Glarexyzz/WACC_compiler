@@ -186,12 +186,23 @@ object CodeGen {
         // }
         // freeRegister(destReg)
         // rvalueIR ++ storeIR
-
-      // 	// load the current value in the destination of the read so it supports defaults
-	// mov w0, w19
-	// bl _readi
-	// mov w19, w0
-      case ReadStmt(lvalue) => List()
+//// load the current value in the destination of the read so it supports defaults
+      case ReadStmt(lvalue) => 
+        lvalue match {
+          case LValue.LName(name) => 
+            val (regX, t) = variableRegisters(name)
+            val reg = regX.asW
+            t match {
+              case BaseType.IntType => 
+                helpers.getOrElseUpdate(IRLabel("_readi"), readi())
+                List(IRMovReg(W0, reg), IRBl("_readi"), IRMovReg(reg, W0))
+              case BaseType.CharType => 
+                helpers.getOrElseUpdate(IRLabel("_readc"), readc())
+                List(IRMovReg(W0, reg), IRBl("_readc"), IRMovReg(reg, W0))
+              case _ => List()
+            }
+          case _ => List()
+        }
         // val reg = getRegister()
         // val readIR = lvalue match {
         //   case LValue.LName(name) => List(IRRead(name))
