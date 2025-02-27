@@ -178,29 +178,14 @@ object CodeGen {
             val (valueIR, _) = generateRValue(rvalue, reg.asW)
             valueIR
           case None =>
+            // should never reach here
             throw new Exception(s"Variable $name used before declaration")
         }
-        val (reg, _) = variableRegisters(name)
-        val (valueIR, _) = generateRValue(rvalue, reg.asW)
-        valueIR
       
       
 
       case AssignStmt(lvalue, rvalue) => List()
-        // val rvalueIR = generateRValue(rvalue)
-        // val destReg = getDestRegister(rvalueIR)
-        // val storeIR = lvalue match {
-        //   case LValue.LName(name) => List(IRStore(name, destReg))
-        //   case LValue.LArray(arrayElem) =>
-        //     val arrayIR = generateArrayElem(arrayElem)
-        //     arrayIR ++ List(IRArrayStore(arrayElem.name, getDestRegister(arrayIR), destReg))
-        //   case LValue.LPair(pairElem) =>
-        //     val pairIR = generatePairElem(pairElem)
-        //     pairIR ++ List(IRStore(getDestRegister(pairIR), destReg))
-        // }
-        // freeRegister(destReg)
-        // rvalueIR ++ storeIR
-//// load the current value in the destination of the read so it supports defaults
+
       case ReadStmt(lvalue) => 
         lvalue match {
           case LValue.LName(name) => 
@@ -217,24 +202,8 @@ object CodeGen {
             }
           case _ => List()
         }
-        // val reg = getRegister()
-        // val readIR = lvalue match {
-        //   case LValue.LName(name) => List(IRRead(name))
-        //   case LValue.LArray(arrayElem) =>
-        //     val arrayIR = generateArrayElem(arrayElem)
-        //     arrayIR :+ IRRead(getDestRegister(arrayIR))
-        //   case LValue.LPair(pairElem) =>
-        //     val pairIR = generatePairElem(pairElem)
-        //     pairIR :+ IRRead(getDestRegister(pairIR))
-        // }
-        // freeRegister(reg)
-        // readIR
 
       case FreeStmt(expr) => List()
-        // val exprIR = generateExpr(expr)
-        // val reg = getDestRegister(exprIR)
-        // freeRegister(reg)
-        // exprIR :+ IRFree(reg)
 
       case PrintStmt(expr) =>
         val (exprIR, exprType) = generateExpr(expr)
@@ -262,26 +231,11 @@ object CodeGen {
 
 
       case ReturnStmt(expr) => List()
-        // val exprIR = generateExpr(expr)
-        // val reg = getDestRegister(exprIR)
-        // freeRegister(reg)
-        // exprIR :+ IRReturn(Some(reg))
 
-      // Focus on Exit Stmt first
-      // Adds the following lines:
-      /*
-      	mov w0, #-1
-	      // statement primitives do not return results (but will clobber r0/rax)
-	      bl exit
-    */
       case ExitStmt(expr) =>
         val (exprIR, exprType) = generateExpr(expr)
         exprIR :+ IRBl("exit")
 
-        // val exprIR = generateExpr(expr)
-        // val reg = getDestRegister(exprIR)
-        // freeRegister(reg)
-        // exprIR :+ IRReturn(Some(reg))
 
       case IfStmt(cond, thenStmt, elseStmt) => List()
           // val condIR = generateExpr(cond)  // Generate IR for condition evaluation
@@ -376,6 +330,7 @@ object CodeGen {
           (instrs, BaseType.IntType) // Char to Int (no instruction needed)
 
         case UnaryOperator.Chr =>
+          helpers.getOrElseUpdate(IRLabel("_errBadChar"), errBadChar())
           (instrs :+ IRTst(srcReg, 0xffffff80)     // Test if value is within ASCII range (0-127)
                   :+ IRCsel(X1, X0, X1, NE) // Conditional move if out of range
                   :+ IRJumpCond(NE , "_errBadChar") // Branch if invalid
