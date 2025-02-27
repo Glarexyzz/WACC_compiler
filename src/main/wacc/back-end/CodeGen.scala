@@ -329,14 +329,14 @@ object CodeGen {
     // move the identifier into the destination register
     case Identifier(name) =>
       val (reg, t) = variableRegisters(name)
-      (List(IRMovReg(dest, reg)), t)
+      (List(IRMovReg(dest, reg.asW)), t)
     
     case PairLiteral =>
       (List(), BaseType.IntType) // Assume IntType for simplicity
     
     case UnaryOp(op, expr) => 
       val srcReg = getRegister()
-      val (exprIR, exprType) = generateExpr(expr, srcReg)
+      val (exprIR, exprType) = generateExpr(expr, srcReg.asW)
       val instrs = exprIR
       op match {
         case UnaryOperator.Negate =>
