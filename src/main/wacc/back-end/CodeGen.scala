@@ -352,13 +352,15 @@ object CodeGen {
         val wreg1 = xreg1.asW
         val xreg2 = getRegister()
         val wreg2 = xreg2.asW
-        val csetRegW = getRegister().asW
         val (instrs1, t1) = generateExpr(expr1, xreg1)  // Generate IR for expr1
         val (instrs2, _) = generateExpr(expr2, xreg2)  // Generate IR for expr2
         val instrs = instrs1 ++ instrs2  // Combine IR instructions for both expressions
         // 📌 Helpers for comparisons:
         def compareFunc(cond:Condition): (List[IRInstr], Type) = {
-          (instrs :+ IRCmp(wreg1, wreg2) :+ IRCset(csetRegW, cond) :+ IRMovReg(destW, csetRegW), t1)
+          val csetRegW = getRegister().asW
+          val compInstrs = (instrs :+ IRCmp(wreg1, wreg2) :+ IRCset(csetRegW, cond) :+ IRMovReg(destW, csetRegW), t1)
+          freeRegister(csetRegW)
+          compInstrs
         }
         val binaryInstrs = op match {
           case BinaryOperator.Add =>
@@ -416,7 +418,6 @@ object CodeGen {
         }
         freeRegister(xreg1)
         freeRegister(xreg2)
-        freeRegister(csetRegW)
         binaryInstrs  
       
 
