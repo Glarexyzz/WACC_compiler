@@ -84,7 +84,7 @@ object Helpers{
     }
 
 
-    // Helpers for printing
+    // General Helpers
     private def strLabel(label: String, no: Int): String = s".L.${label}_str$no"
     def wordLabel(length: Int, label: String, asciz: String): List[IRInstr] = {
         List(
@@ -94,6 +94,7 @@ object Helpers{
         )
     }
 
+    // 📌 Helpers for Printing
     private def printFunc(label: String): IRFuncLabel = {
         val str0label = strLabel(label, 0)
         val instructions: List[IRInstr] = List(
@@ -173,21 +174,7 @@ object Helpers{
             ))
         )
     }
-// length of .L._println_str0
-// 	.word 0
-// .L._println_str0:
-// 	.asciz ""
-// .align 4
-// _println:
-// 	// push {lr}
-// 	stp lr, xzr, [sp, #-16]!
-// 	adr x0, .L._println_str0
-// 	bl puts
-// 	mov x0, #0
-// 	bl fflush
-// 	// pop {lr}
-// 	ldp lr, xzr, [sp], #16
-// 	ret
+
     def printlnFunc(): List[IRInstr] = {
         val str0label = strLabel("_println", 0)
         val instructions: List[IRInstr] = List(
@@ -202,7 +189,30 @@ object Helpers{
         wordLabel(0, str0label, "") :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_println"), instructions)
     }
 
-    // Functions to generate helpers
+    // 📌 Helpers for Reading
+
+    def readFunc(label: String, asciz: String): List[IRInstr]= {
+        val str0label = strLabel(label, 0)
+        val instructions: List[IRInstr] = 
+            pushRegs(List(X0, LR)) ++ List(
+            IRMovReg(X1, SP),
+            IRAdr(X0, str0label),
+            IRBl("scanf"),
+        ) ++ popRegs(List(X0, LR)) ++ List(
+            IRRet()
+        )
+        wordLabel(asciz.length, str0label, asciz) :+ IRAlign(4) :+ IRFuncLabel(IRLabel(label), instructions)
+    }
+
+    def readi(): List[IRInstr] = {
+        readFunc("_readi", "%d")
+    }
+
+    def readc(): List[IRInstr] = {
+        readFunc("_readc", " %c")
+    }
+
+    // 📌 Helpers for Error Handling
     def errGen(name: String, errMsg: String, hasFormatting: Boolean = false): List[IRInstr] = {
         val errStr = strLabel(name, 0)
         val errWord = wordLabel(errMsg.length - 1, errStr, errMsg)
@@ -216,6 +226,8 @@ object Helpers{
         )
         errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel(name), base ++ midsection ++ List(IRMov(W0, -1), IRBl("exit")))
     }
+
+
 
     // Overflow, Out of Memory and Division by Zero errors do not require any additional helpers
     def errOverflow(): List[IRInstr] = {
