@@ -149,16 +149,6 @@ object CodeGen {
     allocatedRegs.toList
   }
 
-  def uninitialiseVariables(): List[Register] = {
-    val allocatedRegs = mutable.ListBuffer[Register]()
-    // Iterate over variables in the variableRegisters and free registers for them
-    variableRegisters.foreach { case (varName, (reg, _)) =>
-      freeRegister(reg)
-      allocatedRegs += reg
-      }
-    allocatedRegs.toList
-  }
-
   def generateFunc(func: Func): List[IRInstr] = {
     List()
     // left blank for now, initialise later - because this looks really tricky....
@@ -177,20 +167,18 @@ object CodeGen {
     helpers.values.toList.flatten
   }
 
-  def generateStmt(stmt: Stmt): List[IRInstr] = stmt match {
-      case SkipStmt => List() 
+  def generateStmt(stmt: Stmt): Unit = stmt match {
+      case SkipStmt =>
 
       // All declared variables are initialised at the start from the symbol table
       case DeclAssignStmt(t, name, value) =>
         val (reg, t) = variableRegisters(name)
         val (valueIR, _) = generateRValue(value, reg)
-        valueIR
       
       case AssignStmt(LValue.LName(name), rvalue) => 
         variableRegisters.get(name) match {
           case Some((reg, _)) =>
             val (valueIR, _) = generateRValue(rvalue, reg)
-            valueIR
           case None =>
             // should never reach here
             throw new Exception(s"Variable $name used before declaration")
@@ -198,7 +186,7 @@ object CodeGen {
       
       
 
-      case AssignStmt(lvalue, rvalue) => List()
+      case AssignStmt(lvalue, rvalue) => 
 
       case ReadStmt(lvalue) => 
         lvalue match {
@@ -208,10 +196,10 @@ object CodeGen {
             t match {
               case BaseType.IntType => 
                 helpers.getOrElseUpdate(IRLabel("_readi"), readi())
-                List(IRMovReg(W0, reg), IRBl("_readi"), IRMovReg(reg, W0))
+                currentBranch ++= List(IRMovReg(W0, reg), IRBl("_readi"), IRMovReg(reg, W0))
               case BaseType.CharType => 
                 helpers.getOrElseUpdate(IRLabel("_readc"), readc())
-                List(IRMovReg(W0, reg), IRBl("_readc"), IRMovReg(reg, W0))
+                currentBranch ++= List(IRMovReg(W0, reg), IRBl("_readc"), IRMovReg(reg, W0))
               case _ => List()
             }
           case _ => List()
@@ -223,32 +211,29 @@ object CodeGen {
         val (exprIR, exprType) = generateExpr(expr)
         if (exprType == BaseType.IntType) {
           helpers.getOrElseUpdate(IRLabel("_printi"), printi())
-          exprIR :+ IRBl("_printi")
+          currentBranch :+  IRBl("_printi")
         } else if (exprType == BaseType.CharType) {
           helpers.getOrElseUpdate(IRLabel("_printc"), printc())
-          exprIR :+ IRBl("_printc")
+          currentBranch :+  IRBl("_printc")
         } else if (exprType == BaseType.StrType) {
           helpers.getOrElseUpdate(IRLabel("_prints"), prints())
-          exprIR :+ IRBl("_prints")
+          currentBranch :+  IRBl("_prints")
         } else if (exprType == BaseType.BoolType) {
           helpers.getOrElseUpdate(IRLabel("_printb"), printb())
-          exprIR :+ IRBl("_printb")
-        } else {
-          // we have not handled arrays and pairs yet
-          exprIR
-        }
-
+          currentBranch :+  IRBl("_printb")
+        } 
 
       case PrintlnStmt(expr) => 
         helpers.getOrElseUpdate(IRLabel("_println"), printlnFunc())
-        generateStmt(PrintStmt(expr)) :+ IRBl("_println")
+        generateStmt(PrintStmt(expr))
+        currentBranch :+ IRBl("_println")
 
 
       case ReturnStmt(expr) => List()
 
       case ExitStmt(expr) =>
         val (exprIR, exprType) = generateExpr(expr)
-        exprIR :+ IRBl("exit")
+        currentBranch :+ IRBl("exit")
 
 
       case IfStmt(cond, thenStmt, elseStmt) => List()
@@ -290,7 +275,8 @@ object CodeGen {
 
       case BodyStmt(body) => generateStmt(body)
 
-      case SeqStmt(left, right) => generateStmt(left) ++ generateStmt(right)
+      case SeqStmt(left, right) => generateStmt(left)
+                                   generateStmt(right)
   }
 
   def generateExpr(expr: Expr, destX: Register = X0): (List[IRInstr], Type) = 
