@@ -68,10 +68,19 @@ case class IRAddImm(dest: Register, left: Register, imm: String) extends IRInstr
 case class IRSub(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"sub $dest, $left, $right"
 }
+case class IRMSub(dest: Register, q1: Register, q2: Register, s: Register) extends IRInstr {
+    override def toString: String = s"msub $dest, $q1, $q2, $s"
+}
 case class IRMul(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"mul $dest, $left, $right"
 }
-case class IRDiv(dest: Register, left: Register, right: Register) extends IRInstr {
+case class IRSMull(dest: Register, left: Register, right: Register) extends IRInstr {
+    override def toString: String = s"smull $dest, $left, $right"
+}
+case class IRUDiv(dest: Register, left: Register, right: Register) extends IRInstr {
+    override def toString: String = s"udiv $dest, $left, $right"
+}
+case class IRSDiv(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"sdiv $dest, $left, $right"
 }
 case class IRAnd(dest: Register, left: Register, right: Register) extends IRInstr {
@@ -99,6 +108,11 @@ case class IRCmp(left: Register, right: Register) extends IRInstr {
 case class IRCmpImm(left: Register, imm: Int) extends IRInstr {
     override def toString: String = s"cmp $left, #$imm"
 }
+
+case class IRCmpExt(left: Register, right: Register) extends IRInstr {
+    override def toString: String = s"cmp $left, $right, sxtw"
+}
+
 // Set a register based on a condition flag
 case class IRCset(reg: Register, condition: Condition) extends IRInstr {
     override def toString: String = s"cset $reg, $condition"

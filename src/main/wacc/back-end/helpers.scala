@@ -189,7 +189,6 @@ object Helpers{
         wordLabel(0, str0label, "") :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_println"), instructions)
     }
 
-
     // 📌 Helpers for Reading
 
     def readFunc(label: String, asciz: String): List[IRInstr]= {
@@ -214,46 +213,41 @@ object Helpers{
     }
 
     // 📌 Helpers for Error Handling
-
-    def errGen(errStr: String): List[IRInstr] = {
-        List(
-            IRAdr(X0, errStr),
-            IRBl("_prints"),
-            IRMov(W0, -1),
-            IRBl("exit")
+    def errGen(name: String, errMsg: String, hasFormatting: Boolean = false): List[IRInstr] = {
+        val errStr = strLabel(name, 0)
+        val errWord = wordLabel(errMsg.length - 1, errStr, errMsg)
+        val base = List(IRAdr(X0, errStr))
+        val midsection = if (hasFormatting) List(
+            IRBl("printf"),
+            IRMov(X0, 0),
+            IRBl("fflush")
+        ) else List(
+            IRBl("_prints")
         )
+        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel(name), base ++ midsection ++ List(IRMov(W0, -1), IRBl("exit")))
     }
 
 
 
+    // Overflow, Out of Memory and Division by Zero errors do not require any additional helpers
     def errOverflow(): List[IRInstr] = {
-        val errStr = strLabel("errOverflow", 0)
-        val errWord = wordLabel(52, errStr, "fatal error: integer overflow or underflow occurred\\n")
-        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_errOverflow"), errGen(errStr))
+        errGen("_errOverflow", "fatal error: integer overflow or underflow occurred\\n")
     }
 
     def errOutOfMemory(): List[IRInstr] = {
-        val errStr = strLabel("errOutOfMemory", 0)
-        val errWord = wordLabel(27, errStr, "fatal error: out of memory\\n")
-        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_errOutOfMemory"), errGen(errStr))
+        errGen("_errOutOfMemory", "fatal error: out of memory\\n")
     }
 
+    def errDivZero(): List[IRInstr] = {
+        errGen("errDivZero", "fatal error: division or modulo by zero\\n")
+    }
+
+    // Out of Bounds and Bad Char errors require "_prints" to be defined in CodeGen
     def errOutOfBounds(): List[IRInstr] = {
-        val errStr = strLabel("errOutOfBounds", 0)
-        val errWord = wordLabel(42, errStr, "fatal error: array index %d out of bounds\\n")
-        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_errOutOfBounds"), errGen(errStr))
+        errGen("_errOutOfBounds", "fatal error: array index %d out of bounds\\n", true)
     }
 
     def errBadChar(): List[IRInstr] = {
-        val errStr = strLabel("errBadChar", 0)
-        val errWord = wordLabel(50, errStr, "fatal error: int %d is not ascii character 0-127 \\n")
-        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_errBadChar"), List(
-            IRAdr(X0, errStr),
-            IRBl("printf"),
-            IRMov(X0, 0),
-            IRBl("fflush"),
-            IRMov(W0, -1),
-            IRBl("exit")
-        ))
+        errGen("_errBadChar", "fatal error: int %d is not ascii character 0-127\\n", true)
     }
 }
