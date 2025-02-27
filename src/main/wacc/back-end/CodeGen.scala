@@ -171,6 +171,20 @@ object CodeGen {
         val (reg, t) = variableRegisters(name)
         val (valueIR, _) = generateRValue(value, reg.asW)
         valueIR
+      
+      case AssignStmt(LValue.LName(name), rvalue) => 
+        variableRegisters.get(name) match {
+          case Some((reg, _)) =>
+            val (valueIR, _) = generateRValue(rvalue, reg.asW)
+            valueIR
+          case None =>
+            throw new Exception(s"Variable $name used before declaration")
+        }
+        val (reg, _) = variableRegisters(name)
+        val (valueIR, _) = generateRValue(rvalue, reg.asW)
+        valueIR
+      
+      
 
       case AssignStmt(lvalue, rvalue) => List()
         // val rvalueIR = generateRValue(rvalue)
