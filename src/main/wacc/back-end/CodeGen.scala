@@ -286,16 +286,18 @@ object CodeGen {
     helpers.getOrElseUpdate(IRLabel("_prints"), prints())
     helpers.getOrElseUpdate(IRLabel("_errDivZero"), errDivZero())
 
-  def extractInt(expr1: Expr, expr2: Expr): Option[(Expr, Int)] = 
+  def extractInt(expr1: Expr, expr2: Expr, isAdd: Boolean): Option[(Expr, Int)] = 
+    def valid(value: Int): Boolean = (value >= -4096 && value <= 4095 && isAdd) || (value >= 1 && value <= 4095 && !isAdd)
+
     (expr1, expr2) match {
-      case (_, IntLiteral(value)) => Some((expr1, value.toInt))
-      case (IntLiteral(value), _) => Some((expr2, value.toInt))
+      case (_, IntLiteral(value)) if valid(value.toInt) => Some((expr1, value.toInt))
+      case (IntLiteral(value), _) if valid(value.toInt) => Some((expr2, value.toInt))
       case _ => None
     }
 
   def genAdd(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
     genOverflow()
-    extractInt(expr1, expr2) match {
+    extractInt(expr1, expr2, true) match {
       case Some((expr, value)) => 
         generateExpr(expr, dest)
         currentBranch += IRAddsImm(dest, dest, value) += IRJumpCond(VS, "_errOverflow")
@@ -307,7 +309,7 @@ object CodeGen {
 
   def genSub(expr1: Expr, expr2: Expr, dest: Register, temp: Register) = 
     genOverflow()
-    extractInt(expr1, expr2) match {
+    extractInt(expr1, expr2, false) match {
       case Some((expr, value)) => 
         generateExpr(expr, dest)
         currentBranch += IRSubImm(dest, dest, value) += IRJumpCond(VS, "_errOverflow")
