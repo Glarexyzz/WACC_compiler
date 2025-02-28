@@ -194,3 +194,8 @@ case class IRAlign(value: Int) extends IRInstr {
 case class IRGlobal(name: String) extends IRInstr {
   override def toString: String = s".global $name"
 }
+
+// 📌 Conditional Branch if Zero
+case class IRCbz(reg: Register, label: String) extends IRInstr {
+    override def toString: String = s"cbz $reg, $label"
+}

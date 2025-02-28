@@ -437,15 +437,8 @@ object CodeGen {
         //   // List(IRLoadImmediate(reg, 0))
 
         
-        //     // val exprIR = generateExpr(expr)
-        //     // val destReg = getRegister()
-        //     // exprIR :+ IRUnaryOp(op, destReg, getDestRegister(exprIR))
-
-        // case BinaryOp(left, op, right) => List()
-        //     // val leftIR = generateExpr(left)
-        //     // val rightIR = generateExpr(right)
-        //     // val destReg = getRegister()
-        //     // leftIR ++ rightIR :+ IRBinaryOp(op, destReg, getDestRegister(leftIR), getDestRegister(rightIR))
+      
+        
 
         // case ArrayElem(name, indices) => List()
         //     // val indexIRs = indices.flatMap(generateExpr)
@@ -460,7 +453,7 @@ object CodeGen {
       case RValue.RArrayLiter(arrayLiter) => 
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
-        val arrayMemory = 8 + 4 * (size - 1) // memory needed for array
+        val arrayMemory = 4 + (size * 4) // memory needed for array
         currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
         += IRAddsImm(X16, X16, 4) += IRMov(W8, size) += IRStur(W8, X16, -4)
         // val registers = 
@@ -472,21 +465,22 @@ object CodeGen {
           currentBranch += IRStr(W8, X16, Some(i * 4)) // Store element
           }
         }
-        currentBranch += IRMovReg(X19, X16) // needs to increment X19, X20... for each array
-        //helpers.getOrElseUpdate()
-        // need to increment X registers
+        currentBranch += IRMovReg(reg, X16) // needs to increment X19, X20... for each array
+        helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+        helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
+        helpers.getOrElseUpdate(IRLabel("_errOutOfMemor"), errOutOfMemory())
+        
+        
+        
         BaseType.IntType
       case RValue.RNewPair(left, right) => BaseType.IntType
       case RValue.RPair(pairElem) => BaseType.IntType
       case RValue.RCall(name, args) => BaseType.IntType
     }
   }
+  
   // rvalue match {
   //     case RValue.RExpr(expr) => generateExpr(expr)
-  //     case RValue.RArrayLiter(arrayLiter) =>
-  //         val elementsIR = arrayLiter.elements.getOrElse(List()).flatMap(generateExpr)
-  //         val arrayReg = getRegister()
-  //         elementsIR :+ IRAlloc(arrayReg, elementsIR.length * 8)
   //     case RValue.RNewPair(left, right) =>
   //       val leftIR = generateExpr(left)
   //       val rightIR = generateExpr(right)
