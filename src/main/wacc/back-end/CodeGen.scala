@@ -452,11 +452,17 @@ object CodeGen {
         //     // indexIRs :+ IRArrayLoad("tmp", name, indexIRs.last.asInstanceOf[IRLoad].dest)
     }
 
+
   def generateRValue(rvalue: RValue, reg: Register): Type = {
     rvalue match {
       case RValue.RExpr(expr) => generateExpr(expr, reg)
       // unimplemented
-      case RValue.RArrayLiter(arrayLiter) => BaseType.IntType
+      case RValue.RArrayLiter(arrayLiter) => 
+        val elementsIR = arrayLiter.elements.getOrElse(List())
+        val size = elementsIR.size
+        val arrayMemory = 8 + 4 * (size - 1)
+        currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) += IRAddsImm(X16, X16, 4)
+        BaseType.IntType
       case RValue.RNewPair(left, right) => BaseType.IntType
       case RValue.RPair(pairElem) => BaseType.IntType
       case RValue.RCall(name, args) => BaseType.IntType
