@@ -75,7 +75,7 @@ case class IRAdds(dest: Register, left: Register, right: Register) extends IRIns
     override def toString: String = s"adds $dest, $left, $right"
 }
 case class IRAddsImm(dest: Register, left: Register, right: Int) extends IRInstr {
-    override def toString: String = s"add $dest, $left, #$right"
+    override def toString: String = s"adds $dest, $left, #$right"
 }
 // to handle immediate values derived from labels
 case class IRAddImm(dest: Register, left: Register, imm: String) extends IRInstr {

@@ -443,8 +443,7 @@ object CodeGen {
             val wreg2 = xreg2.asW
             generateExpr(expr1, xreg1)  // Generate IR for expr1
             generateExpr(expr2, xreg2)  // Generate IR for expr2
-            helpers.getOrElseUpdate(IRLabel("_prints"), prints())
-            helpers.getOrElseUpdate(IRLabel("_errDivZero"), errDivZero())
+            genDivZero()
             currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(destW, wreg1, wreg2)
             freeRegister(xreg1)
             freeRegister(xreg2)
@@ -457,8 +456,7 @@ object CodeGen {
             val wreg2 = xreg2.asW
             generateExpr(expr1, xreg1)  // Generate IR for expr1
             generateExpr(expr2, xreg2)  // Generate IR for expr2
-            helpers.getOrElseUpdate(IRLabel("_prints"), prints())
-            helpers.getOrElseUpdate(IRLabel("_errDivZero"), errDivZero())
+            genDivZero()
             currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(W1, wreg1, wreg2) += IRMSub(destW, W1, wreg2, wreg1)
             freeRegister(xreg1)
             freeRegister(xreg2)
