@@ -291,7 +291,7 @@ object CodeGen {
 
     (expr1, expr2) match {
       case (_, IntLiteral(value)) if valid(value.toInt) => Some((expr1, value.toInt))
-      case (IntLiteral(value), _) if valid(value.toInt) => Some((expr2, value.toInt))
+      case (IntLiteral(value), _) if (valid(value.toInt) && isAdd) => Some((expr2, value.toInt))
       case _ => None
     }
 
