@@ -237,32 +237,31 @@ object CodeGen {
         currentBranch += IRBl("exit")
 
 
-      case IfStmt(cond, thenStmt, elseStmt) => List()
+      case IfStmt(cond, thenStmt, elseStmt) =>
+        val temp = W8
+        generateExpr(cond, temp) // load result in temp register
+        currentBranch += IRCmpImm(temp, 1) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
+        generateStmt(elseStmt) // else, continue
+        currentBranch += IRJump(branchLabel(2)) 
+        addBranch()
+        generateStmt(thenStmt)
+        addBranch()
+
+      case WhileStmt(cond, body) => List()
 // main:
 // 	// push {fp, lr}
 // 	stp fp, lr, [sp, #-16]!
 // 	mov fp, sp
-// 	mov w8, #1
-// 	cmp w8, #1
-// 	b.eq .L0
-// 	b .L1
-// .L0:
+// 	b .L0
 // .L1:
+// .L0:
+// 	mov w8, #0
+// 	cmp w8, #1
+// 	b.eq .L1
 // 	mov x0, #0
 // 	// pop {fp, lr}
 // 	ldp fp, lr, [sp], #16
 // 	ret
-
-      case WhileStmt(cond, body) => List()
-          // val loopLabel = IRLabel("while_loop")
-          // val bodyIR = generateStmt(body)
-          // val endLabel = IRLabel("end_while")
-          // val condIR = generateExpr(cond)
-
-          // List(loopLabel) ++ condIR ++ List(
-          //     IRJumpCond(cond.toString, bodyIR.headOption.map(_.toString).getOrElse(endLabel.name)),
-          //     IRJump(endLabel.name)
-          // ) ++ bodyIR ++ List(IRJump(loopLabel.name), endLabel)
 
       case BodyStmt(body) => generateStmt(body)
 
