@@ -486,18 +486,19 @@ object CodeGen {
           //     }
           // }
           
+          }
         }
         currentBranch += IRMovReg(reg, X16) 
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
         helpers.getOrElseUpdate(IRLabel("_errOutOfMemor"), errOutOfMemory())
-        BaseType.IntType
-
-
+        BaseType.IntType 
       case RValue.RNewPair(left, right) => BaseType.IntType
       case RValue.RPair(pairElem) => BaseType.IntType
       case RValue.RCall(name, args) => BaseType.IntType
     }
+
+    
   }
   
   // rvalue match {
