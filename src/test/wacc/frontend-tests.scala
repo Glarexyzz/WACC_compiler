@@ -38,7 +38,7 @@ trait WACCTestUtils {
     "basic", 
     "basic/exit", "basic/skip", 
     "exit", 
-    // "expressions", 
+    "expressions", 
     "function", 
     "function/nested_functions",  
     "function/simple_functions",
@@ -60,7 +60,7 @@ trait WACCTestUtils {
     "sequence", 
     "read", 
     "variables", 
-    "while" 
+    // "while" 
     )
 
   def getListOfWaccFiles(dir: File): Map[String, List[File]] = {

@@ -253,4 +253,17 @@ object Helpers{
     def errBadChar(): List[IRInstr] = {
         errGen("_errBadChar", "fatal error: int %d is not ascii character 0-127\\n", true)
     }
+
+    def malloc(): List[IRInstr] = {
+        val label = "_malloc"
+        val instructions: List[IRInstr] = List(
+            pushReg(LR, XZR),        // Save return address
+            IRBl("malloc"),          // Call malloc
+            IRCbz(X0, "_errOutOfMemory"), // If malloc returns 0, jump to error handler
+            popReg(LR, XZR),         // Restore return address
+            IRRet()
+        )
+        List(IRFuncLabel(IRLabel(label), instructions))
+    }
+
 }

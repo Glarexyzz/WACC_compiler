@@ -97,10 +97,14 @@ object CodeGen {
   private var nBranch = 0 // Track number of branching sections
   private val branches = mutable.ListBuffer[IRInstr]() // Store branches as IRFuncLabels
   private var currentBranch = mutable.ListBuffer[IRInstr]() // The working branch
-  private def currentBranchLabel(): String = if nBranch == 0 then "main" else s".L${nBranch-1}"
-  private def nextBranchLabel(): String = s".L$nBranch"
+  // default is currentBranch
+  private def branchLabel(n: Int = 0): String = {
+    val branchNo = nBranch + n
+    if branchNo == 0 then "main" else s".L${branchNo-1}"
+  }
+
   private def addBranch(): Unit = {
-    branches += IRFuncLabel(IRLabel(currentBranchLabel()), currentBranch.toList)
+    branches += IRFuncLabel(IRLabel(branchLabel()), currentBranch.toList)
     currentBranch = mutable.ListBuffer[IRInstr]() // Reset for next branch
     nBranch += 1
   }
@@ -247,21 +251,15 @@ object CodeGen {
         generateStmt(thenStmt)
         addBranch()
 
-      case WhileStmt(cond, body) => List()
-// main:
-// 	// push {fp, lr}
-// 	stp fp, lr, [sp, #-16]!
-// 	mov fp, sp
-// 	b .L0
-// .L1:
-// .L0:
-// 	mov w8, #0
-// 	cmp w8, #1
-// 	b.eq .L1
-// 	mov x0, #0
-// 	// pop {fp, lr}
-// 	ldp fp, lr, [sp], #16
-// 	ret
+      case WhileStmt(cond, body) =>
+        val temp = W8
+        currentBranch += IRJump(branchLabel(1)) // jump to condition check
+        addBranch()
+        generateStmt(body)
+        addBranch()
+        generateExpr(cond, temp) // if condition true, jump to body
+        currentBranch += IRCmpImm(temp, 1) += IRJumpCond(EQ, branchLabel(1)) 
+        addBranch()
 
       case BodyStmt(body) => generateStmt(body)
 
@@ -403,23 +401,15 @@ object CodeGen {
             compareFunc(EQ)
           case BinaryOperator.NotEqual =>
             compareFunc(NE)
-            // 
-//  mov w8, #1
-// 	cmp w8, #1
-// 	b.eq .L0
-// 	mov w8, #0
-// 	cmp w8, #1
-// .L0:
-// 	cset w8, eq
-// 	mov w19, w8
+
           case BinaryOperator.Or =>
-            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(EQ, nextBranchLabel()) += IRCmpImm(wreg2, 1)
+            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(EQ, branchLabel(1)) += IRCmpImm(wreg2, 1)
             addBranch()
             currentBranch += IRCset(destW, EQ)
             BaseType.BoolType // AND W0, reg1, reg2
 
           case BinaryOperator.And =>
-            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(NE, nextBranchLabel()) += IRCmpImm(wreg2, 1)
+            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(NE, branchLabel(1)) += IRCmpImm(wreg2, 1)
             addBranch()
             currentBranch += IRCset(destW, EQ)
             BaseType.BoolType
@@ -438,37 +428,73 @@ object CodeGen {
         //   // List(IRLoadImmediate(reg, 0))
 
         
-        //     // val exprIR = generateExpr(expr)
-        //     // val destReg = getRegister()
-        //     // exprIR :+ IRUnaryOp(op, destReg, getDestRegister(exprIR))
-
-        // case BinaryOp(left, op, right) => List()
-        //     // val leftIR = generateExpr(left)
-        //     // val rightIR = generateExpr(right)
-        //     // val destReg = getRegister()
-        //     // leftIR ++ rightIR :+ IRBinaryOp(op, destReg, getDestRegister(leftIR), getDestRegister(rightIR))
+      
+        
 
         // case ArrayElem(name, indices) => List()
         //     // val indexIRs = indices.flatMap(generateExpr)
         //     // indexIRs :+ IRArrayLoad("tmp", name, indexIRs.last.asInstanceOf[IRLoad].dest)
     }
 
+
   def generateRValue(rvalue: RValue, reg: Register): Type = {
     rvalue match {
       case RValue.RExpr(expr) => generateExpr(expr, reg)
       // unimplemented
-      case RValue.RArrayLiter(arrayLiter) => BaseType.IntType
+      case RValue.RArrayLiter(arrayLiter) => 
+        val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
+        val size = elementsIR.size // number of elements 
+        val arrayMemory = 4 + (size * 4) // memory needed for array
+        currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
+        += IRAddsImm(X16, X16, 4) += IRMov(W8, size) += IRStur(W8, X16, -4)
+        // val registers = 
+        for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
+          val expType = generateExpr(element, W8)
+          expType match {
+            case BaseType.IntType => 
+              if (i == 0) { // separate case for first element
+                currentBranch += IRStr(W8, X16)
+              } else {
+              currentBranch += IRStr(W8, X16, Some(i * 4)) // Store element
+              }
+            case BaseType.CharType => 
+              if (i == 0) { // separate case for first element
+                currentBranch += IRStrb(W8, X16)
+              } else {
+              currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+              }
+            case BaseType.BoolType => 
+              if (i == 0) { // separate case for first element
+                currentBranch += IRStrb(W8, X16)
+              } else {
+                currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+              }
+            case BaseType.StrType => List()
+          //     if (i == 0) { // separate case for first element
+          //       currentBranch += IRStrb(W8, X16)
+          //     } else {
+          //       currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+          //     }
+          // }
+            case _ =>
+          
+          }
+        }
+        currentBranch += IRMovReg(reg, X16) 
+        helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+        helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
+        helpers.getOrElseUpdate(IRLabel("_errOutOfMemor"), errOutOfMemory())
+        BaseType.IntType 
       case RValue.RNewPair(left, right) => BaseType.IntType
       case RValue.RPair(pairElem) => BaseType.IntType
       case RValue.RCall(name, args) => BaseType.IntType
     }
+
+    
   }
+  
   // rvalue match {
   //     case RValue.RExpr(expr) => generateExpr(expr)
-  //     case RValue.RArrayLiter(arrayLiter) =>
-  //         val elementsIR = arrayLiter.elements.getOrElse(List()).flatMap(generateExpr)
-  //         val arrayReg = getRegister()
-  //         elementsIR :+ IRAlloc(arrayReg, elementsIR.length * 8)
   //     case RValue.RNewPair(left, right) =>
   //       val leftIR = generateExpr(left)
   //       val rightIR = generateExpr(right)
