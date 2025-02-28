@@ -3,6 +3,7 @@ package wacc
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import wacc.Helpers._
+import wacc.semanticChecker.checkExprType
 
 
 /*
@@ -458,21 +459,36 @@ object CodeGen {
         += IRAddsImm(X16, X16, 4) += IRMov(W8, size) += IRStur(W8, X16, -4)
         // val registers = 
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
-          val expType = generateExpr(element, W8) // need type as diff cases for diff types
-          if (i == 0) { // separate case for first element
-            currentBranch += IRStr(W8, X16)
-          } else {
-          currentBranch += IRStr(W8, X16, Some(i * 4)) // Store element
+          val expType = generateExpr(element, W8)
+          expType match {
+            case BaseType.IntType => 
+              if (i == 0) { // separate case for first element
+                currentBranch += IRStr(W8, X16)
+              } else {
+              currentBranch += IRStr(W8, X16, Some(i * 4)) // Store element
+              }
+            case BaseType.CharType => 
+              if (i == 0) { // separate case for first element
+                currentBranch += IRStrb(W8, X16)
+              } else {
+              currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+              }
+            case BaseType.BoolType => 
+              if (i == 0) { // separate case for first element
+                currentBranch += IRStrb(W8, X16)
+              } else {
+                currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+              }
           }
+          
         }
-        currentBranch += IRMovReg(reg, X16) // needs to increment X19, X20... for each array
+        currentBranch += IRMovReg(reg, X16) 
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
         helpers.getOrElseUpdate(IRLabel("_errOutOfMemor"), errOutOfMemory())
-        
-        
-        
         BaseType.IntType
+
+
       case RValue.RNewPair(left, right) => BaseType.IntType
       case RValue.RPair(pairElem) => BaseType.IntType
       case RValue.RCall(name, args) => BaseType.IntType
