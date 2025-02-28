@@ -461,7 +461,16 @@ object CodeGen {
         val elementsIR = arrayLiter.elements.getOrElse(List())
         val size = elementsIR.size
         val arrayMemory = 8 + 4 * (size - 1)
-        currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) += IRAddsImm(X16, X16, 4)
+        currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
+        += IRAddsImm(X16, X16, 4) += IRMov(W8, size) += IRStur(W8, X16, -4)
+        for ((element, i) <- elementsIR.zipWithIndex) {
+          generateExpr(element, W8) // Generate code for element
+          if (i == 0) {
+            currentBranch += IRStr(W8, X16)
+          } else {
+          currentBranch += IRStr(W8, X16, Some(i * 4)) // Store element
+          }
+        }
         BaseType.IntType
       case RValue.RNewPair(left, right) => BaseType.IntType
       case RValue.RPair(pairElem) => BaseType.IntType

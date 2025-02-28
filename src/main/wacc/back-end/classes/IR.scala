@@ -37,9 +37,13 @@ case class IRLdur(dest: Register, addr: Register, offset: Int) extends IRInstr {
     override def toString: String = s"ldur $dest, [$addr, #$offset]"
 }
 // Store register value into memory	
-case class IRStr(value: Register, addr: Register) extends IRInstr {
-    override def toString: String = s"str $value, [$addr]"
+case class IRStr(value: Register, addr: Register, offset: Option[Int] = None) extends IRInstr {
+    override def toString: String = offset match {
+        case Some(off) => s"str $value, [$addr, #$off]"
+        case None      => s"str $value, [$addr]"
+    }
 }
+
 // Store a pair of registers onto the stack	
 case class IRStp(reg1: Register, reg2: Register, offset: Int, preDecrement: Boolean = false) extends IRInstr {
   override def toString: String =
