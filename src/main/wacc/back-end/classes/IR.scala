@@ -37,9 +37,19 @@ case class IRLdur(dest: Register, addr: Register, offset: Int) extends IRInstr {
     override def toString: String = s"ldur $dest, [$addr, #$offset]"
 }
 // Store register value into memory	
-case class IRStr(value: Register, addr: Register) extends IRInstr {
-    override def toString: String = s"str $value, [$addr]"
+case class IRStr(value: Register, addr: Register, offset: Option[Int] = None) extends IRInstr {
+    override def toString: String = offset match {
+        case Some(off) => s"str $value, [$addr, #$off]"
+        case None      => s"str $value, [$addr]"
+    }
 }
+case class IRStrb(value: Register, addr: Register, offset: Option[Int] = None) extends IRInstr {
+    override def toString: String = offset match {
+        case Some(off) => s"str $value, [$addr, #$off]"
+        case None      => s"str $value, [$addr]"
+    }
+}
+
 // Store a pair of registers onto the stack	
 case class IRStp(reg1: Register, reg2: Register, offset: Int, preDecrement: Boolean = false) extends IRInstr {
   override def toString: String =
@@ -64,12 +74,18 @@ case class IRAdd(dest: Register, left: Register, right: Register) extends IRInst
 case class IRAdds(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"adds $dest, $left, $right"
 }
+case class IRAddsImm(dest: Register, left: Register, right: Int) extends IRInstr {
+    override def toString: String = s"add $dest, $left, #$right"
+}
 // to handle immediate values derived from labels
 case class IRAddImm(dest: Register, left: Register, imm: String) extends IRInstr {
     override def toString: String = s"add $dest, $left, $imm"
 }
 case class IRSub(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"sub $dest, $left, $right"
+}
+case class IRSubImm(dest: Register, left: Register, right: Int) extends IRInstr {
+    override def toString: String = s"sub $dest, $left, #$right"
 }
 case class IRMSub(dest: Register, q1: Register, q2: Register, s: Register) extends IRInstr {
     override def toString: String = s"msub $dest, $q1, $q2, $s"
@@ -183,4 +199,9 @@ case class IRAlign(value: Int) extends IRInstr {
 }
 case class IRGlobal(name: String) extends IRInstr {
   override def toString: String = s".global $name"
+}
+
+// 📌 Conditional Branch if Zero
+case class IRCbz(reg: Register, label: String) extends IRInstr {
+    override def toString: String = s"cbz $reg, $label"
 }
