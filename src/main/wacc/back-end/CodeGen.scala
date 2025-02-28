@@ -98,6 +98,7 @@ object CodeGen {
   private val branches = mutable.ListBuffer[IRInstr]() // Store branches as IRFuncLabels
   private var currentBranch = mutable.ListBuffer[IRInstr]() // The working branch
   private def currentBranchLabel(): String = if nBranch == 0 then "main" else s".L${nBranch-1}"
+  private def nextBranchLabel(): String = s".L$nBranch"
   private def addBranch(): Unit = {
     branches += IRFuncLabel(IRLabel(currentBranchLabel()), currentBranch.toList)
     currentBranch = mutable.ListBuffer[IRInstr]() // Reset for next branch
@@ -237,30 +238,20 @@ object CodeGen {
 
 
       case IfStmt(cond, thenStmt, elseStmt) => List()
-          // val condIR = generateExpr(cond)  // Generate IR for condition evaluation
-          // val condMov = IRMovReg(W19, W0) // boolean is stored in W0 and then moved in W19?
-          // val thenIR = generateStmt(thenStmt)  
-          // val elseIR = generateStmt(elseStmt)  
-
-          // val thenLabel = IRLabel("then")
-          // val elseLabel = IRLabel("else")
-          // val endLabel  = IRLabel("endif")
-
-          // condIR ++
-          // List(condMov, IRCmp(W19, WZR), IRJumpCond(EQ, thenLabel.name)) ++
-          // elseIR ++
-          // List(IRJump(endLabel.name)) ++
-          // List(thenLabel) ++
-          // thenIR ++
-          // List(endLabel)
-
-// would this compile? I'm going to try compiling everything first to test my generateIR
-// .... could you help me comment out the stuff that doesn't compile? Especially in the generateExpr part. I'll fix the other issues
-          // condIR ++ List(
-          //     IRJumpCond(cond.toString, thenLabel.name),
-          //     IRJump(elseLabel.name)
-          // ) ++ List(thenLabel) ++ thenIR ++ List(IRJump(endLabel.name)) ++
-          // List(elseLabel) ++ elseIR ++ List(endLabel)
+// main:
+// 	// push {fp, lr}
+// 	stp fp, lr, [sp, #-16]!
+// 	mov fp, sp
+// 	mov w8, #1
+// 	cmp w8, #1
+// 	b.eq .L0
+// 	b .L1
+// .L0:
+// .L1:
+// 	mov x0, #0
+// 	// pop {fp, lr}
+// 	ldp fp, lr, [sp], #16
+// 	ret
 
       case WhileStmt(cond, body) => List()
           // val loopLabel = IRLabel("while_loop")
@@ -353,9 +344,9 @@ object CodeGen {
       // DO REGISTERS AS PARAMETER  
       
       case BinaryOp(expr1, op, expr2) =>
-        val xreg1 = getRegister()
-        val wreg1 = xreg1.asW
-        val xreg2 = getRegister()
+        val xreg1 = getRegister() // alternatively, generateExpr produces either a register or a value
+        val wreg1 = xreg1.asW // move one to a temporary register
+        val xreg2 = getRegister() 
         val wreg2 = xreg2.asW
         generateExpr(expr1, xreg1)  // Generate IR for expr1
         generateExpr(expr2, xreg2)  // Generate IR for expr2
@@ -413,14 +404,25 @@ object CodeGen {
             compareFunc(EQ)
           case BinaryOperator.NotEqual =>
             compareFunc(NE)
-            
-
+            // 
+//  mov w8, #1
+// 	cmp w8, #1
+// 	b.eq .L0
+// 	mov w8, #0
+// 	cmp w8, #1
+// .L0:
+// 	cset w8, eq
+// 	mov w19, w8
           case BinaryOperator.Or =>
-            //unimplemented
+            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(EQ, nextBranchLabel()) += IRCmpImm(wreg2, 1)
+            addBranch()
+            currentBranch += IRCset(destW, EQ)
             BaseType.BoolType // AND W0, reg1, reg2
 
           case BinaryOperator.And =>
-            //unimplemented
+            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(NE, nextBranchLabel()) += IRCmpImm(wreg2, 1)
+            addBranch()
+            currentBranch += IRCset(destW, EQ)
             BaseType.BoolType
         }
         freeRegister(xreg1)
