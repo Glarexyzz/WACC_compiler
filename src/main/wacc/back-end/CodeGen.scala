@@ -3,6 +3,7 @@ package wacc
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import wacc.Helpers._
+import scala.collection.mutable.ListBuffer
 
 
 /*
@@ -178,12 +179,12 @@ object CodeGen {
       // All declared variables are initialised at the start from the symbol table
       case DeclAssignStmt(t, name, value) =>
         val (reg, t) = variableRegisters(name)
-        generateRValue(value, reg)
+        generateRValue(name, value, reg)
       
       case AssignStmt(LValue.LName(name), rvalue) => 
         variableRegisters.get(name) match {
           case Some((reg, _)) =>
-            generateRValue(rvalue, reg)
+            generateRValue(name, rvalue, reg)
           case None =>
             // should never reach here
             throw new Exception(s"Variable $name used before declaration")
@@ -210,7 +211,12 @@ object CodeGen {
           case _ => List()
         }
 
-      case FreeStmt(expr) => List()
+      case FreeStmt(expr) => 
+        expr match {
+          case (Identifier(name)) =>
+            val reg = variableRegisters.get(name).map(_._1).get
+            currentBranch += IRSubImm(X0, reg, 4) += IRBl("free")
+        }
 
       case PrintStmt(expr) =>
         val exprType = generateExpr(expr)
@@ -226,7 +232,10 @@ object CodeGen {
         } else if (exprType == BaseType.BoolType) {
           helpers.getOrElseUpdate(IRLabel("_printb"), printb())
           currentBranch +=  IRBl("_printb")
-        } 
+        } else if (exprType == ArrayType(BaseType.IntType)) {
+          helpers.getOrElseUpdate(IRLabel("_printp"), printp())
+          currentBranch +=  IRBl("_printp")
+        }
 
       case PrintlnStmt(expr) => 
         helpers.getOrElseUpdate(IRLabel("_println"), printlnFunc())
@@ -420,8 +429,7 @@ object CodeGen {
         freeRegister(xreg2)
         binaryInstrs  
       
-
-        
+  
       case _ => BaseType.IntType
 
 
@@ -429,24 +437,42 @@ object CodeGen {
         //   // val reg = getRegister()
         //   // List(IRLoadImmediate(reg, 0))
 
-        
-      
-        
+      // case ArrayElem(name, indices) => BaseType.CharType
+        // val (baseReg, arrayType) = variableRegisters(name) // Base address
+        // val indexReg = getRegister()
+        // generateExpr(indices.head, indexReg) // Get index value
 
-        // case ArrayElem(name, indices) => List()
-        //     // val indexIRs = indices.flatMap(generateExpr)
-        //     // indexIRs :+ IRArrayLoad("tmp", name, indexIRs.last.asInstanceOf[IRLoad].dest)
+        // // Bounds check
+        // helpers.getOrElseUpdate(IRLabel("_errBounds"), errBounds())
+        // currentBranch += IRLdur(W8, baseReg, -4)  // Load array length
+        // currentBranch += IRCmp(indexReg.asW, W8)  // Compare index with size
+        // currentBranch += IRJumpCond(GE, "_errBounds") // If out of bounds, error
+
+        // // Compute address: base + (index * 4)
+        // currentBranch += IRAddImm(indexReg, indexReg, indexReg) // index * 2
+        // currentBranch += IRAddImm(indexReg, indexReg, indexReg) // index * 4
+        // currentBranch += IRAddReg(indexReg, baseReg, indexReg)  // base + index * 4
+
+        // currentBranch += IRLdur(destW, indexReg, 0) // Load from computed address
+        // freeRegister(indexReg)
+        // arrayType
+
+        
     }
 
 
-  def generateRValue(rvalue: RValue, reg: Register): Type = {
+  def generateRValue(name: String, rvalue: RValue, reg: Register): Type = {
+    
     rvalue match {
       case RValue.RExpr(expr) => generateExpr(expr, reg)
       // unimplemented
       case RValue.RArrayLiter(arrayLiter) => 
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
-        val arrayMemory = 4 + (size * 4) // memory needed for array
+        val tempIR = ListBuffer[IRInstr]()
+        val expType = variableRegisters.get(name).map(_._2).get
+        val arrayMemory = arrayMemorySize(size, expType)
+
         currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
         += IRAddsImm(X16, X16, 4) += IRMov(W8, size) += IRStur(W8, X16, -4)
         // val registers = 
@@ -494,48 +520,22 @@ object CodeGen {
 
     
   }
+
+  def arrayMemorySize(size: Int, expType: Type): Int = {
+    expType match {
+      case BaseType.IntType => 4 + (size * 4)
+      case BaseType.CharType => 4 + size
+      case BaseType.BoolType => 4 + size
+      case BaseType.StrType => 4 + (size * 8)
+      case ArrayType(innerType) => 0 //not done
+    }
+
+  }
   
-  // rvalue match {
-  //     case RValue.RExpr(expr) => generateExpr(expr)
-  //     case RValue.RNewPair(left, right) =>
-  //       val leftIR = generateExpr(left)
-  //       val rightIR = generateExpr(right)
-  //       val leftReg = getDestRegister(leftIR)
-  //       val rightReg = getDestRegister(rightIR)
-  //       val pairReg = getRegister()
-  //       freeRegister(leftReg)
-  //       freeRegister(rightReg)
-  //       leftIR ++ rightIR :+ IRNewPair(pairReg, leftReg, rightReg)
-  //     case RValue.RPair(pairElem) => generatePairElem(pairElem)
-  //     case RValue.RCall(name, args) =>
-  //       val argIRs = args.getOrElse(List()).map(generateExpr)
-  //       val argRegs = argIRs.map(getDestRegister) // Extract registers
-  //       argRegs.foreach(freeRegister) // Free registers correctly
-  //       argIRs.flatten :+ IRCall(name, argRegs) // Flatten instructions list before appending IRCall
-  // }
 
   def generateArrayElem(arrayElem: ArrayElem): List[IRInstr] = List()
-  // {
-  //   val indexIRs = arrayElem.indices.flatMap(generateExpr)
-  //   val indexReg = getDestRegister(indexIRs)
-  //   val arrayReg = getRegister()
-  //   freeRegister(indexReg)
-  //   indexIRs :+ IRArrayLoad(arrayReg, arrayElem.name, indexReg)  
-  // }
+  
 
   def generatePairElem(pairElem: PairElem): List[IRInstr] = List()
-  // pairElem match {
-  //     case PairElem.FstElem(value) =>
-  //       val valueIR = generateExpr(value)
-  //       val valueReg = getDestRegister(valueIR)
-  //       val pairReg = getRegister()
-  //       freeRegister(valueReg)
-  //       valueIR :+ IRPairElem(pairReg, valueReg, isFirst = true)
-  //     case PairElem.SndElem(value) =>
-  //       val valueIR = generateExpr(value)
-  //       val valueReg = getDestRegister(valueIR)
-  //       val pairReg = getRegister()
-  //       freeRegister(valueReg)
-  //       valueIR :+ IRPairElem(pairReg, valueReg, isFirst = false)
-  // }
+  
 }

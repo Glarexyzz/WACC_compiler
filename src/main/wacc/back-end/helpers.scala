@@ -173,6 +173,24 @@ object Helpers{
             ))
         )
     }
+    def printp(): List[IRInstr] = {
+        val label = "_printp"
+        val str0label = strLabel(label, 0)
+        
+        val instructions: List[IRInstr] = List(
+            pushReg(LR, XZR),
+            IRMovReg(X1, X0),
+            IRAdr(X0, str0label),
+            IRBl("printf"),
+            IRMov(X0, 0),
+            IRBl("fflush"),
+            popReg(LR, XZR),
+            IRRet()
+        )
+
+        print(label, "%p", IRFuncLabel(IRLabel(label), instructions))
+    }
+
 
     def printlnFunc(): List[IRInstr] = {
         val str0label = strLabel("_println", 0)
