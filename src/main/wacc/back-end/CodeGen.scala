@@ -211,7 +211,12 @@ object CodeGen {
           case _ => List()
         }
 
-      case FreeStmt(expr) => List()
+      case FreeStmt(expr) => 
+        expr match {
+          case (Identifier(name)) =>
+            val reg = variableRegisters.get(name).map(_._1).get
+            currentBranch += IRSubImm(X0, reg, 4) += IRBl("free")
+        }
 
       case PrintStmt(expr) =>
         val exprType = generateExpr(expr)
@@ -227,7 +232,10 @@ object CodeGen {
         } else if (exprType == BaseType.BoolType) {
           helpers.getOrElseUpdate(IRLabel("_printb"), printb())
           currentBranch +=  IRBl("_printb")
-        } 
+        } else if (exprType == ArrayType(BaseType.IntType)) {
+          helpers.getOrElseUpdate(IRLabel("_printp"), printp())
+          currentBranch +=  IRBl("_printp")
+        }
 
       case PrintlnStmt(expr) => 
         helpers.getOrElseUpdate(IRLabel("_println"), printlnFunc())
@@ -433,7 +441,7 @@ object CodeGen {
         //   // val reg = getRegister()
         //   // List(IRLoadImmediate(reg, 0))
 
-      case ArrayElem(name, indices) => BaseType.CharType
+      // case ArrayElem(name, indices) => BaseType.CharType
         // val (baseReg, arrayType) = variableRegisters(name) // Base address
         // val indexReg = getRegister()
         // generateExpr(indices.head, indexReg) // Get index value
@@ -522,6 +530,7 @@ object CodeGen {
       case BaseType.CharType => 4 + size
       case BaseType.BoolType => 4 + size
       case BaseType.StrType => 4 + (size * 8)
+      case ArrayType(innerType) => 0 //not done
     }
 
   }
