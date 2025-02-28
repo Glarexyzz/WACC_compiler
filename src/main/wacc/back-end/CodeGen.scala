@@ -259,22 +259,18 @@ object CodeGen {
         addBranch()
         generateStmt(thenStmt)
         addBranch()
-// main:
-// 	// push {fp, lr}
-// 	stp fp, lr, [sp, #-16]!
-// 	mov fp, sp
-// 	mov w8, #1
-// 	cmp w8, #1
-// 	b.eq .L0
-// 	b .L1
-// .L0:
-// .L1:
-// 	mov x0, #0
-// 	// pop {fp, lr}
-// 	ldp fp, lr, [sp], #16
-// 	ret
 
-      case WhileStmt(cond, body) => List()
+      case WhileStmt(cond, body) =>
+      // need to save the branch names
+        val temp = W8
+        val bodyBranch = branchLabel(1)
+        val condBranch = branchLabel(2)
+        currentBranch += IRJump(condBranch) // jump to condition check
+        addBranch()
+        generateStmt(body)
+        addBranch()
+        generateExpr(cond, temp) // if condition true, jump to body
+        currentBranch += IRCmpImm(temp, 1) += IRJumpCond(EQ, bodyBranch)
 
       case BodyStmt(body) => generateStmt(body)
 
@@ -508,6 +504,7 @@ object CodeGen {
           //       currentBranch += IRStrb(W8, X16, Some(i)) // Store element
           //     }
           // }
+            case _ =>
           
           }
         }

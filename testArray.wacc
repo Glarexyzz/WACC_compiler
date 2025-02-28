@@ -1,5 +1,0 @@
-begin
-  int[] a = [4, 9, 3, 4];
-  int x = a[0]
-  
-end
