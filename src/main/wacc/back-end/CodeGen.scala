@@ -252,14 +252,16 @@ object CodeGen {
         addBranch()
 
       case WhileStmt(cond, body) =>
+      // need to save the branch names
         val temp = W8
-        currentBranch += IRJump(branchLabel(1)) // jump to condition check
+        val bodyBranch = branchLabel(1)
+        val condBranch = branchLabel(2)
+        currentBranch += IRJump(condBranch) // jump to condition check
         addBranch()
         generateStmt(body)
         addBranch()
         generateExpr(cond, temp) // if condition true, jump to body
-        currentBranch += IRCmpImm(temp, 1) += IRJumpCond(EQ, branchLabel(1)) 
-        addBranch()
+        currentBranch += IRCmpImm(temp, 1) += IRJumpCond(EQ, bodyBranch)
 
       case BodyStmt(body) => generateStmt(body)
 
