@@ -458,21 +458,21 @@ object CodeGen {
       case RValue.RExpr(expr) => generateExpr(expr, reg)
       // unimplemented
       case RValue.RArrayLiter(arrayLiter) => 
-        val elementsIR = arrayLiter.elements.getOrElse(List())
-        val size = elementsIR.size
-        val arrayMemory = 8 + 4 * (size - 1)
+        val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
+        val size = elementsIR.size // number of elements 
+        val arrayMemory = 8 + 4 * (size - 1) // memory needed for array
         currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
         += IRAddsImm(X16, X16, 4) += IRMov(W8, size) += IRStur(W8, X16, -4)
         // val registers = 
-        for ((element, i) <- elementsIR.zipWithIndex) {
+        for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
           val expType = generateExpr(element, W8) // need type as diff cases for diff types
-          if (i == 0) {
+          if (i == 0) { // separate case for first element
             currentBranch += IRStr(W8, X16)
           } else {
           currentBranch += IRStr(W8, X16, Some(i * 4)) // Store element
           }
         }
-        currentBranch += IRMovReg(X19, X16)
+        currentBranch += IRMovReg(X19, X16) // needs to increment X19, X20... for each array
         //helpers.getOrElseUpdate()
         // need to increment X registers
         BaseType.IntType
