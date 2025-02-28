@@ -97,10 +97,14 @@ object CodeGen {
   private var nBranch = 0 // Track number of branching sections
   private val branches = mutable.ListBuffer[IRInstr]() // Store branches as IRFuncLabels
   private var currentBranch = mutable.ListBuffer[IRInstr]() // The working branch
-  private def currentBranchLabel(): String = if nBranch == 0 then "main" else s".L${nBranch-1}"
-  private def nextBranchLabel(): String = s".L$nBranch"
+  // default is currentBranch
+  private def branchLabel(n: Int = 0): String = {
+    val branchNo = nBranch + n
+    if branchNo == 0 then "main" else s".L${branchNo-1}"
+  }
+
   private def addBranch(): Unit = {
-    branches += IRFuncLabel(IRLabel(currentBranchLabel()), currentBranch.toList)
+    branches += IRFuncLabel(IRLabel(branchLabel()), currentBranch.toList)
     currentBranch = mutable.ListBuffer[IRInstr]() // Reset for next branch
     nBranch += 1
   }
@@ -237,7 +241,15 @@ object CodeGen {
         currentBranch += IRBl("exit")
 
 
-      case IfStmt(cond, thenStmt, elseStmt) => List()
+      case IfStmt(cond, thenStmt, elseStmt) =>
+        val temp = W8
+        generateExpr(cond, temp) // load result in temp register
+        currentBranch += IRCmpImm(temp, 1) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
+        generateStmt(elseStmt) // else, continue
+        currentBranch += IRJump(branchLabel(2)) 
+        addBranch()
+        generateStmt(thenStmt)
+        addBranch()
 // main:
 // 	// push {fp, lr}
 // 	stp fp, lr, [sp, #-16]!
@@ -404,23 +416,15 @@ object CodeGen {
             compareFunc(EQ)
           case BinaryOperator.NotEqual =>
             compareFunc(NE)
-            // 
-//  mov w8, #1
-// 	cmp w8, #1
-// 	b.eq .L0
-// 	mov w8, #0
-// 	cmp w8, #1
-// .L0:
-// 	cset w8, eq
-// 	mov w19, w8
+
           case BinaryOperator.Or =>
-            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(EQ, nextBranchLabel()) += IRCmpImm(wreg2, 1)
+            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(EQ, branchLabel(1)) += IRCmpImm(wreg2, 1)
             addBranch()
             currentBranch += IRCset(destW, EQ)
             BaseType.BoolType // AND W0, reg1, reg2
 
           case BinaryOperator.And =>
-            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(NE, nextBranchLabel()) += IRCmpImm(wreg2, 1)
+            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(NE, branchLabel(1)) += IRCmpImm(wreg2, 1)
             addBranch()
             currentBranch += IRCset(destW, EQ)
             BaseType.BoolType
