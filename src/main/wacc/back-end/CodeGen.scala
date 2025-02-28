@@ -3,7 +3,6 @@ package wacc
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import wacc.Helpers._
-import wacc.semanticChecker.checkExprType
 
 
 /*
@@ -479,7 +478,13 @@ object CodeGen {
               } else {
                 currentBranch += IRStrb(W8, X16, Some(i)) // Store element
               }
-          }
+            case BaseType.StrType => List()
+          //     if (i == 0) { // separate case for first element
+          //       currentBranch += IRStrb(W8, X16)
+          //     } else {
+          //       currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+          //     }
+          // }
           
         }
         currentBranch += IRMovReg(reg, X16) 
