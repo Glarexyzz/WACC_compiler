@@ -15,6 +15,7 @@ main:
     stur w8, [x16, #-4]
     mov w8, #0
     str w8, [x16]
+    mov x19, x16
     mov x0, #0
     // Function epilogue
     ldp x19, xzr, [sp], #16
