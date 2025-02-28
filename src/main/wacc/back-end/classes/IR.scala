@@ -64,12 +64,18 @@ case class IRAdd(dest: Register, left: Register, right: Register) extends IRInst
 case class IRAdds(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"adds $dest, $left, $right"
 }
+case class IRAddsImm(dest: Register, left: Register, right: Int) extends IRInstr {
+    override def toString: String = s"adds $dest, $left, #$right"
+}
 // to handle immediate values derived from labels
 case class IRAddImm(dest: Register, left: Register, imm: String) extends IRInstr {
     override def toString: String = s"add $dest, $left, $imm"
 }
 case class IRSub(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"sub $dest, $left, $right"
+}
+case class IRSubImm(dest: Register, left: Register, right: Int) extends IRInstr {
+    override def toString: String = s"sub $dest, $left, #$right"
 }
 case class IRMSub(dest: Register, q1: Register, q2: Register, s: Register) extends IRInstr {
     override def toString: String = s"msub $dest, $q1, $q2, $s"
