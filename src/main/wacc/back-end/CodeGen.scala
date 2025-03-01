@@ -261,17 +261,8 @@ object CodeGen {
             val varReg = getRegister()
             generateRValue(name, rvalue, varReg)
             currentBranch += IRMovReg(X7, baseReg)
-            helpers.getOrElseUpdate(IRLabel("_errOutofBounds"), errOutOfBounds())
-            if (arrType == ArrayType(BaseType.IntType)) {
-              currentBranch += IRBl("_arrStore4")
-              helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore(varReg.asW, 4))
-            }
-            if (arrType == ArrayType(BaseType.CharType)) {
-              currentBranch += IRBl("_arrStore1")
-              helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore(varReg.asW, 1))
-            }
-             
-            
+            currentBranch += IRBl("_arrStore4")
+            helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore(varReg.asW))
             freeRegister(varReg)
 
             // helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
@@ -328,7 +319,7 @@ object CodeGen {
         } else if (exprType == BaseType.CharType) {
           helpers.getOrElseUpdate(IRLabel("_printc"), printc())
           currentBranch +=  IRBl("_printc")
-        } else if (exprType == BaseType.StrType || exprType == ArrayType(BaseType.CharType) ) {
+        } else if (exprType == BaseType.StrType) {
           helpers.getOrElseUpdate(IRLabel("_prints"), prints())
           currentBranch +=  IRBl("_prints")
         } else if (exprType == BaseType.BoolType) {
@@ -662,8 +653,9 @@ object CodeGen {
       
         val (baseReg, arrType) = variableRegisters(name) // Base address
         generateExpr(indices.head, W17) // Get index value
+
         helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
-        helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+        //helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
         currentBranch += IRMovReg(X7, baseReg) 
         currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
         
@@ -727,16 +719,16 @@ object CodeGen {
               } else {
                 currentBranch += IRStrb(W8, X16, Some(i)) // Store element
               }
-            case BaseType.StrType => List()
-          //     if (i == 0) { // separate case for first element
-          //       currentBranch += IRStrb(W8, X16)
-          //     } else {
-          //       currentBranch += IRStrb(W8, X16, Some(i)) // Store element
-          //     }
-          // }
+            case BaseType.StrType => 
+              if (i == 0) { // separate case for first element
+                currentBranch += IRStrb(W8, X16)
+              } else {
+                currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+              }
             case _ =>
-          
           }
+        
+          
         }
         currentBranch += IRMovReg(reg, X16) 
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
@@ -766,6 +758,7 @@ object CodeGen {
       case ArrayType(BaseType.CharType) => 4 + size        // Chars are 1 byte
       case ArrayType(BaseType.BoolType) => 4 + size        // Bools are 1 byte
       case ArrayType(BaseType.StrType)  => 4 + (size * 8)  // Strings are pointers (8 bytes)
+      case BaseType.StrType             => 4 + size 
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
     }
   }
