@@ -383,16 +383,8 @@ object CodeGen {
           case UnaryOperator.Not =>
             currentBranch += IRCmpImm(srcRegW, 1) += IRCset(destW, NE)
             BaseType.BoolType
-      
           case UnaryOperator.Length =>
-            expr match {
-              case Identifier(name) =>
-                val varSrcRegW = variableRegisters(name)._1
-                currentBranch += IRLdur(destW, varSrcRegW, -4)
-              case _ => currentBranch += IRLdur(destW, srcRegW, -4)
-
-            }
-            // currentBranch += IRLdur(destW, srcRegW, -4) 
+            currentBranch += IRLdur(destW, srcRegW, -4) 
             BaseType.IntType
 
           case UnaryOperator.Ord =>
