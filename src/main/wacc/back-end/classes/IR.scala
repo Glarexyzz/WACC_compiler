@@ -52,6 +52,10 @@ case class IRStrb(value: Register, addr: Register, offset: Option[Int] = None) e
         case None      => s"str $value, [$addr]"
     }
 }
+case class IRStrsb(value: Register, addr1: Register, addr2: Register, offset: Int) extends IRInstr {
+    override def toString: String =  s"str $value, [$addr1, $addr2, lsl #$offset]"
+          
+}
 
 // Store a pair of registers onto the stack	
 case class IRStp(reg1: Register, reg2: Register, offset: Int, preDecrement: Boolean = false) extends IRInstr {
@@ -87,6 +91,7 @@ case class IRAddImm(dest: Register, left: Register, imm: String) extends IRInstr
 case class IRAddImmInt(dest: Register, left: Register, imm: Int) extends IRInstr {
     override def toString: String = s"add $dest, $left, #$imm"
 }
+
 case class IRSub(dest: Register, left: Register, right: Register) extends IRInstr {
     override def toString: String = s"sub $dest, $left, $right"
 }
