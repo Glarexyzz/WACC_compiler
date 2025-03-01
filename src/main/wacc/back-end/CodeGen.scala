@@ -297,7 +297,7 @@ object CodeGen {
     helpers.getOrElseUpdate(IRLabel("_errDivZero"), errDivZero())
 
   def extractInt(expr1: Expr, expr2: Expr, isAdd: Boolean): Option[(Expr, Int)] = 
-    def valid(value: Int): Boolean = (value >= -4096 && value <= 4095 && isAdd) || (value >= 1 && value <= 4095 && !isAdd)
+    def valid(value: Int): Boolean = (value >= -4096 && value <= 4095 && isAdd) || (value >= 0 && value <= 4095 && !isAdd)
 
     (expr1, expr2) match {
       case (_, IntLiteral(value)) if valid(value.toInt) => Some((expr1, value.toInt))
