@@ -478,10 +478,17 @@ object CodeGen {
         val (reg, t) = variableRegisters(name)
         // ❌ compare if the dest and src are the same value or not to reduce redundancy
         if (destW != reg.asW) {
-          currentBranch += IRMovReg(destW, reg.asW)
+          t match {
+            case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
+            case _ => currentBranch += IRMovReg(destW, reg.asW)
+          // if (t == ArrayType) {
+          }  
+          // } else {
+          
+          // }
         }
         t
-      
+
       case PairLiteral =>
         BaseType.IntType // Assume IntType for simplicity
       
