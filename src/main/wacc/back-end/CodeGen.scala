@@ -479,7 +479,7 @@ object CodeGen {
         // ❌ compare if the dest and src are the same value or not to reduce redundancy
         if (destW != reg.asW) {
           t match {
-            case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
+            //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
             case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
             case _ => currentBranch += IRMovReg(destW, reg.asW)
           // if (t == ArrayType) {
