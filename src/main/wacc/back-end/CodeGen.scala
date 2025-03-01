@@ -20,6 +20,9 @@ object CodeGen {
 
   // Register allocation
   // We need to account for spill over registers
+  private val tempRegisters: List[Register] = List(X8, X9, X10, X11, X12, X13, X14, X15)
+  private val availableTempRegisters = mutable.Stack[Register](X8, X9, X10, X11, X12, X13, X14, X15)
+  private val activeTempRegisters = mutable.Set[Register]()
   private val availableRegisters = mutable.Stack[Register](X19, X20, X21, X22, X23, X24, X25, X26, X27, X28) // Pool of free registers
   private val activeRegisters = mutable.Set[Register]()  // Set of registers currently in use
   private val registerStack = mutable.Stack[Register]()  // Stack for spilled registers
@@ -45,10 +48,23 @@ object CodeGen {
     throw new Exception("No available registers and no registers to spill!")
   }
 
+    private def getTempRegister(): Register = {
+    if (availableTempRegisters.nonEmpty) {
+      val reg = availableTempRegisters.pop()
+      activeTempRegisters += reg
+      return reg
+    }
+    // If no temp registers available, get a normal one
+    getRegister()
+  }
+
+
   def freeRegister(reg: Register): Unit = {
     if (registerStack.nonEmpty && registerStack.top == reg) {
       instrBuffer += IRLdr(reg, SP)  // Restore spilled register
       registerStack.pop()
+    } else if (tempRegisters.contains(reg)) {
+      availableTempRegisters.push(reg)
     } else {
       availableRegisters.push(reg)
     }
@@ -457,10 +473,11 @@ object CodeGen {
   def genMod(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
     genDivZero()
     generateExpr(expr1, temp)
-    val xreg = getRegister()
+    val xreg = getTempRegister()
     val wreg = xreg.asW
     generateExpr(expr2, xreg)
     currentBranch += IRCmpImm(wreg, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(W1, temp.asW, wreg) += IRMSub(dest, W1, temp.asW, wreg)
+    freeRegister(xreg)
 
   def generateExpr(expr: Expr, destX: Register = X0, temp: Register = X0): Type = 
     val destW = destX.asW
@@ -578,44 +595,38 @@ object CodeGen {
         }
         val binaryInstrs = op match {
           case BinaryOperator.Add =>
-            val xreg = getRegister() // alternatively, generateExpr produces either a register or a value
+            val xreg = getTempRegister() // alternatively, generateExpr produces either a register or a value
             val wreg = xreg.asW // move one to a temporary register
             genAdd(expr1, expr2, destW, wreg)
             freeRegister(xreg)
             BaseType.IntType
           
           case BinaryOperator.Subtract =>
-            val xreg = getRegister() // alternatively, generateExpr produces either a register or a value
+            val xreg = getTempRegister() // alternatively, generateExpr produces either a register or a value
             val wreg = xreg.asW // move one to a temporary register
             genSub(expr1, expr2, destW, wreg)
             freeRegister(xreg)
             BaseType.IntType // SUB W0, reg1, reg2
 
           case BinaryOperator.Multiply =>
-            val xreg = getRegister()
+            val xreg = getTempRegister()
             genMul(expr1, expr2, destX, xreg)
             freeRegister(xreg)
             BaseType.IntType
 
 
           case BinaryOperator.Divide => 
-            val xreg = getRegister()
+            val xreg = getTempRegister()
             val wreg = xreg.asW
             genDiv(expr1, expr2, destW, wreg)
             freeRegister(xreg)
             BaseType.IntType // SDIV W0, reg1, reg2
 
           case BinaryOperator.Modulus => 
-            val xreg1 = getRegister() // alternatively, generateExpr produces either a register or a value
-            val wreg1 = xreg1.asW // move one to a temporary register
-            val xreg2 = getRegister() 
-            val wreg2 = xreg2.asW
-            generateExpr(expr1, xreg1)  // Generate IR for expr1
-            generateExpr(expr2, xreg2)  // Generate IR for expr2
-            genDivZero()
-            currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(W1, wreg1, wreg2) += IRMSub(destW, W1, wreg2, wreg1)
-            freeRegister(xreg1)
-            freeRegister(xreg2)
+            val xreg = getTempRegister()
+            val wreg = xreg.asW
+            genMod(expr1, expr2, destW, wreg)
+            freeRegister(xreg)
             BaseType.IntType
 
           case BinaryOperator.Greater =>
