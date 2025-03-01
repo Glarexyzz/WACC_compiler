@@ -448,6 +448,20 @@ object CodeGen {
     generateExpr(expr2, temp)
     currentBranch += IRSMull(dest.asX, dest.asW, temp.asW) += IRCmpExt(dest.asX, dest.asW) += IRJumpCond(NE, "_errOverflow")
 
+  def genDiv(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
+    genDivZero()
+    generateExpr(expr1, dest.asX, temp.asX)
+    generateExpr(expr2, temp.asX)
+    currentBranch += IRCmpImm(temp, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(dest, dest, temp)
+  
+  def genMod(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
+    genDivZero()
+    generateExpr(expr1, temp)
+    val xreg = getRegister()
+    val wreg = xreg.asW
+    generateExpr(expr2, xreg)
+    currentBranch += IRCmpImm(wreg, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(W1, temp.asW, wreg) += IRMSub(dest, W1, temp.asW, wreg)
+
   def generateExpr(expr: Expr, destX: Register = X0, temp: Register = X0): Type = 
     val destW = destX.asW
     expr match {
@@ -580,20 +594,15 @@ object CodeGen {
           case BinaryOperator.Multiply =>
             val xreg = getRegister()
             genMul(expr1, expr2, destX, xreg)
+            freeRegister(xreg)
             BaseType.IntType
 
 
           case BinaryOperator.Divide => 
-            val xreg1 = getRegister() // alternatively, generateExpr produces either a register or a value
-            val wreg1 = xreg1.asW // move one to a temporary register
-            val xreg2 = getRegister() 
-            val wreg2 = xreg2.asW
-            generateExpr(expr1, xreg1)  // Generate IR for expr1
-            generateExpr(expr2, xreg2)  // Generate IR for expr2
-            genDivZero()
-            currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(destW, wreg1, wreg2)
-            freeRegister(xreg1)
-            freeRegister(xreg2)
+            val xreg = getRegister()
+            val wreg = xreg.asW
+            genDiv(expr1, expr2, destW, wreg)
+            freeRegister(xreg)
             BaseType.IntType // SDIV W0, reg1, reg2
 
           case BinaryOperator.Modulus => 
