@@ -719,16 +719,16 @@ object CodeGen {
               } else {
                 currentBranch += IRStrb(W8, X16, Some(i)) // Store element
               }
-            case BaseType.StrType => List()
-          //     if (i == 0) { // separate case for first element
-          //       currentBranch += IRStrb(W8, X16)
-          //     } else {
-          //       currentBranch += IRStrb(W8, X16, Some(i)) // Store element
-          //     }
-          // }
+            case BaseType.StrType => 
+              if (i == 0) { // separate case for first element
+                currentBranch += IRStrb(W8, X16)
+              } else {
+                currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+              }
             case _ =>
-          
           }
+        
+          
         }
         currentBranch += IRMovReg(reg, X16) 
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
@@ -758,6 +758,7 @@ object CodeGen {
       case ArrayType(BaseType.CharType) => 4 + size        // Chars are 1 byte
       case ArrayType(BaseType.BoolType) => 4 + size        // Bools are 1 byte
       case ArrayType(BaseType.StrType)  => 4 + (size * 8)  // Strings are pointers (8 bytes)
+      case BaseType.StrType             => 4 + size 
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
     }
   }
