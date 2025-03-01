@@ -446,7 +446,7 @@ object CodeGen {
     genOverflow()
     generateExpr(expr1, dest, temp)
     generateExpr(expr2, temp)
-    currentBranch += IRSMull(dest, dest.asW, temp) += IRCmpExt(dest, dest.asW) += IRJumpCond(NE, "_errOverflow")
+    currentBranch += IRSMull(dest.asX, dest.asW, temp.asW) += IRCmpExt(dest.asX, dest.asW) += IRJumpCond(NE, "_errOverflow")
 
   def generateExpr(expr: Expr, destX: Register = X0, temp: Register = X0): Type = 
     val destW = destX.asW
@@ -579,8 +579,7 @@ object CodeGen {
 
           case BinaryOperator.Multiply =>
             val xreg = getRegister()
-            val wreg = xreg.asW
-            genMul(expr1, expr2, destX, wreg)
+            genMul(expr1, expr2, destX, xreg)
             BaseType.IntType
 
 
