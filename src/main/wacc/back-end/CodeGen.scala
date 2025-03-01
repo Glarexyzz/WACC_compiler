@@ -261,8 +261,17 @@ object CodeGen {
             val varReg = getRegister()
             generateRValue(name, rvalue, varReg)
             currentBranch += IRMovReg(X7, baseReg)
-            currentBranch += IRBl("_arrStore4")
-            helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore(varReg.asW))
+            helpers.getOrElseUpdate(IRLabel("_errOutofBounds"), errOutOfBounds())
+            if (arrType == ArrayType(BaseType.IntType)) {
+              currentBranch += IRBl("_arrStore4")
+              helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore(varReg.asW, 4))
+            }
+            if (arrType == ArrayType(BaseType.CharType)) {
+              currentBranch += IRBl("_arrStore1")
+              helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore(varReg.asW, 1))
+            }
+             
+            
             freeRegister(varReg)
 
             // helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
@@ -319,7 +328,7 @@ object CodeGen {
         } else if (exprType == BaseType.CharType) {
           helpers.getOrElseUpdate(IRLabel("_printc"), printc())
           currentBranch +=  IRBl("_printc")
-        } else if (exprType == BaseType.StrType) {
+        } else if (exprType == BaseType.StrType || exprType == ArrayType(BaseType.CharType) ) {
           helpers.getOrElseUpdate(IRLabel("_prints"), prints())
           currentBranch +=  IRBl("_prints")
         } else if (exprType == BaseType.BoolType) {
@@ -653,9 +662,8 @@ object CodeGen {
       
         val (baseReg, arrType) = variableRegisters(name) // Base address
         generateExpr(indices.head, W17) // Get index value
-
         helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
-        //helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+        helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
         currentBranch += IRMovReg(X7, baseReg) 
         currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
         
