@@ -319,7 +319,7 @@ object CodeGen {
         } else if (exprType == BaseType.CharType) {
           helpers.getOrElseUpdate(IRLabel("_printc"), printc())
           currentBranch +=  IRBl("_printc")
-        } else if (exprType == BaseType.StrType) {
+        } else if (exprType == BaseType.StrType || exprType == ArrayType(BaseType.CharType)) {
           helpers.getOrElseUpdate(IRLabel("_prints"), prints())
           currentBranch +=  IRBl("_prints")
         } else if (exprType == BaseType.BoolType) {
