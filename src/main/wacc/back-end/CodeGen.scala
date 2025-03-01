@@ -3,7 +3,7 @@ package wacc
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import wacc.Helpers._
-import scala.collection.mutable.ListBuffer
+
 
 
 /*
@@ -181,13 +181,23 @@ object CodeGen {
         val (reg, t) = variableRegisters(name)
         generateRValue(name, value, reg)
       
-      case AssignStmt(LValue.LName(name), rvalue) => 
-        variableRegisters.get(name) match {
-          case Some((reg, _)) =>
-            generateRValue(name, rvalue, reg)
-          case None =>
-            // should never reach here
-            throw new Exception(s"Variable $name used before declaration")
+      case AssignStmt(lvalue, rvalue) => 
+      
+      case AssignStmt(lvalue, rvalue) => 
+        lvalue match {
+          case LValue.LName(name) => 
+            variableRegisters.get(name) match {
+              case Some((reg, _)) =>
+                generateRValue(name, rvalue, reg)
+              case None =>
+                // should never reach here
+                throw new Exception(s"Variable $name used before declaration")
+            }
+          case LValue.LArray(ArrayElem(name, indices)) =>
+            val varReg = variableRegisters.get(name).map(_._1).get
+            val varType = variableRegisters.get(name).map(_._2).get
+
+
         }
       
       
@@ -509,36 +519,40 @@ object CodeGen {
         binaryInstrs  
       
   
-      case _ => BaseType.IntType
+      
 
 
         // case PairLiteral => List()
         //   // val reg = getRegister()
         //   // List(IRLoadImmediate(reg, 0))
 
-      // case ArrayElem(name, indices) => BaseType.CharType
-        // val (baseReg, arrayType) = variableRegisters(name) // Base address
-        // val indexReg = getRegister()
-        // generateExpr(indices.head, indexReg) // Get index value
-
-        // // Bounds check
-        // helpers.getOrElseUpdate(IRLabel("_errBounds"), errBounds())
-        // currentBranch += IRLdur(W8, baseReg, -4)  // Load array length
-        // currentBranch += IRCmp(indexReg.asW, W8)  // Compare index with size
-        // currentBranch += IRJumpCond(GE, "_errBounds") // If out of bounds, error
-
-        // // Compute address: base + (index * 4)
-        // currentBranch += IRAddImm(indexReg, indexReg, indexReg) // index * 2
-        // currentBranch += IRAddImm(indexReg, indexReg, indexReg) // index * 4
-        // currentBranch += IRAddReg(indexReg, baseReg, indexReg)  // base + index * 4
-
-        // currentBranch += IRLdur(destW, indexReg, 0) // Load from computed address
-        // freeRegister(indexReg)
-        // arrayType
+      case ArrayElem(name, indices) => BaseType.CharType
+        val (baseReg, arrayType) = variableRegisters(name) // Base address
+        val indexReg = getRegister()
+        generateExpr(indices.head, indexReg) // Get index value
 
         
-    }
+        helpers.getOrElseUpdate(IRLabel("_errBounds"), errOutOfBounds())
+        currentBranch += IRLdur(W8, baseReg, -4)  // Load array length
+        currentBranch += IRCmp(indexReg.asW, W8)  // Compare index with size
+        currentBranch += IRJumpCond(GE, "_errBounds") // If out of bounds, error
 
+        // // Compute address: base + (index * 4)
+        currentBranch += IRAdd(indexReg, indexReg, indexReg) // index * 2
+        currentBranch += IRAdd(indexReg, indexReg, indexReg) // index * 4
+        currentBranch += IRAdd(indexReg, baseReg, indexReg)  // base + index * 4
+
+        currentBranch += IRLdur(destW, indexReg, 0) // Load from computed address
+        freeRegister(indexReg)
+        arrayType
+
+      case _ => BaseType.IntType
+        
+    }
+  
+  def generateLValue (name: String, rvalue: RValue, reg: Register): Type = BaseType.IntType
+    
+  
 
   def generateRValue(name: String, rvalue: RValue, reg: Register): Type = {
     
@@ -548,7 +562,6 @@ object CodeGen {
       case RValue.RArrayLiter(arrayLiter) => 
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
-        val tempIR = ListBuffer[IRInstr]()
         val expType = variableRegisters.get(name).map(_._2).get
         val arrayMemory = arrayMemorySize(size, expType)
 
@@ -610,7 +623,7 @@ object CodeGen {
     }
 
   }
-  
+
 
   def generateArrayElem(arrayElem: ArrayElem): List[IRInstr] = List()
   
