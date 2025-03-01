@@ -262,7 +262,8 @@ object CodeGen {
             generateRValue(name, rvalue, varReg)
             currentBranch += IRMovReg(X7, baseReg)
             currentBranch += IRBl("_arrStore4")
-            helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore())
+            helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore(varReg.asW))
+            freeRegister(varReg)
 
             // helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
             // //helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
@@ -676,6 +677,7 @@ object CodeGen {
   def generateLValue (name: String, lvalue: LValue, reg: Register): Type =
     lvalue match {
         case LValue.LName(name) => 
+        case _ =>
     } 
     BaseType.IntType
 

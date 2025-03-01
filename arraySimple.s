@@ -3,7 +3,7 @@
 .text
 .global main
 main:
-    // Function prologue
+    // Main/Branch prologue
     stp fp, lr, [sp, #-16]!
     stp x19, xzr, [sp, #-16]!
     mov fp, sp
@@ -26,8 +26,8 @@ main:
     mov w0, w7
     bl _printi
     bl _println
+    // Main/Branch epilogue
     mov x0, #0
-    // Function epilogue
     ldp x19, xzr, [sp], #16
     ldp fp, lr, [sp], #16
     ret
@@ -128,7 +128,7 @@ _arrStore4:
     cmp w17, w30
     csel x1, x17, x1, ge
     b.ge _errOutOfBounds
-    str w8, [x7, x17, lsl #2]
+    str w20, [x7, x17, lsl #2]
     ldp lr, xzr, [sp], #16
     ret
 
