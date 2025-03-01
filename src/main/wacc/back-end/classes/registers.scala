@@ -86,6 +86,6 @@ case object W25 extends Register
 case object W26 extends Register
 case object W27 extends Register
 case object W28 extends Register
-// case object W29 extends Register  // Frame Pointer
-// case object W30 extends Register  // Link Register
+case object W29 extends Register  // Frame Pointer
+case object W30 extends Register  // Link Register
 case object WZR extends Register

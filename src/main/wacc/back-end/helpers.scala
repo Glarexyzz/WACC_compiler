@@ -283,5 +283,25 @@ object Helpers{
         )
         List(IRFuncLabel(IRLabel(label), instructions))
     }
+    def arrLoad(): List[IRInstr] = 
+        val label = "_arrLoad4"
+        val instructions: List[IRInstr] = List( // push {lr}
+            pushReg(LR, XZR), 
+            IRCmpImm(W17, 0), // cmp w17, #0
+            IRCsel(X1, X17, X1, LT), // csel x1, x17, x1, lt
+            IRJumpCond(LT, "_errOutOfBounds"), // b.lt _errOutOfBounds
+            
+            IRLdur(W30, X7, -4), // ldur w30, [x7, #-4]
+            IRCmp(W17, W30), // cmp w17, w30
+            IRCsel(X1, X17, X1, GE), // csel x1, x17, x1, ge
+            IRJumpCond(GE, "_errOutOfBounds"), // b.ge _errOutOfBounds
+
+            IRLdrsb(W7, X7, X17, 2), // ldr w7, [x7, x17, lsl #2]
+
+            popReg(LR, XZR),
+            IRRet() // ret
+        )
+        List(IRFuncLabel(IRLabel(label), instructions))
+
 
 }
