@@ -255,9 +255,20 @@ object CodeGen {
                 // should never reach here
                 throw new Exception(s"Variable $name used before declaration")
             }
-          // case LValue.LArray(ArrayElem(name, indices)) =>
-          //   val varReg = variableRegisters(name)._1
-          //   val varType = variableRegisters(name)._2
+          case LValue.LArray(ArrayElem(name, indices)) =>
+            val (baseReg, arrType) = variableRegisters(name) // Base address
+            generateExpr(indices.head, W17) // Get index value
+            val varReg = getRegister()
+            generateRValue(name, rvalue, varReg)
+            currentBranch += IRMovReg(X7, baseReg)
+            currentBranch += IRBl("_arrStore4")
+            helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore(varReg.asW))
+            freeRegister(varReg)
+
+            // helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
+            // //helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+            // currentBranch += IRMovReg(X7, baseReg) 
+            // currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W17)
           case _ =>
 
         }
@@ -663,7 +674,13 @@ object CodeGen {
         
     }
   
-  def generateLValue (name: String, rvalue: RValue, reg: Register): Type = BaseType.IntType
+  def generateLValue (name: String, lvalue: LValue, reg: Register): Type =
+    lvalue match {
+        case LValue.LName(name) => 
+        case _ =>
+    } 
+    BaseType.IntType
+
     
   
 
