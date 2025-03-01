@@ -54,7 +54,7 @@ case class IRStrb(value: Register, addr: Register, offset: Option[Int] = None) e
 }
 case class IRStrsb(value: Register, addr1: Register, addr2: Register, offset: Option[Int] = None) extends IRInstr {
     override def toString: String =  offset match {
-        case Some(off) => s"strb $value, [$addr1, $addr2, lsl #$offset]"
+        case Some(off) => s"strb $value, [$addr1, $addr2, lsl #$off]"
         case None      => s"strb $value, [$addr1, $addr2]"
     }    
           
