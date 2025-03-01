@@ -532,6 +532,7 @@ object CodeGen {
         generateExpr(indices.head, W17) // Get index value
 
         helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
+        //helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
         currentBranch += IRMovReg(X7, baseReg) 
         currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
         
