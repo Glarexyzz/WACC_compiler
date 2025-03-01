@@ -11,14 +11,12 @@ main:
     bl _malloc
     mov x16, x0
     add x16, x16, #4
-    mov w8, #3
+    mov w8, #2
     stur w8, [x16, #-4]
     mov w8, #1
     str w8, [x16]
-    mov w8, #2
-    str w8, [x16, #4]
-    mov w8, #3
-    str w8, [x16, #8]
+    mov w8, #0
+    str w8, [x16, #1]
     mov x19, x16
     sub x0, x19, #4
     bl free

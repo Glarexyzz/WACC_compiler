@@ -1,8 +1,4 @@
 .data
-// length of .L.str0
-    .word 53
-.L.str0:
-    .asciz "Printing an array variable gives an address, such as "
 .align 4
 .text
 .global main
@@ -11,21 +7,25 @@ main:
     stp fp, lr, [sp, #-16]!
     stp x19, xzr, [sp, #-16]!
     mov fp, sp
-    mov w0, #0
+    mov w0, #20
     bl _malloc
     mov x16, x0
-    add x16, x16, #4
-    mov w8, #3
+    adds x16, x16, #4
+    mov w8, #4
     stur w8, [x16, #-4]
-    mov w8, #1
+    mov w8, #43
     str w8, [x16]
     mov w8, #2
     str w8, [x16, #4]
-    mov w8, #3
+    mov w8, #18
     str w8, [x16, #8]
+    mov w8, #1
+    str w8, [x16, #12]
     mov x19, x16
-    mov w0, w19
-    bl _printp
+    mov w20, #0
+    mov x7, x19
+    bl _arrLoad4
+    bl _printi
     bl _println
     mov x0, #0
     // Function epilogue
@@ -33,15 +33,15 @@ main:
     ldp fp, lr, [sp], #16
     ret
 
-// length of .L._printp_str0
+// length of .L._printi_str0
     .word 2
-.L._printp_str0:
-    .asciz "%p"
+.L._printi_str0:
+    .asciz "%d"
 .align 4
-_printp:
+_printi:
     stp lr, xzr, [sp, #-16]!
     mov x1, x0
-    adr x0, .L._printp_str0
+    adr x0, .L._printi_str0
     bl printf
     mov x0, #0
     bl fflush

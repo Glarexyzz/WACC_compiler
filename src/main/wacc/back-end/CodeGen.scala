@@ -534,25 +534,27 @@ object CodeGen {
         //   // val reg = getRegister()
         //   // List(IRLoadImmediate(reg, 0))
 
-      case ArrayElem(name, indices) => BaseType.CharType
-        val (baseReg, arrayType) = variableRegisters(name) // Base address
+      case ArrayElem(name, indices) => 
+      
+        val (baseReg, arrType) = variableRegisters(name) // Base address
         val indexReg = getRegister()
         generateExpr(indices.head, indexReg) // Get index value
 
         
-        helpers.getOrElseUpdate(IRLabel("_errBounds"), errOutOfBounds())
-        currentBranch += IRLdur(W8, baseReg, -4)  // Load array length
-        currentBranch += IRCmp(indexReg.asW, W8)  // Compare index with size
-        currentBranch += IRJumpCond(GE, "_errBounds") // If out of bounds, error
+        //helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
+        currentBranch += IRMovReg(X7, baseReg)
+        currentBranch += IRBl("_arrLoad4")
+        
+        
+        
 
-        // // Compute address: base + (index * 4)
-        currentBranch += IRAdd(indexReg, indexReg, indexReg) // index * 2
-        currentBranch += IRAdd(indexReg, indexReg, indexReg) // index * 4
-        currentBranch += IRAdd(indexReg, baseReg, indexReg)  // base + index * 4
-
-        currentBranch += IRLdur(destW, indexReg, 0) // Load from computed address
+        
         freeRegister(indexReg)
-        arrayType
+        arrType match {
+          case ArrayType(inner) => inner
+          case _ => throw new Exception()
+        }
+        
 
       case _ => BaseType.IntType
         
@@ -570,7 +572,7 @@ object CodeGen {
       case RValue.RArrayLiter(arrayLiter) => 
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
-        val expType = variableRegisters.get(name).map(_._2).get
+        val expType = variableRegisters(name)._2
         val arrayMemory = arrayMemorySize(size, expType)
 
         currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
@@ -623,14 +625,14 @@ object CodeGen {
 
   def arrayMemorySize(size: Int, expType: Type): Int = {
     expType match {
-      case BaseType.IntType => 4 + (size * 4)
-      case BaseType.CharType => 4 + size
-      case BaseType.BoolType => 4 + size
-      case BaseType.StrType => 4 + (size * 8)
-      case ArrayType(innerType) => 0 //not done
+      case ArrayType(BaseType.IntType)  => 4 + (size * 4)  // Integers are 4 bytes
+      case ArrayType(BaseType.CharType) => 4 + size        // Chars are 1 byte
+      case ArrayType(BaseType.BoolType) => 4 + size        // Bools are 1 byte
+      case ArrayType(BaseType.StrType)  => 4 + (size * 8)  // Strings are pointers (8 bytes)
+      case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
     }
-
   }
+
 
 
   def generateArrayElem(arrayElem: ArrayElem): List[IRInstr] = List()
