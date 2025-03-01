@@ -518,7 +518,12 @@ object CodeGen {
             
             // currentBranch += IRLdur(destW, srcRegW, -4) 
 
-          case UnaryOperator.Ord =>
+          case UnaryOperator.Ord => 
+            expr match {
+              case Identifier(name) => 
+                val r = variableRegisters(name)._1
+                currentBranch += IRMovReg(destW, r.asW)
+            }
             BaseType.IntType
 
           case UnaryOperator.Chr =>
