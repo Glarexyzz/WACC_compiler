@@ -422,10 +422,10 @@ object CodeGen {
     genOverflow()
     extractInt(expr1, expr2, true) match {
       case Some((expr, value)) => 
-        generateExpr(expr, dest)
+        generateExpr(expr, dest, temp)
         currentBranch += IRAddsImm(dest, dest, value) += IRJumpCond(VS, "_errOverflow")
       case _ =>
-        generateExpr(expr1, dest)
+        generateExpr(expr1, dest, temp)
         generateExpr(expr2, temp)
         currentBranch += IRAdds(dest, dest, temp) += IRJumpCond(VS, "_errOverflow")
     }
@@ -434,15 +434,21 @@ object CodeGen {
     genOverflow()
     extractInt(expr1, expr2, false) match {
       case Some((expr, value)) => 
-        generateExpr(expr, dest)
+        generateExpr(expr, dest, temp)
         currentBranch += IRSubImm(dest, dest, value) += IRJumpCond(VS, "_errOverflow")
       case _ =>
-        generateExpr(expr1, dest)
+        generateExpr(expr1, dest, temp)
         generateExpr(expr2, temp)
         currentBranch += IRSub(dest, dest, temp) += IRJumpCond(VS, "_errOverflow")
     }
 
-  def generateExpr(expr: Expr, destX: Register = X0): Type = 
+  def genMul(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
+    genOverflow()
+    generateExpr(expr1, dest, temp)
+    generateExpr(expr2, temp)
+    currentBranch += IRSMull(dest, dest.asW, temp) += IRCmpExt(dest, dest.asW) += IRJumpCond(NE, "_errOverflow")
+
+  def generateExpr(expr: Expr, destX: Register = X0, temp: Register = X0): Type = 
     val destW = destX.asW
     expr match {
       case IntLiteral(value) =>
@@ -572,18 +578,9 @@ object CodeGen {
             BaseType.IntType // SUB W0, reg1, reg2
 
           case BinaryOperator.Multiply =>
-            val xreg1 = getRegister() // alternatively, generateExpr produces either a register or a value
-            val wreg1 = xreg1.asW // move one to a temporary register
-            val xreg2 = getRegister() 
-            val wreg2 = xreg2.asW
-            generateExpr(expr1, xreg1)  // Generate IR for expr1
-            generateExpr(expr2, xreg2)  // Generate IR for expr2
-            genOverflow()
             val xreg = getRegister()
-            currentBranch += IRSMull(xreg, wreg1, wreg2) += IRCmpExt(xreg, xreg.asW) += 
-                              IRJumpCond(NE, "_errOverflow") += IRMovReg(destW, xreg.asW) // MUL W0, reg1, reg2
-            freeRegister(xreg1)
-            freeRegister(xreg2)
+            val wreg = xreg.asW
+            genMul(expr1, expr2, destX, wreg)
             BaseType.IntType
 
 
