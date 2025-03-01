@@ -94,51 +94,111 @@ object CodeGen {
     headIR ++ mainIR ++ funcIRs ++ helperIRs
   }
 
-  // Branches for main function
-  private var nBranch = 0 // Track number of branching sections
-  private val branches = mutable.ListBuffer[IRInstr]() // Store branches as IRFuncLabels
-  private var currentBranch = mutable.ListBuffer[IRInstr]() // The working branch
-  // default is currentBranch
-  private def branchLabel(n: Int = 0): String = {
-    val branchNo = nBranch + n
-    if branchNo == 0 then "main" else s".L${branchNo-1}"
+  def generateMainIR(stmt: Stmt): List[IRInstr] = generateFunctionIR(stmt)
+
+  def generateFunc(func: Func): List[IRInstr] = {
+    generateFunctionIR(func.stmt, Some(func.name), func.paramList)
   }
 
-  private def addBranch(): Unit = {
-    branches += IRFuncLabel(IRLabel(branchLabel()), currentBranch.toList)
+  // for storing parameters of functions
+  private var paramsMap = Map[String, (Register, Type)]()
+
+  def assignFuncParams(params: List[Param]):Map[String, (Register, Type)] = {
+    val paramRegisters = List(X0, X1, X2, X3, X4, X5, X6, X7)
+    params.zip(paramRegisters).map {
+      case (param, reg) =>
+        (param.name, (reg, param.t))
+    }.toMap
+  }
+  
+  // Branches for main function
+  private var nBranch = 0 // Track number of branching sections
+  private var branches = mutable.ListBuffer[IRInstr]() // Store branches as IRFuncLabels
+  private var currentBranch = mutable.ListBuffer[IRInstr]() // The working branch
+  // default is currentBranch
+  private def branchLabel(n: Int = 0, funcLabel: Option[String] = None): String = {
+    val branchNo = nBranch + n
+    funcLabel match {
+      case Some(name) => s"wacc_$name"
+      case None if branchNo == 0 => "main" 
+      case None => s".L${branchNo-1}"
+    }
+  }
+
+  private def addBranch(funcLabel: Option[String] = None): Unit = {
+    branches += IRFuncLabel(IRLabel(branchLabel(funcLabel = funcLabel)), currentBranch.toList)
     currentBranch = mutable.ListBuffer[IRInstr]() // Reset for next branch
     nBranch += 1
   }
 
-  def generateMainIR(stmt: Stmt): List[IRInstr] = {
+  def generateFunctionIR(
+    stmt: Stmt, 
+    funcLabel: Option[String] = None, 
+    paramRegs: Option[List[wacc.Param]] = None
+  ): List[IRInstr] = {
+    branches = mutable.ListBuffer[IRInstr]() // cleanup the branches
+
+    
+    paramRegs match {
+      case Some(params) =>
+        paramsMap = assignFuncParams(params)
+        variableRegisters ++= paramsMap  // add parameters
+      case None =>
+        None  // unchanged
+    }
+
     val allocatedRegs = initialiseVariables(symbolTable)
+
+    // function: Save parameters onto the stack to allow modification
+    val paramPushInstrs = paramsMap.values.map { case (reg, _) => 
+      List(
+        IRCmt(s"push {$reg}"),
+        pushReg(reg, XZR),
+        IRMovReg(X16, SP)
+      )
+    }
+
     // Generate prologue (Add to first branch)
-    val prologue = List(
-      IRCmt("Function prologue"),
-      pushReg(FP, LR)
-    ) ++ pushRegs(allocatedRegs) ++ List(
-      IRMovReg(FP, SP)
-    )
+    val prologue = funcLabel match {
+      case Some(_) =>
+        List(
+          IRCmt("Function prologue"),
+          pushReg(FP, LR),
+          IRMovReg(FP, SP)
+        ) ++ paramPushInstrs.flatten
+      case None =>
+        List(
+          IRCmt("Main/Branch prologue"),
+          pushReg(FP, LR)
+        ) ++ pushRegs(allocatedRegs) ++ List(
+          IRMovReg(FP, SP)
+        )
+    }
 
     currentBranch ++= prologue
 
     generateStmt(stmt) // Generate IR for main function body
 
     // Add function epilogue (add to last branch)
-    val epilogue = List(
-      IRMov(X0, 0), // Default return code
-      IRCmt("Function epilogue")
-    ) ++ popRegs(allocatedRegs) ++ List(
-      popReg(FP, LR),
-      IRRet()
-    )
+    val epilogue = funcLabel match {
+      case Some(_) =>
+        None
+      case None =>
+        List(
+          IRCmt("Main/Branch epilogue"),
+          IRMov(X0, 0) // Default return code
+        ) ++ popRegs(allocatedRegs) ++ List(
+          popReg(FP, LR),
+          IRRet()
+        )
+    }
 
     currentBranch ++= epilogue
 
-    addBranch() // Save last branch
+    // ❌ Ensure function label appears first, followed by branch labels inside the function
+    addBranch(funcLabel)
 
     branches.toList
-    
   }
 
   def initialiseVariables(symTab: SymbolTable): List[Register] = {
@@ -153,12 +213,6 @@ object CodeGen {
       }
     }
     allocatedRegs.toList
-  }
-
-  def generateFunc(func: Func): List[IRInstr] = {
-    List()
-    // left blank for now, initialise later - because this looks really tricky....
-    // if anyone has any ideas for this, please go ahead
   }
 
   def generateHeadIR(): List[IRInstr] = {
@@ -189,6 +243,14 @@ object CodeGen {
             variableRegisters.get(name) match {
               case Some((reg, _)) =>
                 generateRValue(name, rvalue, reg)
+                // function parameter update push to stack
+                if (paramsMap.contains(name)) {
+                  currentBranch ++= List(
+                    IRCmt(s"push {$reg}"),
+                    pushReg(reg, XZR),
+                    IRMovReg(X16, SP)
+                  )
+                }
               case None =>
                 // should never reach here
                 throw new Exception(s"Variable $name used before declaration")
@@ -198,12 +260,7 @@ object CodeGen {
           //   val varType = variableRegisters(name)._2
           case _ =>
 
-
         }
-      
-      
-
-       
 
       case ReadStmt(lvalue) => 
         lvalue match {
@@ -230,6 +287,18 @@ object CodeGen {
         }
 
       case PrintStmt(expr) =>
+        expr match {
+          case Identifier(name) if paramsMap.contains(name) =>
+            val (reg, t) = paramsMap(name)
+            // function parameter push
+            currentBranch ++= List(
+              IRCmt(s"pop/peek {$reg}"),
+              IRLdur(reg, SP, 0),
+              IRMovReg(X16, SP)
+            )
+          case _ =>
+            None
+        }
         val exprType = generateExpr(expr)
         
         //val exprType = generateExpr(expr)
@@ -255,8 +324,38 @@ object CodeGen {
         generateStmt(PrintStmt(expr))
         currentBranch += IRBl("_println")
 
+        // 
+        expr match {
+          case Identifier(name) if paramsMap.contains(name) =>
+            val (reg, t) = paramsMap(name)
+            // function parameter pop
+            currentBranch ++= List(
+              IRCmt(s"pop {$reg}"),
+              popReg(reg, XZR)
+            )
+          case _ =>
+            None
+        }
 
-      case ReturnStmt(expr) => List()
+
+      case ReturnStmt(expr) => 
+        // function: Restore parameters from the stack before returning
+        val paramPopInstrs = paramsMap.values.map { case (reg, _) =>
+          List(
+            IRCmt(s"pop {$reg}"),
+            popReg(reg, XZR)
+          )
+        }
+        generateExpr(expr, W0)
+        currentBranch ++= (
+          List(
+            IRCmt("Function epilogue: reset stack pointer")
+          ) ++ paramPopInstrs.flatten ++ List(
+            IRMovReg(SP, FP), // Reset stack pointer before returning
+            popReg(FP, LR),
+            IRRet()
+          )
+        )
 
       case ExitStmt(expr) =>
         generateExpr(expr)
@@ -366,7 +465,10 @@ object CodeGen {
       // move the identifier into the destination register
       case Identifier(name) =>
         val (reg, t) = variableRegisters(name)
-        currentBranch += IRMovReg(destW, reg.asW)
+        // ❌ compare if the dest and src are the same value or not to reduce redundancy
+        if (destW != reg.asW) {
+          currentBranch += IRMovReg(destW, reg.asW)
+        }
         t
       
       case PairLiteral =>
@@ -618,7 +720,16 @@ object CodeGen {
         BaseType.IntType 
       case RValue.RNewPair(left, right) => BaseType.IntType
       case RValue.RPair(pairElem) => BaseType.IntType
-      case RValue.RCall(name, args) => BaseType.IntType
+      case RValue.RCall(name, Some(args)) => 
+        val paramRegs = List(X0, X1, X2, X3, X4, X5, X6, X7)
+        args.zip(paramRegs).foreach { case (arg, reg) =>
+          generateExpr(arg, reg) // Move argument values into x0-x7
+        }
+        currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
+        BaseType.IntType
+      case RValue.RCall(name, None) =>
+        currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
+        BaseType.IntType
     }
 
     
