@@ -22,9 +22,10 @@ main:
     mov w8, #1
     str w8, [x16, #12]
     mov x19, x16
-    mov w20, #0
+    mov w17, #0
     mov x7, x19
     bl _arrLoad4
+    mov w0, w7
     bl _printi
     bl _println
     mov x0, #0
@@ -58,6 +59,19 @@ _errOutOfMemory:
     bl _prints
     mov w0, #-1
     bl exit
+_arrLoad4:
+    stp lr, xzr, [sp, #-16]!
+    cmp w17, #0
+    csel x1, x17, x1, lt
+    b.lt _errOutOfBounds
+    ldur w30, [x7, #-4]
+    cmp w17, w30
+    csel x1, x17, x1, ge
+    b.ge _errOutOfBounds
+    ldr w7, [x7, x17, lsl #2]
+    ldp lr, xzr, [sp], #16
+    ret
+
 // length of .L._prints_str0
     .word 4
 .L._prints_str0:

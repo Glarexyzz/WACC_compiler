@@ -181,7 +181,7 @@ object CodeGen {
         val (reg, t) = variableRegisters(name)
         generateRValue(name, value, reg)
       
-      case AssignStmt(lvalue, rvalue) => 
+      // case AssignStmt(lvalue, rvalue) => 
       
       case AssignStmt(lvalue, rvalue) => 
         lvalue match {
@@ -193,16 +193,17 @@ object CodeGen {
                 // should never reach here
                 throw new Exception(s"Variable $name used before declaration")
             }
-          case LValue.LArray(ArrayElem(name, indices)) =>
-            val varReg = variableRegisters.get(name).map(_._1).get
-            val varType = variableRegisters.get(name).map(_._2).get
+          // case LValue.LArray(ArrayElem(name, indices)) =>
+          //   val varReg = variableRegisters(name)._1
+          //   val varType = variableRegisters(name)._2
+          case _ =>
 
 
         }
       
       
 
-      case AssignStmt(lvalue, rvalue) => 
+       
 
       case ReadStmt(lvalue) => 
         lvalue match {
@@ -230,6 +231,8 @@ object CodeGen {
 
       case PrintStmt(expr) =>
         val exprType = generateExpr(expr)
+        
+        //val exprType = generateExpr(expr)
         if (exprType == BaseType.IntType) {
           helpers.getOrElseUpdate(IRLabel("_printi"), printi())
           currentBranch +=  IRBl("_printi")
@@ -527,9 +530,6 @@ object CodeGen {
         binaryInstrs  
       
   
-      
-
-
         // case PairLiteral => List()
         //   // val reg = getRegister()
         //   // List(IRLoadImmediate(reg, 0))
@@ -537,19 +537,17 @@ object CodeGen {
       case ArrayElem(name, indices) => 
       
         val (baseReg, arrType) = variableRegisters(name) // Base address
-        val indexReg = getRegister()
-        generateExpr(indices.head, indexReg) // Get index value
+        generateExpr(indices.head, W17) // Get index value
+
+        helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
+        currentBranch += IRMovReg(X7, baseReg) 
+        currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
+        
+        
+        
 
         
-        //helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
-        currentBranch += IRMovReg(X7, baseReg)
-        currentBranch += IRBl("_arrLoad4")
         
-        
-        
-
-        
-        freeRegister(indexReg)
         arrType match {
           case ArrayType(inner) => inner
           case _ => throw new Exception()

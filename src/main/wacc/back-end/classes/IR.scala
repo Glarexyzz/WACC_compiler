@@ -32,6 +32,9 @@ case class IRAdrp(dest: Register, label: String) extends IRInstr {
 case class IRLdr(dest: Register, addr: Register) extends IRInstr {
     override def toString: String = s"ldr $dest, [$addr]"
 }
+case class IRLdrsb(dest: Register, addr1: Register, addr2: Register, offset: Int) extends IRInstr {
+    override def toString: String = s"ldr $dest, [$addr1, $addr2, lsl #$offset]"
+}
 // Load an unsigned register
 case class IRLdur(dest: Register, addr: Register, offset: Int) extends IRInstr {
     override def toString: String = s"ldur $dest, [$addr, #$offset]"
