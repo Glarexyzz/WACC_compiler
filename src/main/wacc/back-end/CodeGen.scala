@@ -474,9 +474,8 @@ object CodeGen {
     genDivZero()
     generateExpr(expr1, temp)
     val xreg = getTempRegister()
-    val wreg = xreg.asW
     generateExpr(expr2, xreg)
-    currentBranch += IRCmpImm(wreg, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(W1, temp.asW, wreg) += IRMSub(dest, W1, temp.asW, wreg)
+    currentBranch += IRCmpImm(xreg.asW, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(W1, temp.asW, xreg.asW) += IRMSub(dest, W1, xreg.asW, temp.asW)
     freeRegister(xreg)
 
   def generateExpr(expr: Expr, destX: Register = X0, temp: Register = X0): Type = 
