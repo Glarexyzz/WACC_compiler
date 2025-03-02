@@ -739,7 +739,7 @@ object CodeGen {
               if (i == 0) { // separate case for first element
                 currentBranch += IRStrb(W8, X16)
               } else {
-              currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+              currentBranch += IRStrb(W8, X16, Some(i)) // Should be strb
               }
             case BaseType.BoolType => 
               if (i == 0) { // separate case for first element
@@ -751,8 +751,20 @@ object CodeGen {
               if (i == 0) { // separate case for first element
                 currentBranch += IRStrb(W8, X16)
               } else {
-                currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+                currentBranch += IRStrb(W8, X16, Some(i)) // should be str but if char[] then should be strb
               }
+            case ArrayType(inner) =>
+              currentBranch.remove(currentBranch.length - 1)
+              element match {
+                case Identifier(name) =>
+                  val elemReg = variableRegisters(name)._1
+                  if (i == 0) { // separate case for first element
+                    currentBranch += IRStr(elemReg, X16)
+                  } else {
+                    currentBranch += IRStr(elemReg, X16, Some(i * 8)) // should be str but if char[] then should be strb
+                  }
+              }
+              
             case _ =>
           }
         
@@ -782,14 +794,15 @@ object CodeGen {
 
   def arrayMemorySize(size: Int, expType: Type): Int = {
     expType match {
-      case ArrayType(BaseType.IntType)  => 4 + (size * 4)  // Integers are 4 bytes
-      case ArrayType(BaseType.CharType) => 4 + size        // Chars are 1 byte
-      case ArrayType(BaseType.BoolType) => 4 + size        // Bools are 1 byte
-      case ArrayType(BaseType.StrType)  => 4 + (size * 8)  // Strings are pointers (8 bytes)
-      case BaseType.StrType             => 4 + size 
+      
+      case ArrayType(BaseType.IntType)    => 4 + (size * 4)
+      case ArrayType(BaseType.CharType)   => 4 + size
+      case ArrayType(BaseType.BoolType)   => 4 + size
+      case ArrayType(BaseType.StrType)    => 4 + (size * 8)
+      case ArrayType(ArrayType(_))        => 4 + (size * 8) // Pointers to subarrays (8 bytes each)
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
     }
-  }
+}
 
 
 
