@@ -283,9 +283,9 @@ object CodeGen {
             } else {
               currentBranch += IRBl("_arrStore4")
               helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore4(varReg.asW))
-              freeRegister(varReg)
+              
             }
-
+            freeRegister(varReg)
             // helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
             // currentBranch += IRMovReg(X7, baseReg) 
@@ -688,7 +688,7 @@ object CodeGen {
         generateExpr(indices.head, W17) // Get index value
 
         helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
-        //helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+        helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
         currentBranch += IRMovReg(X7, baseReg) 
         currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
         

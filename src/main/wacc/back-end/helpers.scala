@@ -285,7 +285,7 @@ object Helpers{
     }
     def arrLoad(): List[IRInstr] = 
         val label = "_arrLoad4"
-        val errBoundmsg = errOutOfBounds()
+        //val errBoundmsg = errOutOfBounds()
         val instructions: List[IRInstr] = List( // push {lr}
             pushReg(LR, XZR), 
             IRCmpImm(W17, 0), // cmp w17, #0
@@ -302,7 +302,8 @@ object Helpers{
             popReg(LR, XZR),
             IRRet() // ret
         )
-        List(IRFuncLabel(IRLabel(label), instructions)) ++ errBoundmsg
+        List(IRFuncLabel(IRLabel(label), instructions)) 
+        //++ errBoundmsg
     
     def arrStore4(reg: Register): List[IRInstr] = 
         val label = "_arrStore4"
