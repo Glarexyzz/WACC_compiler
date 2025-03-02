@@ -131,7 +131,7 @@ case class IRXor(dest: Register, left: Register, right: Register) extends IRInst
 // consider if needed: 
 // https://developer.arm.com/documentation/ddi0602/2023-12/Base-Instructions/NEG--shifted-register---Negate--shifted-register---an-alias-of-SUB--shifted-register--?lang=encase 
 class IRNeg(dest: Register, src: Register) extends IRInstr {
-    override def toString: String = s"neg $dest, $src"
+    override def toString: String = s"negs $dest, $src"
 }
 
 // 📌 Comparison Operations
