@@ -462,26 +462,26 @@ object CodeGen {
       case _ =>
         generateExpr(expr1, temp)
         val xreg = getTempRegister()
-        generateExpr(expr2, xreg)
-        currentBranch += IRSub(dest, dest, temp) += IRJumpCond(VS, "_errOverflow")
+        val wreg = xreg.asW
+        generateExpr(expr2, wreg)
+        currentBranch += IRSub(dest, temp, wreg) += IRJumpCond(VS, "_errOverflow")
         freeRegister(xreg)
     }
 
   def genMul(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
     genOverflow()
-    generateExpr(expr1, temp)
+    generateExpr(expr1, temp.asW)
     val xreg = getTempRegister()
-    generateExpr(expr2, xreg)
-    currentBranch += IRSMull(dest.asX, xreg.asW, temp.asW) += IRCmpExt(dest.asX, dest.asW) += IRJumpCond(NE, "_errOverflow")
+    generateExpr(expr2, xreg.asW)
+    currentBranch += IRSMull(dest.asX, temp.asW, xreg.asW) += IRCmpExt(dest.asX, dest.asW) += IRJumpCond(NE, "_errOverflow")
     freeRegister(xreg)
 
   def genDiv(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
     genDivZero()
     generateExpr(expr1, temp.asX)
     val xreg = getTempRegister()
-    val wreg = xreg.asW
-    generateExpr(expr2, wreg)
-    currentBranch += IRCmpImm(wreg, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(dest, temp, wreg)
+    generateExpr(expr2, xreg)
+    currentBranch += IRCmpImm(xreg, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(dest.asX, temp.asX, xreg)
     freeRegister(xreg)
   
   def genMod(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
@@ -634,8 +634,7 @@ object CodeGen {
 
           case BinaryOperator.Divide => 
             val xreg = getTempRegister()
-            val wreg = xreg.asW
-            genDiv(expr1, expr2, destW, wreg)
+            genDiv(expr1, expr2, destX, xreg)
             freeRegister(xreg)
             BaseType.IntType // SDIV W0, reg1, reg2
 
