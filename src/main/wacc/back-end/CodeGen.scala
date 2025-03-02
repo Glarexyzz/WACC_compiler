@@ -275,11 +275,16 @@ object CodeGen {
             val (baseReg, arrType) = variableRegisters(name) // Base address
             generateExpr(indices.head, W17) // Get index value
             val varReg = getRegister()
-            generateRValue(name, rvalue, varReg)
+            val elemType = generateRValue(name, rvalue, varReg)
             currentBranch += IRMovReg(X7, baseReg)
-            currentBranch += IRBl("_arrStore4")
-            helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore(varReg.asW))
-            freeRegister(varReg)
+            if (elemType == BaseType.CharType) {
+              currentBranch += IRBl("_arrStore1")
+              helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore1(varReg.asW))
+            } else {
+              currentBranch += IRBl("_arrStore4")
+              helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore4(varReg.asW))
+              freeRegister(varReg)
+            }
 
             // helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
             // //helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
@@ -775,7 +780,8 @@ object CodeGen {
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
         helpers.getOrElseUpdate(IRLabel("_errOutOfMemor"), errOutOfMemory())
-        BaseType.IntType 
+        // BaseType.IntType 
+        expType
       case RValue.RNewPair(left, right) => BaseType.IntType
       case RValue.RPair(pairElem) => BaseType.IntType
       case RValue.RCall(name, Some(args)) => 
