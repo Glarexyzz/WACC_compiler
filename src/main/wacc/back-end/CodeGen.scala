@@ -275,14 +275,19 @@ object CodeGen {
             val (baseReg, arrType) = variableRegisters(name) // Base address
             generateExpr(indices.head, W17) // Get index value
             val varReg = getRegister()
-            generateRValue(name, rvalue, varReg)
+            val elemType = generateRValue(name, rvalue, varReg)
             currentBranch += IRMovReg(X7, baseReg)
-            currentBranch += IRBl("_arrStore4")
-            helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore(varReg.asW))
+            if (elemType == BaseType.CharType) {
+              currentBranch += IRBl("_arrStore1")
+              helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore1(varReg.asW))
+            } else {
+              currentBranch += IRBl("_arrStore4")
+              helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore4(varReg.asW))
+              
+            }
             freeRegister(varReg)
-
             // helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
-            // //helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+            helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
             // currentBranch += IRMovReg(X7, baseReg) 
             // currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W17)
           case _ =>
@@ -482,7 +487,7 @@ object CodeGen {
     val destW = destX.asW
     expr match {
       case IntLiteral(value) =>
-        if (value.abs <= 65535) {
+        if (value.abs <= 65535 || value <= -2147483647) {
           currentBranch += IRMov(destW, value.toInt)
           BaseType.IntType
         } else {
@@ -505,7 +510,8 @@ object CodeGen {
 
       case StrLiteral(value) =>
         val label = nextLabel()
-        stringLiterals.getOrElseUpdate(label, value) // Store string in .data
+        val formatVal = escapeInnerQuotes(value)
+        stringLiterals.getOrElseUpdate(label, formatVal) // Store string in .data
         currentBranch += IRAdrp(destX, label) += IRAddImm(destX, destX, s":lo12:$label")
         BaseType.StrType
 
@@ -536,7 +542,8 @@ object CodeGen {
         generateExpr(expr, srcRegX)
         val unaryType = op match {
           case UnaryOperator.Negate =>
-            currentBranch += IRNeg(destW, srcRegW) 
+            currentBranch += IRNeg(destW, srcRegW) += IRJumpCond(VS, "_errOverflow")
+            genOverflow()
             BaseType.IntType 
           case UnaryOperator.Not =>
             currentBranch += IRCmpImm(srcRegW, 1) += IRCset(destW, NE)
@@ -684,7 +691,7 @@ object CodeGen {
         generateExpr(indices.head, W17) // Get index value
 
         helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
-        //helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+        helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
         currentBranch += IRMovReg(X7, baseReg) 
         currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
         
@@ -728,8 +735,8 @@ object CodeGen {
         += IRAddImmInt(X16, X16, 4) += IRMov(W8, size) += IRStur(W8, X16, -4)
         // val registers = 
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
-          val expType = generateExpr(element, W8)
-          expType match {
+          val elType = generateExpr(element, W8)
+          elType match {
             case BaseType.IntType => 
               if (i == 0) { // separate case for first element
                 currentBranch += IRStr(W8, X16)
@@ -737,10 +744,11 @@ object CodeGen {
               currentBranch += IRStr(W8, X16, Some(i * 4)) // Store element
               }
             case BaseType.CharType => 
+              //if (expType == BaseType.StrType)
               if (i == 0) { // separate case for first element
                 currentBranch += IRStrb(W8, X16)
               } else {
-              currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+              currentBranch += IRStrb(W8, X16, Some(i)) // Should be strb
               }
             case BaseType.BoolType => 
               if (i == 0) { // separate case for first element
@@ -752,8 +760,20 @@ object CodeGen {
               if (i == 0) { // separate case for first element
                 currentBranch += IRStrb(W8, X16)
               } else {
-                currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+                currentBranch += IRStrb(W8, X16, Some(i)) // should be str but if char[] then should be strb
               }
+            case ArrayType(inner) =>
+              currentBranch.remove(currentBranch.length - 1)
+              element match {
+                case Identifier(name) =>
+                  val elemReg = variableRegisters(name)._1
+                  if (i == 0) { // separate case for first element
+                    currentBranch += IRStr(elemReg, X16)
+                  } else {
+                    currentBranch += IRStr(elemReg, X16, Some(i * 8)) // should be str but if char[] then should be strb
+                  }
+              }
+              
             case _ =>
           }
         
@@ -763,7 +783,8 @@ object CodeGen {
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
         helpers.getOrElseUpdate(IRLabel("_errOutOfMemor"), errOutOfMemory())
-        BaseType.IntType 
+        // BaseType.IntType 
+        expType
       case RValue.RNewPair(left, right) => BaseType.IntType
       case RValue.RPair(pairElem) => BaseType.IntType
       case RValue.RCall(name, Some(args)) => 
@@ -783,14 +804,16 @@ object CodeGen {
 
   def arrayMemorySize(size: Int, expType: Type): Int = {
     expType match {
-      case ArrayType(BaseType.IntType)  => 4 + (size * 4)  // Integers are 4 bytes
-      case ArrayType(BaseType.CharType) => 4 + size        // Chars are 1 byte
-      case ArrayType(BaseType.BoolType) => 4 + size        // Bools are 1 byte
-      case ArrayType(BaseType.StrType)  => 4 + (size * 8)  // Strings are pointers (8 bytes)
-      case BaseType.StrType             => 4 + size 
+
+      case BaseType.StrType               => 4 + size
+      case ArrayType(BaseType.IntType)    => 4 + (size * 4)
+      case ArrayType(BaseType.CharType)   => 4 + size
+      case ArrayType(BaseType.BoolType)   => 4 + size
+      case ArrayType(BaseType.StrType)    => 4 + (size * 8)
+      case ArrayType(ArrayType(_))        => 4 + (size * 8) // Pointers to subarrays (8 bytes each)
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
     }
-  }
+}
 
 
 
@@ -798,5 +821,15 @@ object CodeGen {
   
 
   def generatePairElem(pairElem: PairElem): List[IRInstr] = List()
+  
+  def escapeInnerQuotes(str: String): String = {
+    if (str.startsWith("\"") && str.endsWith("\"")) {
+      "\"" + str.drop(1).dropRight(1).replace("\"", "\\\"") + "\""
+    } else {
+      str.replace("\"", "\\\"") // Just escape quotes if no surrounding quotes
+    }
+  }
+
+
   
 }

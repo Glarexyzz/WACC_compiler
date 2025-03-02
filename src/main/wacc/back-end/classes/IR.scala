@@ -52,6 +52,12 @@ case class IRStrb(value: Register, addr: Register, offset: Option[Int] = None) e
         case None      => s"strb $value, [$addr]"
     }
 }
+
+case class IRStrbReg(value: Register, addr1: Register, addr2: Register) extends IRInstr {
+    override def toString: String =  s"strb $value, [$addr1, $addr2]"
+          
+}
+
 case class IRStrsb(value: Register, addr1: Register, addr2: Register, offset: Int) extends IRInstr {
     override def toString: String =  s"str $value, [$addr1, $addr2, lsl #$offset]"
           
@@ -93,10 +99,10 @@ case class IRAddImmInt(dest: Register, left: Register, imm: Int) extends IRInstr
 }
 
 case class IRSub(dest: Register, left: Register, right: Register) extends IRInstr {
-    override def toString: String = s"sub $dest, $left, $right"
+    override def toString: String = s"subs $dest, $left, $right"
 }
 case class IRSubImm(dest: Register, left: Register, right: Int) extends IRInstr {
-    override def toString: String = s"sub $dest, $left, #$right"
+    override def toString: String = s"subs $dest, $left, #$right"
 }
 case class IRMSub(dest: Register, q1: Register, q2: Register, s: Register) extends IRInstr {
     override def toString: String = s"msub $dest, $q1, $q2, $s"
@@ -125,7 +131,7 @@ case class IRXor(dest: Register, left: Register, right: Register) extends IRInst
 // consider if needed: 
 // https://developer.arm.com/documentation/ddi0602/2023-12/Base-Instructions/NEG--shifted-register---Negate--shifted-register---an-alias-of-SUB--shifted-register--?lang=encase 
 class IRNeg(dest: Register, src: Register) extends IRInstr {
-    override def toString: String = s"neg $dest, $src"
+    override def toString: String = s"negs $dest, $src"
 }
 
 // 📌 Comparison Operations
