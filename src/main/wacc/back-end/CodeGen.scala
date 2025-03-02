@@ -506,7 +506,7 @@ object CodeGen {
       case StrLiteral(value) =>
         val label = nextLabel()
         stringLiterals.getOrElseUpdate(label, value) // Store string in .data
-        currentBranch += IRAdrp(X0, label) += IRAddImm(X0, X0, s":lo12:$label")
+        currentBranch += IRAdrp(destX, label) += IRAddImm(destX, destX, s":lo12:$label")
         BaseType.StrType
 
       // move the identifier into the destination register
@@ -517,6 +517,7 @@ object CodeGen {
           t match {
             //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
             case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
+            case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
             case _ => currentBranch += IRMovReg(destW, reg.asW)
           // if (t == ArrayType) {
           }  
