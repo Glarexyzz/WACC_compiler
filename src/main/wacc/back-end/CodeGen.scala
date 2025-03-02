@@ -483,8 +483,9 @@ object CodeGen {
     currentBranch += IRCmpImm(xreg.asW, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(W1, temp.asW, xreg.asW) += IRMSub(dest, W1, xreg.asW, temp.asW)
     freeRegister(xreg)
 
-  def generateExpr(expr: Expr, destX: Register = X0, temp: Register = X0): Type = 
-    val destW = destX.asW
+  def generateExpr(expr: Expr, dest: Register = X0, temp: Register = X0): Type = 
+    val destX = dest.asX
+    val destW = dest.asW
     expr match {
       case IntLiteral(value) =>
         if (value.abs <= 65535 || value <= -2147483647) {
