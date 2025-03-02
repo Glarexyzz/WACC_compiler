@@ -510,7 +510,8 @@ object CodeGen {
 
       case StrLiteral(value) =>
         val label = nextLabel()
-        stringLiterals.getOrElseUpdate(label, value) // Store string in .data
+        val formatVal = escapeInnerQuotes(value)
+        stringLiterals.getOrElseUpdate(label, formatVal) // Store string in .data
         currentBranch += IRAdrp(X0, label) += IRAddImm(X0, X0, s":lo12:$label")
         BaseType.StrType
 
@@ -819,5 +820,15 @@ object CodeGen {
   
 
   def generatePairElem(pairElem: PairElem): List[IRInstr] = List()
+  
+  def escapeInnerQuotes(str: String): String = {
+    if (str.startsWith("\"") && str.endsWith("\"")) {
+      "\"" + str.drop(1).dropRight(1).replace("\"", "\\\"") + "\""
+    } else {
+      str.replace("\"", "\\\"") // Just escape quotes if no surrounding quotes
+    }
+  }
+
+
   
 }
