@@ -727,8 +727,8 @@ object CodeGen {
         += IRAddImmInt(X16, X16, 4) += IRMov(W8, size) += IRStur(W8, X16, -4)
         // val registers = 
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
-          val expType = generateExpr(element, W8)
-          expType match {
+          val elType = generateExpr(element, W8)
+          elType match {
             case BaseType.IntType => 
               if (i == 0) { // separate case for first element
                 currentBranch += IRStr(W8, X16)
@@ -736,6 +736,7 @@ object CodeGen {
               currentBranch += IRStr(W8, X16, Some(i * 4)) // Store element
               }
             case BaseType.CharType => 
+              //if (expType == BaseType.StrType)
               if (i == 0) { // separate case for first element
                 currentBranch += IRStrb(W8, X16)
               } else {
@@ -794,7 +795,8 @@ object CodeGen {
 
   def arrayMemorySize(size: Int, expType: Type): Int = {
     expType match {
-      
+
+      case BaseType.StrType               => 4 + size
       case ArrayType(BaseType.IntType)    => 4 + (size * 4)
       case ArrayType(BaseType.CharType)   => 4 + size
       case ArrayType(BaseType.BoolType)   => 4 + size
