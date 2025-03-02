@@ -487,7 +487,7 @@ object CodeGen {
     val destW = destX.asW
     expr match {
       case IntLiteral(value) =>
-        if (value.abs <= 65535) {
+        if (value.abs <= 65535 || value <= -2147483647) {
           currentBranch += IRMov(destW, value.toInt)
           BaseType.IntType
         } else {
