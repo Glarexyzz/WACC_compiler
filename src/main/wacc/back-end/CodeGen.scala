@@ -443,37 +443,45 @@ object CodeGen {
     genOverflow()
     extractInt(expr1, expr2, true) match {
       case Some((expr, value)) => 
-        generateExpr(expr, dest, temp)
-        currentBranch += IRAddsImm(dest, dest, value) += IRJumpCond(VS, "_errOverflow")
+        generateExpr(expr, temp)
+        currentBranch += IRAddsImm(dest, temp, value) += IRJumpCond(VS, "_errOverflow")
       case _ =>
-        generateExpr(expr1, dest, temp)
-        generateExpr(expr2, temp)
-        currentBranch += IRAdds(dest, dest, temp) += IRJumpCond(VS, "_errOverflow")
+        generateExpr(expr1, temp)
+        val xreg = getTempRegister()
+        generateExpr(expr2, xreg)
+        currentBranch += IRAdds(dest, temp, xreg.asW) += IRJumpCond(VS, "_errOverflow")
+        freeRegister(xreg)
     }
 
   def genSub(expr1: Expr, expr2: Expr, dest: Register, temp: Register) = 
     genOverflow()
     extractInt(expr1, expr2, false) match {
       case Some((expr, value)) => 
-        generateExpr(expr, dest, temp)
-        currentBranch += IRSubImm(dest, dest, value) += IRJumpCond(VS, "_errOverflow")
+        generateExpr(expr, temp)
+        currentBranch += IRSubImm(dest, temp, value) += IRJumpCond(VS, "_errOverflow")
       case _ =>
-        generateExpr(expr1, dest, temp)
-        generateExpr(expr2, temp)
+        generateExpr(expr1, temp)
+        val xreg = getTempRegister()
+        generateExpr(expr2, xreg)
         currentBranch += IRSub(dest, dest, temp) += IRJumpCond(VS, "_errOverflow")
+        freeRegister(xreg)
     }
 
   def genMul(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
     genOverflow()
-    generateExpr(expr1, dest, temp)
-    generateExpr(expr2, temp)
-    currentBranch += IRSMull(dest.asX, dest.asW, temp.asW) += IRCmpExt(dest.asX, dest.asW) += IRJumpCond(NE, "_errOverflow")
+    generateExpr(expr1, temp)
+    val xreg = getTempRegister()
+    generateExpr(expr2, xreg)
+    currentBranch += IRSMull(dest.asX, xreg.asW, temp.asW) += IRCmpExt(dest.asX, dest.asW) += IRJumpCond(NE, "_errOverflow")
+    freeRegister(xreg)
 
   def genDiv(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
     genDivZero()
-    generateExpr(expr1, dest.asX, temp.asX)
-    generateExpr(expr2, temp.asX)
-    currentBranch += IRCmpImm(temp, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(dest, dest, temp)
+    generateExpr(expr1, temp.asX)
+    val xreg = getTempRegister()
+    generateExpr(expr2, xreg)
+    currentBranch += IRCmpImm(xreg, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(dest, temp, xreg)
+    freeRegister(xreg)
   
   def genMod(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
     genDivZero()
