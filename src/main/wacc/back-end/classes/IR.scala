@@ -99,7 +99,7 @@ case class IRAddImmInt(dest: Register, left: Register, imm: Int) extends IRInstr
 }
 
 case class IRSub(dest: Register, left: Register, right: Register) extends IRInstr {
-    override def toString: String = s"sub $dest, $left, $right"
+    override def toString: String = s"subs $dest, $left, $right"
 }
 case class IRSubImm(dest: Register, left: Register, right: Int) extends IRInstr {
     override def toString: String = s"subs $dest, $left, #$right"
