@@ -540,7 +540,8 @@ object CodeGen {
         generateExpr(expr, srcRegX)
         val unaryType = op match {
           case UnaryOperator.Negate =>
-            currentBranch += IRNeg(destW, srcRegW) 
+            currentBranch += IRNeg(destW, srcRegW) += IRJumpCond(VS, "_errOverflow")
+            genOverflow()
             BaseType.IntType 
           case UnaryOperator.Not =>
             currentBranch += IRCmpImm(srcRegW, 1) += IRCset(destW, NE)
