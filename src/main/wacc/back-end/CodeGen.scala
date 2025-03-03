@@ -838,11 +838,11 @@ object CodeGen {
         currentBranch += IRMov(W0, pairMemorySize) += IRBl("_malloc") += IRMovReg(X16, X0)
         val xreg = getTempRegister()
         generateExpr(fst, xreg) // store in temp register
-        currentBranch += IRStr(xreg.asW, X16) // store in pair memory
+        currentBranch += IRStr(xreg, X16) // store in pair memory
         freeRegister(xreg)
         val yreg = getTempRegister()
         generateExpr(snd, yreg) // store in temp register
-        currentBranch += IRStr(yreg.asW, X16, Some(8)) // store in pair memory
+        currentBranch += IRStr(yreg, X16, Some(8)) // store in pair memory
         freeRegister(yreg)
         currentBranch += IRMovReg(reg, X16) // move pair memory to destination register
 
@@ -873,16 +873,17 @@ object CodeGen {
 // AssignStmt(LName(f),RPair(FstElem(LName(p)))))
 
       case RValue.RPair(pairElem) => 
-        nullErrorCheck(reg)
         pairElem match {
           // how do i get the dest and source?
           case PairElem.FstElem(LValue.LName(srcName)) => 
             val (source,t) = variableRegisters(srcName)
+            nullErrorCheck(source)
             currentBranch += IRLdr (reg, source)
             t
 
           case PairElem.SndElem(LValue.LName(srcName)) => 
             val (source,t) = variableRegisters(srcName)
+            nullErrorCheck(source)
             currentBranch += IRLdr (reg, source, Some(8))
             t
 
