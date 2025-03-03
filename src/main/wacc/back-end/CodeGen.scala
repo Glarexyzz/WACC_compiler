@@ -274,7 +274,7 @@ object CodeGen {
           case LValue.LArray(ArrayElem(name, indices)) =>
             val (baseReg, arrType) = variableRegisters(name) // Base address
             generateExpr(indices.head, W17) // Get index value
-            val varReg = getRegister()
+            val varReg = getTempRegister()
             val elemType = generateRValue(name, rvalue, varReg)
             currentBranch += IRMovReg(X7, baseReg)
             if (elemType == BaseType.CharType) {
@@ -576,7 +576,7 @@ object CodeGen {
         PairType(NullType, NullType)
       
       case UnaryOp(op, expr) => 
-        val srcRegX = getRegister()
+        val srcRegX = getTempRegister()
         val srcRegW = srcRegX.asW
         generateExpr(expr, srcRegX)
         val unaryType = op match {
