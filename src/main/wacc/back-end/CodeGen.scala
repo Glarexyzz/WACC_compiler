@@ -290,8 +290,34 @@ object CodeGen {
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
             // currentBranch += IRMovReg(X7, baseReg) 
             // currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W17)
-          case _ =>
 
+	// cmp x19, #0
+	// b.eq _errNull
+
+	// mov w8, #5
+	// str x8, [x19]
+
+
+          case LValue.LPair(pairElem) =>
+            pairElem match {
+              case PairElem.FstElem(LValue.LName(p)) =>
+                // we are assuming that p is a pair.
+                val (reg, t) = variableRegisters(p)
+                nullErrorCheck(reg)
+                val xreg = getTempRegister()
+                generateRValue(p, rvalue, xreg) // this will surely return the wrong type
+                freeRegister(xreg)
+                currentBranch += IRStr(xreg, reg)
+              case PairElem.SndElem(LValue.LName(p)) =>
+                // we can extract these four lines into their own helper function
+                val (reg, t) = variableRegisters(p)
+                nullErrorCheck(reg)
+                val xreg = getTempRegister()
+                generateRValue(p, rvalue, xreg) // I think we need to get rid of this name parameter.
+                freeRegister(xreg)
+                currentBranch += IRStr(xreg, reg, Some(8))
+              case _ => // not defined yet (pair in pair, pair array, etc)
+            }
         }
 
       case ReadStmt(lvalue) => 
@@ -818,6 +844,16 @@ object CodeGen {
             val (source,t) = variableRegisters(srcName)
             currentBranch += IRLdr (reg, source, Some(8))
             t
+
+          // case PairElem.FstElem(LPair(t)) =>
+          //   val tempReg = getTempRegister()
+          //   generateRValue(name, t, tempReg)
+          //   currentBranch += IRStr(tempReg.asW, reg)
+          //   freeRegister(tempReg)
+          //   t
+
+          // case PairElem.SndElem(LPair(t)) =>
+
 
           case _ => BaseType.IntType //temp
         }
