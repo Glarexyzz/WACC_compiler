@@ -334,6 +334,43 @@ object CodeGen {
                 currentBranch ++= List(IRMovReg(W0, reg), IRBl("_readc"), IRMovReg(reg, W0))
               case _ => List()
             }
+
+          case LValue.LPair(PairElem.FstElem(LValue.LName(name))) =>
+            val (reg, t) = variableRegisters(name)
+            nullErrorCheck(reg)
+            currentBranch += IRLdr(X0, reg)
+            checkPairType(t, true) match {
+              case BaseType.IntType =>
+                helpers.getOrElseUpdate(IRLabel("_readi"), readi())
+                currentBranch += IRBl("_readi")
+              case BaseType.CharType =>
+                helpers.getOrElseUpdate(IRLabel("_readc"), readc())
+                currentBranch += IRBl("_readi")
+              case _ => List()
+            }
+            currentBranch ++= List(
+              IRMovReg(W16, W0),
+              IRStr(W16, reg)
+            )
+          case LValue.LPair(PairElem.SndElem(LValue.LName(name))) =>
+            val (reg, t) = variableRegisters(name)
+            nullErrorCheck(reg)
+            currentBranch += IRLdr(X0, reg, Some(8))
+            checkPairType(t, false) match {
+              case BaseType.IntType =>
+                helpers.getOrElseUpdate(IRLabel("_readi"), readi())
+                currentBranch += IRBl("_readi")
+              case BaseType.CharType =>
+                helpers.getOrElseUpdate(IRLabel("_readc"), readc())
+                currentBranch += IRBl("_readi")
+              case _ => List()
+            }
+            currentBranch ++= List(
+              IRMovReg(W16, W0),
+              IRStr(W16, reg, Some(8))
+            )
+
+            
           case _ => List()
         }
 
@@ -801,11 +838,11 @@ object CodeGen {
         currentBranch += IRMov(W0, pairMemorySize) += IRBl("_malloc") += IRMovReg(X16, X0)
         val xreg = getTempRegister()
         generateExpr(fst, xreg) // store in temp register
-        currentBranch += IRStr(xreg.asW, X16) // store in pair memory
+        currentBranch += IRStr(xreg, X16) // store in pair memory
         freeRegister(xreg)
         val yreg = getTempRegister()
         generateExpr(snd, yreg) // store in temp register
-        currentBranch += IRStr(yreg.asW, X16, Some(8)) // store in pair memory
+        currentBranch += IRStr(yreg, X16, Some(8)) // store in pair memory
         freeRegister(yreg)
         currentBranch += IRMovReg(reg, X16) // move pair memory to destination register
 
@@ -836,16 +873,17 @@ object CodeGen {
 // AssignStmt(LName(f),RPair(FstElem(LName(p)))))
 
       case RValue.RPair(pairElem) => 
-        nullErrorCheck(reg)
         pairElem match {
           // how do i get the dest and source?
           case PairElem.FstElem(LValue.LName(srcName)) => 
             val (source,t) = variableRegisters(srcName)
+            nullErrorCheck(source)
             currentBranch += IRLdr (reg, source)
             t
 
           case PairElem.SndElem(LValue.LName(srcName)) => 
             val (source,t) = variableRegisters(srcName)
+            nullErrorCheck(source)
             currentBranch += IRLdr (reg, source, Some(8))
             t
 
@@ -901,6 +939,18 @@ object CodeGen {
     }
 }
 
+  def checkPairType(pairType: Type, isFst: Boolean): Type = {
+    def toBaseType(t: Type): Type = t match {
+      case BaseTElem(t) => t
+      case ArrayTElem(t) => t
+      case _ => t
+    }
+    pairType match {
+      case PairType(fst, snd) => if (isFst) then toBaseType(fst) else toBaseType(snd)
+      case _ => pairType
+    }
+  }
+
 
 
   def generateArrayElem(arrayElem: ArrayElem): List[IRInstr] = List()
@@ -922,6 +972,4 @@ object CodeGen {
     currentBranch += IRCmpImm(reg, 0) += IRJumpCond(EQ, "_errNull")
   }
 
-
-  
 }
