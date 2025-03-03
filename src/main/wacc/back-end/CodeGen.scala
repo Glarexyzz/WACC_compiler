@@ -712,14 +712,16 @@ object CodeGen {
             compareFunc(NE)
 
           case BinaryOperator.Or =>
-            val (wreg1, wreg2) = genExprs(expr1, expr2, false)
-            currentBranch += IRCmpImm(wreg1, 1) += IRCset(wreg1, EQ) += IRCmpImm(wreg2, 1) += IRCset(wreg2, EQ) += IROr(destW, wreg1, wreg2)
+            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(EQ, branchLabel(1)) += IRCmpImm(wreg2, 1)
+            addBranch()
+            currentBranch += IRCset(destW, EQ)
             freeRegister(wreg1.asX)
             freeRegister(wreg2.asX)
             BaseType.BoolType
           
           case BinaryOperator.And =>
-            val (wreg1, wreg2) = genExprs(expr1, expr2, false)
+            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
             currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(NE, branchLabel(1)) += IRCmpImm(wreg2, 1)
             addBranch()
             currentBranch += IRCset(destW, EQ)
