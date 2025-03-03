@@ -344,6 +344,9 @@ object CodeGen {
         } else if (exprType == ArrayType(BaseType.IntType)) {
           helpers.getOrElseUpdate(IRLabel("_printp"), printp())
           currentBranch +=  IRBl("_printp")
+        } else if (exprType == PairType) {
+          helpers.getOrElseUpdate(IRLabel("_printp"), printp())
+          currentBranch +=  IRBl("_printp")
         }
 
       case PrintlnStmt(expr) => 
@@ -712,7 +715,7 @@ object CodeGen {
     
   
 
-  def generateRValue(name: String, rvalue: RValue, reg: Register): Type = {
+  def generateRValue(name: String, rvalue: RValue, reg: Register): Unit = {
     
     rvalue match {
       case RValue.RExpr(expr) => generateExpr(expr, reg)
@@ -762,33 +765,83 @@ object CodeGen {
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
         helpers.getOrElseUpdate(IRLabel("_errOutOfMemor"), errOutOfMemory())
-        BaseType.IntType 
-      case RValue.RNewPair(left, right) => BaseType.IntType
-      case RValue.RPair(pairElem) => BaseType.IntType
+
+	// // push {x19}
+	// stp x19, xzr, [sp, #-16]!
+	// mov fp, sp
+// why move 16 into w0?
+	// mov w0, #16
+	// bl _malloc
+// x16 is an 'interprocedural scratch register' - what purpose does it have here?
+	// mov x16, x0
+// allocate first elem
+	// mov w8, #10
+	// str x8, [x16]
+// allocate second elem
+	// mov w8, #3
+	// str x8, [x16, #8]
+// move interprocedural scratch x16 into variable register. Why?
+	// mov x19, x16
+// for printing pair
+	// mov x0, x19
+	// // statement primitives do not return results (but will clobber r0/rax)
+	// bl _printp
+	// bl _println
+// allocate null pair
+	// mov x19, #0
+	// mov x0, x19
+	// // statement primitives do not return results (but will clobber r0/rax)
+	// bl _printp
+	// bl _println
+      case RValue.RNewPair(fst, snd) => 
+        val expType = variableRegisters(name)._2
+        val arrayMemory = arrayMemorySize(2, expType)
+        currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
+        += IRAddImmInt(X16, X16, 4) += IRMov(W8, 0) += IRStur(W8, X16, -4)
+        += IRAddImmInt(X16, X16, 4) += IRMov(W8, 0) += IRStur(W8, X16, -4)
+        currentBranch += IRMovReg(reg, X16) 
+
+      case RValue.RPair(pairElem) => 
+
       case RValue.RCall(name, Some(args)) => 
         val paramRegs = List(X0, X1, X2, X3, X4, X5, X6, X7)
         args.zip(paramRegs).foreach { case (arg, reg) =>
           generateExpr(arg, reg) // Move argument values into x0-x7
         }
         currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
-        BaseType.IntType
       case RValue.RCall(name, None) =>
         currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
-        BaseType.IntType
     }
 
     
   }
 
+  def elementSize(expType: Type): Int = {
+    expType match {
+      case BaseType.IntType => 4 // Integers are 4 bytes
+      case BaseType.CharType => 1 // Chars are 1 byte
+      case BaseType.BoolType => 1 // Bools are 1 byte
+      case BaseType.StrType => 8 // Strings are pointers (8 bytes)
+      case ArrayType(t) => elementSize(t)
+      case BaseTElem(t) => elementSize(t)
+      case ArrayTElem(t) => elementSize(t) // does the pair contain an array or an element of the array?
+      case _ => throw new IllegalArgumentException(s"Unsupported element type: $expType")
+    }
+  }
+
   def arrayMemorySize(size: Int, expType: Type): Int = {
     expType match {
-      case ArrayType(BaseType.IntType)  => 4 + (size * 4)  // Integers are 4 bytes
-      case ArrayType(BaseType.CharType) => 4 + size        // Chars are 1 byte
-      case ArrayType(BaseType.BoolType) => 4 + size        // Bools are 1 byte
-      case ArrayType(BaseType.StrType)  => 4 + (size * 8)  // Strings are pointers (8 bytes)
-      case BaseType.StrType             => 4 + size 
+      case ArrayType(t)  => 4 + (size * elementSize(t))  // Integers are 4 bytes
+      case BaseType.StrType  => 4 + size 
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
     }
+  }
+
+  def pairMemorySize(fstType: Type, sndType: Type): Int = {
+    
+    val fstSize = elementSize(fstType)
+    val sndSize = elementSize(sndType)
+    8 + fstSize + sndSize
   }
 
 
