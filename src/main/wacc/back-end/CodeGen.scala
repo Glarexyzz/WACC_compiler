@@ -787,7 +787,7 @@ object CodeGen {
         currentBranch += IRMovReg(reg, X16) 
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
-        helpers.getOrElseUpdate(IRLabel("_errOutOfMemor"), errOutOfMemory())
+        helpers.getOrElseUpdate(IRLabel("_errOutOfMemory"), errOutOfMemory())
         expType
 
 // allocate null pair
@@ -808,6 +808,10 @@ object CodeGen {
         currentBranch += IRStr(yreg.asW, X16, Some(8)) // store in pair memory
         freeRegister(yreg)
         currentBranch += IRMovReg(reg, X16) // move pair memory to destination register
+
+        helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+        helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
+        helpers.getOrElseUpdate(IRLabel("_errOutOfMemory"), errOutOfMemory())
         expType 
 
 // 	cmp x19, #0
@@ -913,6 +917,7 @@ object CodeGen {
   }
 
   def nullErrorCheck(reg: Register): Unit = {
+    helpers.getOrElseUpdate(IRLabel("_prints"), prints())
     helpers.getOrElseUpdate(IRLabel("_errNull"), errNull())
     currentBranch += IRCmpImm(reg, 0) += IRJumpCond(EQ, "_errNull")
   }
