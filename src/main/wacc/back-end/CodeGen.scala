@@ -334,6 +334,43 @@ object CodeGen {
                 currentBranch ++= List(IRMovReg(W0, reg), IRBl("_readc"), IRMovReg(reg, W0))
               case _ => List()
             }
+
+          case LValue.LPair(PairElem.FstElem(LValue.LName(name))) =>
+            val (reg, t) = variableRegisters(name)
+            nullErrorCheck(reg)
+            currentBranch += IRLdr(X0, reg)
+            checkPairType(t, true) match {
+              case BaseType.IntType =>
+                helpers.getOrElseUpdate(IRLabel("_readi"), readi())
+                currentBranch += IRBl("_readi")
+              case BaseType.CharType =>
+                helpers.getOrElseUpdate(IRLabel("_readc"), readc())
+                currentBranch += IRBl("_readi")
+              case _ => List()
+            }
+            currentBranch ++= List(
+              IRMovReg(W16, W0),
+              IRStr(W16, reg)
+            )
+          case LValue.LPair(PairElem.SndElem(LValue.LName(name))) =>
+            val (reg, t) = variableRegisters(name)
+            nullErrorCheck(reg)
+            currentBranch += IRLdr(X0, reg, Some(8))
+            checkPairType(t, false) match {
+              case BaseType.IntType =>
+                helpers.getOrElseUpdate(IRLabel("_readi"), readi())
+                currentBranch += IRBl("_readi")
+              case BaseType.CharType =>
+                helpers.getOrElseUpdate(IRLabel("_readc"), readc())
+                currentBranch += IRBl("_readi")
+              case _ => List()
+            }
+            currentBranch ++= List(
+              IRMovReg(W16, W0),
+              IRStr(W16, reg, Some(8))
+            )
+
+            
           case _ => List()
         }
 
@@ -901,6 +938,18 @@ object CodeGen {
     }
 }
 
+  def checkPairType(pairType: Type, isFst: Boolean): Type = {
+    def toBaseType(t: Type): Type = t match {
+      case BaseTElem(t) => t
+      case ArrayTElem(t) => t
+      case _ => t
+    }
+    pairType match {
+      case PairType(fst, snd) => if (isFst) then toBaseType(fst) else toBaseType(snd)
+      case _ => pairType
+    }
+  }
+
 
 
   def generateArrayElem(arrayElem: ArrayElem): List[IRInstr] = List()
@@ -922,6 +971,4 @@ object CodeGen {
     currentBranch += IRCmpImm(reg, 0) += IRJumpCond(EQ, "_errNull")
   }
 
-
-  
 }
