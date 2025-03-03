@@ -632,7 +632,7 @@ object CodeGen {
         }
         // 📌 Helpers for comparisons:
         def compareFunc(cond:Condition): Type = {
-          val (wreg1, wreg2) = genExprs(expr1, expr2, false)
+          val (wreg1, wreg2) = genExprs(expr1, expr2)
           val temp = W8 // Use X8 as temporary register
           currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp, cond) += IRMovReg(destW, temp)
           freeRegister(wreg1.asX)
@@ -640,11 +640,11 @@ object CodeGen {
           BaseType.BoolType
         }
         // Helper to generate both sides of a binary operator
-        def genExprs(expr1: Expr, expr2: Expr, useTemp: Boolean): (Register, Register) = {
-          val xreg1 = if (useTemp) then getTempRegister() else getRegister()
+        def genExprs(expr1: Expr, expr2: Expr): (Register, Register) = {
+          val xreg1 = getTempRegister()
           val wreg1 = xreg1.asW        
           generateExpr(expr1, xreg1)
-          val xreg2 = if (useTemp) then getTempRegister() else getRegister()
+          val xreg2 = getTempRegister()
           val wreg2 = xreg2.asW 
           generateExpr(expr2, xreg2)
           (wreg1, wreg2)
@@ -656,7 +656,7 @@ object CodeGen {
                 generateExpr(expr, dest)
                 currentBranch += IRAddsImm(destW, destW, value) += IRJumpCond(VS, "_errOverflow")
               case _ =>
-                val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+                val (wreg1, wreg2) = genExprs(expr1, expr2)
                 currentBranch += IRAdds(destW, wreg1, wreg2) += IRJumpCond(VS, "_errOverflow")
                 freeRegister(wreg1.asX)
                 freeRegister(wreg2.asX)
@@ -669,7 +669,7 @@ object CodeGen {
                 generateExpr(expr, dest)
                 currentBranch += IRSubImm(destW, destW, value) += IRJumpCond(VS, "_errOverflow")
               case _ =>
-                val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+                val (wreg1, wreg2) = genExprs(expr1, expr2)
                 currentBranch += IRSub(destW, wreg1, wreg2) += IRJumpCond(VS, "_errOverflow")
                 freeRegister(wreg1.asX)
                 freeRegister(wreg2.asX)
@@ -677,7 +677,7 @@ object CodeGen {
             BaseType.IntType
 
           case BinaryOperator.Multiply =>
-            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+            val (wreg1, wreg2) = genExprs(expr1, expr2)
             currentBranch += IRSMull(destX, wreg1, wreg2) += IRCmpExt(destX, destW) += IRJumpCond(NE, "_errOverflow")
             freeRegister(wreg1.asX)
             freeRegister(wreg2.asX)
@@ -685,14 +685,14 @@ object CodeGen {
 
 
           case BinaryOperator.Divide => 
-            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+            val (wreg1, wreg2) = genExprs(expr1, expr2)
             currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(destW, wreg1, wreg2)
             freeRegister(wreg1.asX)
             freeRegister(wreg2.asX)
             BaseType.IntType
 
           case BinaryOperator.Modulus => 
-            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+            val (wreg1, wreg2) = genExprs(expr1, expr2)
             currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(W1, wreg1, wreg2) += IRMSub(destW, W1, wreg2, wreg1)
             freeRegister(wreg1.asX)
             freeRegister(wreg2.asX)
@@ -712,7 +712,7 @@ object CodeGen {
             compareFunc(NE)
 
           case BinaryOperator.Or =>
-            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+            val (wreg1, wreg2) = genExprs(expr1, expr2)
             currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(EQ, branchLabel(1)) += IRCmpImm(wreg2, 1)
             addBranch()
             currentBranch += IRCset(destW, EQ)
@@ -721,7 +721,7 @@ object CodeGen {
             BaseType.BoolType
           
           case BinaryOperator.And =>
-            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+            val (wreg1, wreg2) = genExprs(expr1, expr2)
             currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(NE, branchLabel(1)) += IRCmpImm(wreg2, 1)
             addBranch()
             currentBranch += IRCset(destW, EQ)
