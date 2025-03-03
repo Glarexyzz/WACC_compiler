@@ -344,7 +344,7 @@ object CodeGen {
         } else if (exprType == ArrayType(BaseType.IntType)) {
           helpers.getOrElseUpdate(IRLabel("_printp"), printp())
           currentBranch +=  IRBl("_printp")
-        } else if (exprType == PairType) {
+        } else if (exprType.isInstanceOf[PairType]) {
           helpers.getOrElseUpdate(IRLabel("_printp"), printp())
           currentBranch +=  IRBl("_printp")
         }
@@ -531,7 +531,7 @@ object CodeGen {
 
       case PairLiteral =>
         currentBranch += IRMov(destX, 0) // 0 is the null value
-        NullType
+        PairType(NullType, NullType)
       
       case UnaryOp(op, expr) => 
         val srcRegX = getRegister()
