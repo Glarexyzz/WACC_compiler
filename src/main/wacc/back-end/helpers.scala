@@ -318,7 +318,7 @@ object Helpers{
             IRCsel(X1, X17, X1, GE), // csel x1, x17, x1, ge
             IRJumpCond(GE, "_errOutOfBounds"), // b.ge _errOutOfBounds
 
-            IRLdrsb(X7, X7, X17, 2), // ldr w7, [x7, x17, lsl #2]
+            IRLdrsb(X7, X7, X17, 3), // ldr w7, [x7, x17, lsl #2]
 
             popReg(LR, XZR),
             IRRet() // ret
