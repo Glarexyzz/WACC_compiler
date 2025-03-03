@@ -784,8 +784,44 @@ object CodeGen {
         currentBranch += IRMovReg(reg, X16) // move pair memory to destination register
         expType 
 
+// 	cmp x19, #0
+// guessing this is the null error
+// 	b.eq _errNull
+// x20 is int f. so they are loading... part of x19?
+// 	ldr x20, [x19]
+
+// once again null error (  fst p = 42 ;)
+// 	cmp x19, #0
+// 	b.eq _errNull
+// they have to load 42 in an intermediate register
+// 	mov w8, #42
+// so they are storing... part of x19?
+// 	str x8, [x19]
+//   f = fst p ;
+
+// 	cmp x19, #0
+// 	b.eq _errNull
+// 	ldr x20, [x19]
+// 	mov w0, w20
+// AssignStmt(LName(f),RPair(FstElem(LName(p)))))
+
       case RValue.RPair(pairElem) => 
-        expType
+        nullErrorCheck(reg)
+        pairElem match {
+          // how do i get the dest and source?
+          case PairElem.FstElem(LValue.LName(srcName)) => 
+            val (source,t) = variableRegisters(srcName)
+            currentBranch += IRLdr (reg, source)
+            t
+
+          case PairElem.SndElem(LValue.LName(srcName)) => 
+            val (source,t) = variableRegisters(srcName)
+            currentBranch += IRLdr (reg, source, Some(8))
+            t
+
+          case _ => BaseType.IntType //temp
+        }
+        
 
       case RValue.RCall(name, Some(args)) => 
         val paramRegs = List(X0, X1, X2, X3, X4, X5, X6, X7)
@@ -837,6 +873,11 @@ object CodeGen {
     } else {
       str.replace("\"", "\\\"") // Just escape quotes if no surrounding quotes
     }
+  }
+
+  def nullErrorCheck(reg: Register): Unit = {
+    helpers.getOrElseUpdate(IRLabel("_errNull"), errNull())
+    currentBranch += IRCmpImm(reg, 0) += IRJumpCond(EQ, "_errNull")
   }
 
 
