@@ -390,6 +390,7 @@ object CodeGen {
                 currentBranch += IRMovReg(X0, reg) += IRBl("_freepair")
                 helpers.getOrElseUpdate(IRLabel("_freepair"), freepair())
                 helpers.getOrElseUpdate(IRLabel("_errNull"), errNull())
+                helpers.getOrElseUpdate(IRLabel("_prints"), prints())
               case _ => throw new Exception(s"Unsupported type for freeing: $t")
             
             }
