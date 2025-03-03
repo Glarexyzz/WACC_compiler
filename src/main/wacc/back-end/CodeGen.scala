@@ -510,7 +510,7 @@ object CodeGen {
                 case Identifier(name) =>
                   val varSrcRegW = variableRegisters(name)._1
                   currentBranch += IRLdur(destW, varSrcRegW, -4)
-                case _ => currentBranch += IRLdur(destW, srcRegW, -4)
+                case _ => //currentBranch += IRLdur(destW, srcRegW, -4)
 
             }
             // currentBranch += IRLdur(destW, srcRegW, -4) 
@@ -659,11 +659,20 @@ object CodeGen {
       
         val (baseReg, arrType) = variableRegisters(name) // Base address
         generateExpr(indices.head, W17) // Get index value
-
-        helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
-        helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-        currentBranch += IRMovReg(X7, baseReg) 
-        currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
+        arrType match {
+          case ArrayType(ArrayType(_)) => 
+            helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
+            helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+            currentBranch += IRMovReg(X7, baseReg) 
+            currentBranch += IRBl("_arrLoad8") += IRMovReg(X8, X7) += IRLdur(W0, X8, -4)
+          case _ =>
+            helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
+            helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+            currentBranch += IRMovReg(X7, baseReg) 
+            currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
+          
+        
+        }
         
         
         

@@ -1,3 +1,0 @@
-begin
-  bool[] c = [true, false] 
-end
