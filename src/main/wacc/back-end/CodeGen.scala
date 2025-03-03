@@ -249,16 +249,14 @@ object CodeGen {
       // All declared variables are initialised at the start from the symbol table
       case DeclAssignStmt(t, name, value) =>
         val (reg, t) = variableRegisters(name)
-        generateRValue(name, value, reg)
-      
-      // case AssignStmt(lvalue, rvalue) => 
-      
+        generateRValue(value, reg, Some(t))
+            
       case AssignStmt(lvalue, rvalue) => 
         lvalue match {
           case LValue.LName(name) => 
             variableRegisters.get(name) match {
-              case Some((reg, _)) =>
-                generateRValue(name, rvalue, reg)
+              case Some((reg, t)) =>
+                generateRValue(rvalue, reg, Some(t))
                 // function parameter update push to stack
                 if (paramsMap.contains(name)) {
                   currentBranch ++= List(
@@ -275,7 +273,8 @@ object CodeGen {
             val (baseReg, arrType) = variableRegisters(name) // Base address
             generateExpr(indices.head, W17) // Get index value
             val varReg = getTempRegister()
-            val elemType = generateRValue(name, rvalue, varReg)
+            val elemType = variableRegisters(name)._2
+            generateRValue(rvalue, varReg, Some(elemType))
             currentBranch += IRMovReg(X7, baseReg)
             if (elemType == BaseType.CharType) {
               currentBranch += IRBl("_arrStore1")
@@ -291,15 +290,9 @@ object CodeGen {
             // currentBranch += IRMovReg(X7, baseReg) 
             // currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W17)
 
-	// cmp x19, #0
-	// b.eq _errNull
-
-	// mov w8, #5
-	// str x8, [x19]
-
-
           case LValue.LPair(pairElem) =>
-            val temp = getRegister()
+            val temp = getTempRegister()
+            generateRValue(rvalue, temp, Some(PairType(NullType, NullType))) // ...
             generateLPair(pairElem, temp, true)
             freeRegister(temp)
         }
@@ -758,6 +751,17 @@ object CodeGen {
         case _ =>
     } 
     BaseType.IntType
+//           case PairElem.FstElem(LValue.LName(srcName)) => 
+          //   val (source,t) = variableRegisters(srcName)
+          //   nullErrorCheck(source)
+          //   currentBranch += IRLdr (reg, source)
+          //   t
+
+          // case PairElem.SndElem(LValue.LName(srcName)) => 
+          //   val (source,t) = variableRegisters(srcName)
+          //   nullErrorCheck(source)
+          //   currentBranch += IRLdr (reg, source, Some(8))
+          //   t
 
   def generateLPair(pair: PairElem, dest: Register, isStr: Boolean, isFirst: Boolean = true): Type =
     pair match {
@@ -805,15 +809,14 @@ object CodeGen {
     }
   
 
-  def generateRValue(name: String, rvalue: RValue, reg: Register): Type = {
-    val expType = variableRegisters(name)._2
+  def generateRValue(rvalue: RValue, reg: Register, exprType: Option[Type] = None): Unit = {
     rvalue match {
       case RValue.RExpr(expr) => generateExpr(expr, reg)
       // unimplemented
       case RValue.RArrayLiter(arrayLiter) => 
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
-        val arrayMemory = arrayMemorySize(size, expType)
+        val arrayMemory = arrayMemorySize(size, exprType.get)
 
         currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
         += IRAddImmInt(X16, X16, 4) += IRMov(W8, size) += IRStur(W8, X16, -4)
@@ -878,14 +881,8 @@ object CodeGen {
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
         helpers.getOrElseUpdate(IRLabel("_errOutOfMemory"), errOutOfMemory())
-        expType
+        
 
-// allocate null pair
-	// mov x19, #0
-	// mov x0, x19
-	// // statement primitives do not return results (but will clobber r0/rax)
-	// bl _printp
-	// bl _println
       case RValue.RNewPair(fst, snd) => 
         val pairMemorySize = 16 // 8 bytes for each element
         currentBranch += IRMov(W0, pairMemorySize) += IRBl("_malloc") += IRMovReg(X16, X0)
@@ -902,34 +899,9 @@ object CodeGen {
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
         helpers.getOrElseUpdate(IRLabel("_errOutOfMemory"), errOutOfMemory())
-        expType 
-
-// 	cmp x19, #0
-// guessing this is the null error
-// 	b.eq _errNull
-// x20 is int f. so they are loading... part of x19?
-// 	ldr x20, [x19]
-
-// once again null error (  fst p = 42 ;)
-// 	cmp x19, #0
-// 	b.eq _errNull
-// they have to load 42 in an intermediate register
-// 	mov w8, #42
-// so they are storing... part of x19?
-// 	str x8, [x19]
-//   f = fst p ;
-
-// 	cmp x19, #0
-// 	b.eq _errNull
-// 	ldr x20, [x19]
-// 	mov w0, w20
-// AssignStmt(LName(f),RPair(FstElem(LName(p)))))
 
       case RValue.RPair(pairElem) => 
-        val temp = getRegister()
-        val t = generateLPair(pairElem, temp, false)
-        freeRegister(temp)
-        t
+        generateLPair(pairElem, reg, false)
 
       case RValue.RCall(name, Some(args)) => 
         val paramRegs = List(X0, X1, X2, X3, X4, X5, X6, X7)
@@ -937,12 +909,9 @@ object CodeGen {
           generateExpr(arg, reg) // Move argument values into x0-x7
         }
         currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
-        expType
 
       case RValue.RCall(name, None) =>
-        currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
-        expType
-    }
+        currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))    }
 
     
   }
@@ -963,7 +932,7 @@ object CodeGen {
 
   def arrayMemorySize(size: Int, expType: Type): Int = {
     expType match {
-      case ArrayType(PairType(_, _)) => 4 + size * 8 // treat pairs as pointer so 8 bytes
+      case PairType(_, _) => 4 + size * 8 // treat pairs as pointer so 8 bytes
       case ArrayType(t)  => 4 + (size * elementSize(t))  // Integers are 4 bytes
       case BaseType.StrType  => 4 + size 
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
