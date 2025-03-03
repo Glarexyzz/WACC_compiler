@@ -275,14 +275,19 @@ object CodeGen {
             val (baseReg, arrType) = variableRegisters(name) // Base address
             generateExpr(indices.head, W17) // Get index value
             val varReg = getRegister()
-            generateRValue(name, rvalue, varReg)
+            val elemType = generateRValue(name, rvalue, varReg)
             currentBranch += IRMovReg(X7, baseReg)
-            currentBranch += IRBl("_arrStore4")
-            helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore(varReg.asW))
+            if (elemType == BaseType.CharType) {
+              currentBranch += IRBl("_arrStore1")
+              helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore1(varReg.asW))
+            } else {
+              currentBranch += IRBl("_arrStore4")
+              helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore4(varReg.asW))
+              
+            }
             freeRegister(varReg)
-
             // helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
-            // //helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+            helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
             // currentBranch += IRMovReg(X7, baseReg) 
             // currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W17)
           case _ =>
@@ -437,55 +442,12 @@ object CodeGen {
       case _ => None
     }
 
-  def genAdd(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
-    genOverflow()
-    extractInt(expr1, expr2, true) match {
-      case Some((expr, value)) => 
-        generateExpr(expr, dest, temp)
-        currentBranch += IRAddsImm(dest, dest, value) += IRJumpCond(VS, "_errOverflow")
-      case _ =>
-        generateExpr(expr1, dest, temp)
-        generateExpr(expr2, temp)
-        currentBranch += IRAdds(dest, dest, temp) += IRJumpCond(VS, "_errOverflow")
-    }
-
-  def genSub(expr1: Expr, expr2: Expr, dest: Register, temp: Register) = 
-    genOverflow()
-    extractInt(expr1, expr2, false) match {
-      case Some((expr, value)) => 
-        generateExpr(expr, dest, temp)
-        currentBranch += IRSubImm(dest, dest, value) += IRJumpCond(VS, "_errOverflow")
-      case _ =>
-        generateExpr(expr1, dest, temp)
-        generateExpr(expr2, temp)
-        currentBranch += IRSub(dest, dest, temp) += IRJumpCond(VS, "_errOverflow")
-    }
-
-  def genMul(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
-    genOverflow()
-    generateExpr(expr1, dest, temp)
-    generateExpr(expr2, temp)
-    currentBranch += IRSMull(dest.asX, dest.asW, temp.asW) += IRCmpExt(dest.asX, dest.asW) += IRJumpCond(NE, "_errOverflow")
-
-  def genDiv(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
-    genDivZero()
-    generateExpr(expr1, dest.asX, temp.asX)
-    generateExpr(expr2, temp.asX)
-    currentBranch += IRCmpImm(temp, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(dest, dest, temp)
-  
-  def genMod(expr1: Expr, expr2: Expr, dest: Register, temp: Register) =
-    genDivZero()
-    generateExpr(expr1, temp)
-    val xreg = getTempRegister()
-    generateExpr(expr2, xreg)
-    currentBranch += IRCmpImm(xreg.asW, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(W1, temp.asW, xreg.asW) += IRMSub(dest, W1, xreg.asW, temp.asW)
-    freeRegister(xreg)
-
-  def generateExpr(expr: Expr, destX: Register = X0, temp: Register = X0): Type = 
-    val destW = destX.asW
+  def generateExpr(expr: Expr, dest: Register = X0, temp: Register = X0): Type = 
+    val destX = dest.asX
+    val destW = dest.asW
     expr match {
       case IntLiteral(value) =>
-        if (value.abs <= 65535) {
+        if (value.abs <= 65535 || value <= -2147483647) {
           currentBranch += IRMov(destW, value.toInt)
           BaseType.IntType
         } else {
@@ -508,8 +470,9 @@ object CodeGen {
 
       case StrLiteral(value) =>
         val label = nextLabel()
-        stringLiterals.getOrElseUpdate(label, value) // Store string in .data
-        currentBranch += IRAdrp(X0, label) += IRAddImm(X0, X0, s":lo12:$label")
+        val formatVal = escapeInnerQuotes(value)
+        stringLiterals.getOrElseUpdate(label, formatVal) // Store string in .data
+        currentBranch += IRAdrp(destX, label) += IRAddImm(destX, destX, s":lo12:$label")
         BaseType.StrType
 
       // move the identifier into the destination register
@@ -520,6 +483,7 @@ object CodeGen {
           t match {
             //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
             case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
+            case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
             case _ => currentBranch += IRMovReg(destW, reg.asW)
           // if (t == ArrayType) {
           }  
@@ -539,7 +503,8 @@ object CodeGen {
         generateExpr(expr, srcRegX)
         val unaryType = op match {
           case UnaryOperator.Negate =>
-            currentBranch += IRNeg(destW, srcRegW) 
+            currentBranch += IRNeg(destW, srcRegW) += IRJumpCond(VS, "_errOverflow")
+            genOverflow()
             BaseType.IntType 
           case UnaryOperator.Not =>
             currentBranch += IRCmpImm(srcRegW, 1) += IRCset(destW, NE)
@@ -549,7 +514,7 @@ object CodeGen {
                 case Identifier(name) =>
                   val varSrcRegW = variableRegisters(name)._1
                   currentBranch += IRLdur(destW, varSrcRegW, -4)
-                case _ => currentBranch += IRLdur(destW, srcRegW, -4)
+                case _ => //currentBranch += IRLdur(destW, srcRegW, -4)
 
             }
             // currentBranch += IRLdur(destW, srcRegW, -4) 
@@ -582,54 +547,77 @@ object CodeGen {
       // DO REGISTERS AS PARAMETER  
       
       case BinaryOp(expr1, op, expr2) =>
+        if (op == BinaryOperator.Add || op == BinaryOperator.Subtract || op == BinaryOperator.Multiply) then {
+          genOverflow()
+        } else {
+          genDivZero()
+        }
         // 📌 Helpers for comparisons:
         def compareFunc(cond:Condition): Type = {
-          val xreg1 = getRegister() // alternatively, generateExpr produces either a register or a value
-          val wreg1 = xreg1.asW // move one to a temporary register
-          val xreg2 = getRegister() 
-          val wreg2 = xreg2.asW
-          generateExpr(expr1, xreg1)  // Generate IR for expr1
-          generateExpr(expr2, xreg2)  // Generate IR for expr2
+          val (wreg1, wreg2) = genExprs(expr1, expr2, false)
           val temp = W8 // Use X8 as temporary register
           currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp, cond) += IRMovReg(destW, temp)
-          freeRegister(xreg1)
-          freeRegister(xreg2)
+          freeRegister(wreg1.asX)
+          freeRegister(wreg2.asX)
           BaseType.BoolType
         }
+        // Helper to generate both sides of a binary operator
+        def genExprs(expr1: Expr, expr2: Expr, useTemp: Boolean): (Register, Register) = {
+          val xreg1 = if (useTemp) then getTempRegister() else getRegister()
+          val wreg1 = xreg1.asW        
+          generateExpr(expr1, xreg1)
+          val xreg2 = if (useTemp) then getTempRegister() else getRegister()
+          val wreg2 = xreg2.asW 
+          generateExpr(expr2, xreg2)
+          (wreg1, wreg2)
+        }
         val binaryInstrs = op match {
-          case BinaryOperator.Add =>
-            val xreg = getTempRegister() // alternatively, generateExpr produces either a register or a value
-            val wreg = xreg.asW // move one to a temporary register
-            genAdd(expr1, expr2, destW, wreg)
-            freeRegister(xreg)
+          case BinaryOperator.Add => 
+            extractInt(expr1, expr2, true) match {
+              case Some((expr, value)) =>
+                generateExpr(expr, dest)
+                currentBranch += IRAddsImm(destW, destW, value) += IRJumpCond(VS, "_errOverflow")
+              case _ =>
+                val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+                currentBranch += IRAdds(destW, wreg1, wreg2) += IRJumpCond(VS, "_errOverflow")
+                freeRegister(wreg1.asX)
+                freeRegister(wreg2.asX)
+            }
             BaseType.IntType
           
           case BinaryOperator.Subtract =>
-            val xreg = getTempRegister() // alternatively, generateExpr produces either a register or a value
-            val wreg = xreg.asW // move one to a temporary register
-            genSub(expr1, expr2, destW, wreg)
-            freeRegister(xreg)
-            BaseType.IntType // SUB W0, reg1, reg2
+            extractInt(expr1, expr2, false) match {
+              case Some((expr, value)) => 
+                generateExpr(expr, dest)
+                currentBranch += IRSubImm(destW, destW, value) += IRJumpCond(VS, "_errOverflow")
+              case _ =>
+                val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+                currentBranch += IRSub(destW, wreg1, wreg2) += IRJumpCond(VS, "_errOverflow")
+                freeRegister(wreg1.asX)
+                freeRegister(wreg2.asX)
+            }
+            BaseType.IntType
 
           case BinaryOperator.Multiply =>
-            val xreg = getTempRegister()
-            genMul(expr1, expr2, destX, xreg)
-            freeRegister(xreg)
+            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+            currentBranch += IRSMull(destX, wreg1, wreg2) += IRCmpExt(destX, destW) += IRJumpCond(NE, "_errOverflow")
+            freeRegister(wreg1.asX)
+            freeRegister(wreg2.asX)
             BaseType.IntType
 
 
           case BinaryOperator.Divide => 
-            val xreg = getTempRegister()
-            val wreg = xreg.asW
-            genDiv(expr1, expr2, destW, wreg)
-            freeRegister(xreg)
-            BaseType.IntType // SDIV W0, reg1, reg2
+            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+            currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(destW, wreg1, wreg2)
+            freeRegister(wreg1.asX)
+            freeRegister(wreg2.asX)
+            BaseType.IntType
 
           case BinaryOperator.Modulus => 
-            val xreg = getTempRegister()
-            val wreg = xreg.asW
-            genMod(expr1, expr2, destW, wreg)
-            freeRegister(xreg)
+            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+            currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(W1, wreg1, wreg2) += IRMSub(destW, W1, wreg2, wreg1)
+            freeRegister(wreg1.asX)
+            freeRegister(wreg2.asX)
             BaseType.IntType
 
           case BinaryOperator.Greater =>
@@ -645,33 +633,20 @@ object CodeGen {
           case BinaryOperator.NotEqual =>
             compareFunc(NE)
 
-            
           case BinaryOperator.Or =>
-            val xreg1 = getRegister() // alternatively, generateExpr produces either a register or a value
-            val wreg1 = xreg1.asW // move one to a temporary register
-            val xreg2 = getRegister() 
-            val wreg2 = xreg2.asW
-            generateExpr(expr1, xreg1)  // Generate IR for expr1
-            generateExpr(expr2, xreg2)  // Generate IR for expr2
-            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(EQ, branchLabel(1)) += IRCmpImm(wreg2, 1)
-            addBranch()
-            currentBranch += IRCset(destW, EQ)
-            freeRegister(xreg1)
-            freeRegister(xreg2)
-            BaseType.BoolType // AND W0, reg1, reg2
-
+            val (wreg1, wreg2) = genExprs(expr1, expr2, false)
+            currentBranch += IRCmpImm(wreg1, 1) += IRCset(wreg1, EQ) += IRCmpImm(wreg2, 1) += IRCset(wreg2, EQ) += IROr(destW, wreg1, wreg2)
+            freeRegister(wreg1.asX)
+            freeRegister(wreg2.asX)
+            BaseType.BoolType
+          
           case BinaryOperator.And =>
-            val xreg1 = getRegister() // alternatively, generateExpr produces either a register or a value
-            val wreg1 = xreg1.asW // move one to a temporary register
-            val xreg2 = getRegister() 
-            val wreg2 = xreg2.asW
-            generateExpr(expr1, xreg1)  // Generate IR for expr1
-            generateExpr(expr2, xreg2)  // Generate IR for expr2
+            val (wreg1, wreg2) = genExprs(expr1, expr2, false)
             currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(NE, branchLabel(1)) += IRCmpImm(wreg2, 1)
             addBranch()
             currentBranch += IRCset(destW, EQ)
-            freeRegister(xreg1)
-            freeRegister(xreg2)
+            freeRegister(wreg1.asX)
+            freeRegister(wreg2.asX)
             BaseType.BoolType
         }
         binaryInstrs  
@@ -685,11 +660,20 @@ object CodeGen {
       
         val (baseReg, arrType) = variableRegisters(name) // Base address
         generateExpr(indices.head, W17) // Get index value
-
-        helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad())
-        //helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-        currentBranch += IRMovReg(X7, baseReg) 
-        currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
+        arrType match {
+          case ArrayType(ArrayType(_)) => 
+            helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
+            helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+            currentBranch += IRMovReg(X7, baseReg) 
+            currentBranch += IRBl("_arrLoad8") += IRMovReg(X8, X7) += IRLdur(W0, X8, -4)
+          case _ =>
+            helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
+            helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+            currentBranch += IRMovReg(X7, baseReg) 
+            currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
+          
+        
+        }
         
         
         
@@ -716,23 +700,22 @@ object CodeGen {
     
   
 
-  def generateRValue(name: String, rvalue: RValue, reg: Register): Unit = {
-    
+  def generateRValue(name: String, rvalue: RValue, reg: Register): Type = {
+    val expType = variableRegisters(name)._2
     rvalue match {
       case RValue.RExpr(expr) => generateExpr(expr, reg)
       // unimplemented
       case RValue.RArrayLiter(arrayLiter) => 
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
-        val expType = variableRegisters(name)._2
         val arrayMemory = arrayMemorySize(size, expType)
 
         currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
         += IRAddImmInt(X16, X16, 4) += IRMov(W8, size) += IRStur(W8, X16, -4)
         // val registers = 
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
-          val expType = generateExpr(element, W8)
-          expType match {
+          val elType = generateExpr(element, W8)
+          elType match {
             case BaseType.IntType => 
               if (i == 0) { // separate case for first element
                 currentBranch += IRStr(W8, X16)
@@ -740,10 +723,11 @@ object CodeGen {
               currentBranch += IRStr(W8, X16, Some(i * 4)) // Store element
               }
             case BaseType.CharType => 
+              //if (expType == BaseType.StrType)
               if (i == 0) { // separate case for first element
                 currentBranch += IRStrb(W8, X16)
               } else {
-              currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+              currentBranch += IRStrb(W8, X16, Some(i)) // Should be strb
               }
             case BaseType.BoolType => 
               if (i == 0) { // separate case for first element
@@ -755,8 +739,20 @@ object CodeGen {
               if (i == 0) { // separate case for first element
                 currentBranch += IRStrb(W8, X16)
               } else {
-                currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+                currentBranch += IRStrb(W8, X16, Some(i)) // should be str but if char[] then should be strb
               }
+            case ArrayType(inner) =>
+              currentBranch.remove(currentBranch.length - 1)
+              element match {
+                case Identifier(name) =>
+                  val elemReg = variableRegisters(name)._1
+                  if (i == 0) { // separate case for first element
+                    currentBranch += IRStr(elemReg, X16)
+                  } else {
+                    currentBranch += IRStr(elemReg, X16, Some(i * 8)) // should be str but if char[] then should be strb
+                  }
+              }
+              
             case _ =>
           }
         
@@ -766,6 +762,7 @@ object CodeGen {
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
         helpers.getOrElseUpdate(IRLabel("_errOutOfMemor"), errOutOfMemory())
+        expType
 
 // allocate null pair
 	// mov x19, #0
@@ -785,8 +782,10 @@ object CodeGen {
         currentBranch += IRStr(yreg.asW, X16, Some(8)) // store in pair memory
         freeRegister(yreg)
         currentBranch += IRMovReg(reg, X16) // move pair memory to destination register
+        expType 
 
       case RValue.RPair(pairElem) => 
+        expType
 
       case RValue.RCall(name, Some(args)) => 
         val paramRegs = List(X0, X1, X2, X3, X4, X5, X6, X7)
@@ -794,8 +793,11 @@ object CodeGen {
           generateExpr(arg, reg) // Move argument values into x0-x7
         }
         currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
+        expType
+
       case RValue.RCall(name, None) =>
         currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
+        expType
     }
 
     
@@ -820,7 +822,7 @@ object CodeGen {
       case BaseType.StrType  => 4 + size 
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
     }
-  }
+}
 
 
 
@@ -828,5 +830,15 @@ object CodeGen {
   
 
   def generatePairElem(pairElem: PairElem): List[IRInstr] = List()
+  
+  def escapeInnerQuotes(str: String): String = {
+    if (str.startsWith("\"") && str.endsWith("\"")) {
+      "\"" + str.drop(1).dropRight(1).replace("\"", "\\\"") + "\""
+    } else {
+      str.replace("\"", "\\\"") // Just escape quotes if no surrounding quotes
+    }
+  }
+
+
   
 }

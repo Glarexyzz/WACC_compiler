@@ -283,9 +283,9 @@ object Helpers{
         )
         List(IRFuncLabel(IRLabel(label), instructions))
     }
-    def arrLoad(): List[IRInstr] = 
+    def arrLoad4(): List[IRInstr] = 
         val label = "_arrLoad4"
-        val errBoundmsg = errOutOfBounds()
+        //val errBoundmsg = errOutOfBounds()
         val instructions: List[IRInstr] = List( // push {lr}
             pushReg(LR, XZR), 
             IRCmpImm(W17, 0), // cmp w17, #0
@@ -302,9 +302,30 @@ object Helpers{
             popReg(LR, XZR),
             IRRet() // ret
         )
-        List(IRFuncLabel(IRLabel(label), instructions)) ++ errBoundmsg
+        List(IRFuncLabel(IRLabel(label), instructions)) 
     
-    def arrStore(reg: Register): List[IRInstr] = 
+    def arrLoad8(): List[IRInstr] = 
+        val label = "_arrLoad8"
+        //val errBoundmsg = errOutOfBounds()
+        val instructions: List[IRInstr] = List( // push {lr}
+            pushReg(LR, XZR), 
+            IRCmpImm(W17, 0), // cmp w17, #0
+            IRCsel(X1, X17, X1, LT), // csel x1, x17, x1, lt
+            IRJumpCond(LT, "_errOutOfBounds"), // b.lt _errOutOfBounds
+            
+            IRLdur(W30, X7, -4), // ldur w30, [x7, #-4]
+            IRCmp(W17, W30), // cmp w17, w30
+            IRCsel(X1, X17, X1, GE), // csel x1, x17, x1, ge
+            IRJumpCond(GE, "_errOutOfBounds"), // b.ge _errOutOfBounds
+
+            IRLdrsb(X7, X7, X17, 3), // ldr w7, [x7, x17, lsl #2]
+
+            popReg(LR, XZR),
+            IRRet() // ret
+        )
+        List(IRFuncLabel(IRLabel(label), instructions)) 
+    
+    def arrStore4(reg: Register): List[IRInstr] = 
         val label = "_arrStore4"
         //val errBoundmsg = errOutOfBounds()
         val instructions: List[IRInstr] = List( // push {lr}
@@ -319,6 +340,27 @@ object Helpers{
             IRJumpCond(GE, "_errOutOfBounds"), // b.ge _errOutOfBounds
 
             IRStrsb(reg, X7, X17, 2), // ldr w7, [x7, x17, lsl #2]
+
+            popReg(LR, XZR),
+            IRRet() // ret
+        )
+        List(IRFuncLabel(IRLabel(label), instructions)) 
+    
+    def arrStore1(reg: Register): List[IRInstr] = 
+        val label = "_arrStore1"
+        //val errBoundmsg = errOutOfBounds()
+        val instructions: List[IRInstr] = List( // push {lr}
+            pushReg(LR, XZR), 
+            IRCmpImm(W17, 0), // cmp w17, #0
+            IRCsel(X1, X17, X1, LT), // csel x1, x17, x1, lt
+            IRJumpCond(LT, "_errOutOfBounds"), // b.lt _errOutOfBounds
+            
+            IRLdur(W30, X7, -4), // ldur w30, [x7, #-4]
+            IRCmp(W17, W30), // cmp w17, w30
+            IRCsel(X1, X17, X1, GE), // csel x1, x17, x1, ge
+            IRJumpCond(GE, "_errOutOfBounds"), // b.ge _errOutOfBounds
+
+            IRStrbReg(reg, X7, X17), 
 
             popReg(LR, XZR),
             IRRet() // ret
