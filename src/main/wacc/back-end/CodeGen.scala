@@ -290,8 +290,34 @@ object CodeGen {
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
             // currentBranch += IRMovReg(X7, baseReg) 
             // currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W17)
-          case _ =>
 
+	// cmp x19, #0
+	// b.eq _errNull
+
+	// mov w8, #5
+	// str x8, [x19]
+
+
+          case LValue.LPair(pairElem) =>
+            pairElem match {
+              case PairElem.FstElem(LValue.LName(p)) =>
+                // we are assuming that p is a pair.
+                val (reg, t) = variableRegisters(p)
+                nullErrorCheck(reg)
+                val xreg = getTempRegister()
+                generateRValue(p, rvalue, xreg) // this will surely return the wrong type
+                freeRegister(xreg)
+                currentBranch += IRStr(xreg, reg)
+              case PairElem.SndElem(LValue.LName(p)) =>
+                // we can extract these four lines into their own helper function
+                val (reg, t) = variableRegisters(p)
+                nullErrorCheck(reg)
+                val xreg = getTempRegister()
+                generateRValue(p, rvalue, xreg) // I think we need to get rid of this name parameter.
+                freeRegister(xreg)
+                currentBranch += IRStr(xreg, reg, Some(8))
+              case _ => // not defined yet (pair in pair, pair array, etc)
+            }
         }
 
       case ReadStmt(lvalue) => 
@@ -347,6 +373,9 @@ object CodeGen {
           helpers.getOrElseUpdate(IRLabel("_printb"), printb())
           currentBranch +=  IRBl("_printb")
         } else if (exprType == ArrayType(BaseType.IntType)) {
+          helpers.getOrElseUpdate(IRLabel("_printp"), printp())
+          currentBranch +=  IRBl("_printp")
+        } else if (exprType.isInstanceOf[PairType]) {
           helpers.getOrElseUpdate(IRLabel("_printp"), printp())
           currentBranch +=  IRBl("_printp")
         }
@@ -491,7 +520,8 @@ object CodeGen {
         t
 
       case PairLiteral =>
-        BaseType.IntType // Assume IntType for simplicity
+        currentBranch += IRMov(destX, 0) // 0 is the null value
+        PairType(NullType, NullType)
       
       case UnaryOp(op, expr) => 
         val srcRegX = getRegister()
@@ -697,14 +727,13 @@ object CodeGen {
   
 
   def generateRValue(name: String, rvalue: RValue, reg: Register): Type = {
-    
+    val expType = variableRegisters(name)._2
     rvalue match {
       case RValue.RExpr(expr) => generateExpr(expr, reg)
       // unimplemented
       case RValue.RArrayLiter(arrayLiter) => 
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
-        val expType = variableRegisters(name)._2
         val arrayMemory = arrayMemorySize(size, expType)
 
         currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
@@ -758,35 +787,116 @@ object CodeGen {
         currentBranch += IRMovReg(reg, X16) 
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
-        helpers.getOrElseUpdate(IRLabel("_errOutOfMemor"), errOutOfMemory())
-        // BaseType.IntType 
+        helpers.getOrElseUpdate(IRLabel("_errOutOfMemory"), errOutOfMemory())
         expType
-      case RValue.RNewPair(left, right) => BaseType.IntType
-      case RValue.RPair(pairElem) => BaseType.IntType
+
+// allocate null pair
+	// mov x19, #0
+	// mov x0, x19
+	// // statement primitives do not return results (but will clobber r0/rax)
+	// bl _printp
+	// bl _println
+      case RValue.RNewPair(fst, snd) => 
+        val pairMemorySize = 16 // 8 bytes for each element
+        currentBranch += IRMov(W0, pairMemorySize) += IRBl("_malloc") += IRMovReg(X16, X0)
+        val xreg = getTempRegister()
+        generateExpr(fst, xreg) // store in temp register
+        currentBranch += IRStr(xreg.asW, X16) // store in pair memory
+        freeRegister(xreg)
+        val yreg = getTempRegister()
+        generateExpr(snd, yreg) // store in temp register
+        currentBranch += IRStr(yreg.asW, X16, Some(8)) // store in pair memory
+        freeRegister(yreg)
+        currentBranch += IRMovReg(reg, X16) // move pair memory to destination register
+
+        helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+        helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
+        helpers.getOrElseUpdate(IRLabel("_errOutOfMemory"), errOutOfMemory())
+        expType 
+
+// 	cmp x19, #0
+// guessing this is the null error
+// 	b.eq _errNull
+// x20 is int f. so they are loading... part of x19?
+// 	ldr x20, [x19]
+
+// once again null error (  fst p = 42 ;)
+// 	cmp x19, #0
+// 	b.eq _errNull
+// they have to load 42 in an intermediate register
+// 	mov w8, #42
+// so they are storing... part of x19?
+// 	str x8, [x19]
+//   f = fst p ;
+
+// 	cmp x19, #0
+// 	b.eq _errNull
+// 	ldr x20, [x19]
+// 	mov w0, w20
+// AssignStmt(LName(f),RPair(FstElem(LName(p)))))
+
+      case RValue.RPair(pairElem) => 
+        nullErrorCheck(reg)
+        pairElem match {
+          // how do i get the dest and source?
+          case PairElem.FstElem(LValue.LName(srcName)) => 
+            val (source,t) = variableRegisters(srcName)
+            currentBranch += IRLdr (reg, source)
+            t
+
+          case PairElem.SndElem(LValue.LName(srcName)) => 
+            val (source,t) = variableRegisters(srcName)
+            currentBranch += IRLdr (reg, source, Some(8))
+            t
+
+          // case PairElem.FstElem(LPair(t)) =>
+          //   val tempReg = getTempRegister()
+          //   generateRValue(name, t, tempReg)
+          //   currentBranch += IRStr(tempReg.asW, reg)
+          //   freeRegister(tempReg)
+          //   t
+
+          // case PairElem.SndElem(LPair(t)) =>
+
+
+          case _ => BaseType.IntType //temp
+        }
+        
+
       case RValue.RCall(name, Some(args)) => 
         val paramRegs = List(X0, X1, X2, X3, X4, X5, X6, X7)
         args.zip(paramRegs).foreach { case (arg, reg) =>
           generateExpr(arg, reg) // Move argument values into x0-x7
         }
         currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
-        BaseType.IntType
+        expType
+
       case RValue.RCall(name, None) =>
         currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
-        BaseType.IntType
+        expType
     }
 
     
   }
 
+  def elementSize(expType: Type): Int = {
+    expType match {
+      case BaseType.IntType => 4 // Integers are 4 bytes
+      case BaseType.CharType => 1 // Chars are 1 byte
+      case BaseType.BoolType => 1 // Bools are 1 byte
+      case BaseType.StrType => 8 // Strings are pointers (8 bytes)
+      case ArrayType(t) => elementSize(t)
+      case BaseTElem(t) => elementSize(t)
+      case ArrayTElem(t) => elementSize(t) // does the pair contain an array or an element of the array?
+      case PairType(_,_) => 16
+      case _ => throw new IllegalArgumentException(s"Unsupported element type: $expType")
+    }
+  }
+
   def arrayMemorySize(size: Int, expType: Type): Int = {
     expType match {
-
-      case BaseType.StrType               => 4 + size
-      case ArrayType(BaseType.IntType)    => 4 + (size * 4)
-      case ArrayType(BaseType.CharType)   => 4 + size
-      case ArrayType(BaseType.BoolType)   => 4 + size
-      case ArrayType(BaseType.StrType)    => 4 + (size * 8)
-      case ArrayType(ArrayType(_))        => 4 + (size * 8) // Pointers to subarrays (8 bytes each)
+      case ArrayType(t)  => 4 + (size * elementSize(t))  // Integers are 4 bytes
+      case BaseType.StrType  => 4 + size 
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
     }
 }
@@ -804,6 +914,12 @@ object CodeGen {
     } else {
       str.replace("\"", "\\\"") // Just escape quotes if no surrounding quotes
     }
+  }
+
+  def nullErrorCheck(reg: Register): Unit = {
+    helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+    helpers.getOrElseUpdate(IRLabel("_errNull"), errNull())
+    currentBranch += IRCmpImm(reg, 0) += IRJumpCond(EQ, "_errNull")
   }
 
 

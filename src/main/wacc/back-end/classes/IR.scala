@@ -29,8 +29,11 @@ case class IRAdrp(dest: Register, label: String) extends IRInstr {
     override def toString: String = s"adrp $dest, $label"
 }
 // Load from memory into a register	
-case class IRLdr(dest: Register, addr: Register) extends IRInstr {
-    override def toString: String = s"ldr $dest, [$addr]"
+case class IRLdr(dest: Register, addr: Register, offset: Option[Int] = None) extends IRInstr {
+    override def toString: String = offset match {
+        case Some(off) => s"ldr $dest, [$addr, #$off]"
+        case None      => s"ldr $dest, [$addr]"
+    }
 }
 case class IRLdrsb(dest: Register, addr1: Register, addr2: Register, offset: Int) extends IRInstr {
     override def toString: String = s"ldr $dest, [$addr1, $addr2, lsl #$offset]"
