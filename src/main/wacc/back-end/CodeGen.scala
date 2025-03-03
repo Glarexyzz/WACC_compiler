@@ -819,6 +819,17 @@ object CodeGen {
               } else {
                 currentBranch += IRStrb(W8, X16, Some(i)) // should be str but if char[] then should be strb
               }
+            case PairType(_,_) =>
+              currentBranch.remove(currentBranch.length - 1)
+              element match {
+                case Identifier(name) =>
+                  val elemReg = variableRegisters(name)._1
+                  if (i == 0) { // separate case for first element
+                    currentBranch += IRStr(elemReg, X16)
+                  } else {
+                    currentBranch += IRStr(elemReg, X16, Some(i * 8)) // should be str but if char[] then should be strb
+                  }
+              }
             case ArrayType(inner) =>
               currentBranch.remove(currentBranch.length - 1)
               element match {
@@ -948,6 +959,7 @@ object CodeGen {
 
   def arrayMemorySize(size: Int, expType: Type): Int = {
     expType match {
+      case ArrayType(PairType(_, _)) => 4 + size * 8 // treat pairs as pointer so 8 bytes
       case ArrayType(t)  => 4 + (size * elementSize(t))  // Integers are 4 bytes
       case BaseType.StrType  => 4 + size 
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
