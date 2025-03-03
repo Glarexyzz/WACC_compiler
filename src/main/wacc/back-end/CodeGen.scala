@@ -299,25 +299,9 @@ object CodeGen {
 
 
           case LValue.LPair(pairElem) =>
-            pairElem match {
-              case PairElem.FstElem(LValue.LName(p)) =>
-                // we are assuming that p is a pair.
-                val (reg, t) = variableRegisters(p)
-                nullErrorCheck(reg)
-                val xreg = getTempRegister()
-                generateRValue(p, rvalue, xreg) // this will surely return the wrong type
-                freeRegister(xreg)
-                currentBranch += IRStr(xreg, reg)
-              case PairElem.SndElem(LValue.LName(p)) =>
-                // we can extract these four lines into their own helper function
-                val (reg, t) = variableRegisters(p)
-                nullErrorCheck(reg)
-                val xreg = getTempRegister()
-                generateRValue(p, rvalue, xreg) // I think we need to get rid of this name parameter.
-                freeRegister(xreg)
-                currentBranch += IRStr(xreg, reg, Some(8))
-              case _ => // not defined yet (pair in pair, pair array, etc)
-            }
+            val temp = getRegister()
+            generateLPair(pairElem, temp, true)
+            freeRegister(temp)
         }
 
       case ReadStmt(lvalue) => 
@@ -775,7 +759,50 @@ object CodeGen {
     } 
     BaseType.IntType
 
-    
+  def generateLPair(pair: PairElem, dest: Register, isStr: Boolean, isFirst: Boolean = true): Type =
+    pair match {
+      case PairElem.FstElem(LValue.LName(p)) =>
+        val (reg, t) = variableRegisters(p)
+        nullErrorCheck(reg)
+        if (isFirst && isStr) then {
+          currentBranch += IRStr(dest, reg)
+        } else {
+          currentBranch += IRLdr(dest, reg)
+        }
+        t
+      case PairElem.SndElem(LValue.LName(p)) => 
+        val (reg, t) = variableRegisters(p)
+        nullErrorCheck(reg)
+        if (isFirst && isStr) then {
+          currentBranch += IRStr(dest, reg, Some(8))
+        } else {
+          currentBranch += IRLdr(dest, reg, Some(8))
+        }
+        t
+      case PairElem.FstElem(LValue.LPair(innerPair)) => 
+        val temp = getRegister()
+        val t = generateLPair(innerPair, temp, isStr, false)
+        nullErrorCheck(temp)
+        if (isFirst && isStr) then {
+          currentBranch += IRStr(dest, temp)
+        } else {
+          currentBranch += IRLdr(dest, temp)
+        }
+        freeRegister(temp)
+        t
+      case PairElem.SndElem(LValue.LPair(innerPair)) => 
+        val temp = getRegister()
+        val t = generateLPair(innerPair, temp, isStr, false)
+        nullErrorCheck(temp)
+        if (isFirst && isStr) then {
+          currentBranch += IRStr(dest, temp, Some(8))
+        } else {
+          currentBranch += IRLdr(dest, temp, Some(8))
+        }
+        freeRegister(temp)
+        t
+      case _ => BaseType.IntType // Nothing yet - add arrays later
+    }
   
 
   def generateRValue(name: String, rvalue: RValue, reg: Register): Type = {
@@ -899,33 +926,10 @@ object CodeGen {
 // AssignStmt(LName(f),RPair(FstElem(LName(p)))))
 
       case RValue.RPair(pairElem) => 
-        pairElem match {
-          // how do i get the dest and source?
-          case PairElem.FstElem(LValue.LName(srcName)) => 
-            val (source,t) = variableRegisters(srcName)
-            nullErrorCheck(source)
-            currentBranch += IRLdr (reg, source)
-            t
-
-          case PairElem.SndElem(LValue.LName(srcName)) => 
-            val (source,t) = variableRegisters(srcName)
-            nullErrorCheck(source)
-            currentBranch += IRLdr (reg, source, Some(8))
-            t
-
-          // case PairElem.FstElem(LPair(t)) =>
-          //   val tempReg = getTempRegister()
-          //   generateRValue(name, t, tempReg)
-          //   currentBranch += IRStr(tempReg.asW, reg)
-          //   freeRegister(tempReg)
-          //   t
-
-          // case PairElem.SndElem(LPair(t)) =>
-
-
-          case _ => BaseType.IntType //temp
-        }
-        
+        val temp = getRegister()
+        val t = generateLPair(pairElem, temp, false)
+        freeRegister(temp)
+        t
 
       case RValue.RCall(name, Some(args)) => 
         val paramRegs = List(X0, X1, X2, X3, X4, X5, X6, X7)
