@@ -884,6 +884,7 @@ object CodeGen {
       case ArrayType(t) => elementSize(t)
       case BaseTElem(t) => elementSize(t)
       case ArrayTElem(t) => elementSize(t) // does the pair contain an array or an element of the array?
+      case PairType(_,_) => 16
       case _ => throw new IllegalArgumentException(s"Unsupported element type: $expType")
     }
   }
