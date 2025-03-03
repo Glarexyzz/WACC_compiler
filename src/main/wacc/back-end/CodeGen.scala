@@ -530,7 +530,8 @@ object CodeGen {
         t
 
       case PairLiteral =>
-        BaseType.IntType // Assume IntType for simplicity
+        currentBranch += IRMov(destX, 0) // 0 is the null value
+        NullType
       
       case UnaryOp(op, expr) => 
         val srcRegX = getRegister()
@@ -766,27 +767,6 @@ object CodeGen {
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
         helpers.getOrElseUpdate(IRLabel("_errOutOfMemor"), errOutOfMemory())
 
-	// // push {x19}
-	// stp x19, xzr, [sp, #-16]!
-	// mov fp, sp
-// why move 16 into w0?
-	// mov w0, #16
-	// bl _malloc
-// x16 is an 'interprocedural scratch register' - what purpose does it have here?
-	// mov x16, x0
-// allocate first elem
-	// mov w8, #10
-	// str x8, [x16]
-// allocate second elem
-	// mov w8, #3
-	// str x8, [x16, #8]
-// move interprocedural scratch x16 into variable register. Why?
-	// mov x19, x16
-// for printing pair
-	// mov x0, x19
-	// // statement primitives do not return results (but will clobber r0/rax)
-	// bl _printp
-	// bl _println
 // allocate null pair
 	// mov x19, #0
 	// mov x0, x19
@@ -794,12 +774,17 @@ object CodeGen {
 	// bl _printp
 	// bl _println
       case RValue.RNewPair(fst, snd) => 
-        val expType = variableRegisters(name)._2
-        val arrayMemory = arrayMemorySize(2, expType)
-        currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
-        += IRAddImmInt(X16, X16, 4) += IRMov(W8, 0) += IRStur(W8, X16, -4)
-        += IRAddImmInt(X16, X16, 4) += IRMov(W8, 0) += IRStur(W8, X16, -4)
-        currentBranch += IRMovReg(reg, X16) 
+        val pairMemorySize = 16 // 8 bytes for each element
+        currentBranch += IRMov(W0, pairMemorySize) += IRBl("_malloc") += IRMovReg(X16, X0)
+        val xreg = getTempRegister()
+        generateExpr(fst, xreg) // store in temp register
+        currentBranch += IRStr(xreg.asW, X16) // store in pair memory
+        freeRegister(xreg)
+        val yreg = getTempRegister()
+        generateExpr(snd, yreg) // store in temp register
+        currentBranch += IRStr(yreg.asW, X16, Some(8)) // store in pair memory
+        freeRegister(yreg)
+        currentBranch += IRMovReg(reg, X16) // move pair memory to destination register
 
       case RValue.RPair(pairElem) => 
 
@@ -835,13 +820,6 @@ object CodeGen {
       case BaseType.StrType  => 4 + size 
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
     }
-  }
-
-  def pairMemorySize(fstType: Type, sndType: Type): Int = {
-    
-    val fstSize = elementSize(fstType)
-    val sndSize = elementSize(sndType)
-    8 + fstSize + sndSize
   }
 
 
