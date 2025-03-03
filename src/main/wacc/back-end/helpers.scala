@@ -366,6 +366,16 @@ object Helpers{
             IRRet() // ret
         )
         List(IRFuncLabel(IRLabel(label), instructions)) 
-
+    
+    def freepair() : List[IRInstr] =
+        val label = "_freepair"
+        val instructions: List[IRInstr] = List(
+            pushReg(LR, XZR),
+            IRCbz(X0, "_errNull"),
+            IRBl("free"),
+            popReg(LR, XZR),
+            IRRet()
+        )
+        List(IRFuncLabel(IRLabel(label), instructions)) 
 
 }

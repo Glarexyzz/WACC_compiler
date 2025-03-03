@@ -374,11 +374,25 @@ object CodeGen {
           case _ => List()
         }
 
+      // case FreeStmt(expr) => 
+      //   expr match {
+      //     case (Identifier(name)) =>
+      //       val reg = variableRegisters.get(name).map(_._1).get
+      //       currentBranch += IRSubImm(X0, reg, 4) += IRBl("free")
+      //   }
       case FreeStmt(expr) => 
         expr match {
           case (Identifier(name)) =>
-            val reg = variableRegisters.get(name).map(_._1).get
-            currentBranch += IRSubImm(X0, reg, 4) += IRBl("free")
+            val (reg, t) = variableRegisters(name)
+            t match {
+              case ArrayType(_) => currentBranch += IRSubImm(X0, reg, 4) += IRBl("free")
+              case PairType(_, _)=> 
+                currentBranch += IRMovReg(X0, reg) += IRBl("_freepair")
+                helpers.getOrElseUpdate(IRLabel("_freepair"), freepair())
+                helpers.getOrElseUpdate(IRLabel("_errNull"), errNull())
+              case _ => throw new Exception(s"Unsupported type for freeing: $t")
+            
+            }
         }
 
       case PrintStmt(expr) =>
