@@ -523,7 +523,11 @@ object CodeGen {
             if (elemType == ArrayType(BaseType.CharType)) {
               currentBranch += IRBl("_arrStore1")
               helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore1(varReg.asW))
-            } else {
+            } else if (elemType == ArrayType(ArrayType(BaseType.IntType))) {
+              currentBranch += IRBl("_arrStore8")
+              helpers.getOrElseUpdate(IRLabel("_arrStore8"), arrStore8(varReg.asX))
+            }
+            else {
               currentBranch += IRBl("_arrStore4")
               helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore4(varReg.asW))
               
