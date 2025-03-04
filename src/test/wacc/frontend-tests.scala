@@ -48,7 +48,7 @@ trait WACCTestUtils {
     "IO/print", 
     "IO/read", 
     "multiple",
-    // "pairs",
+    "pairs",
     "print", 
     "runtimeErr", 
     "runtimeErr/arrayOutOfBounds", 
