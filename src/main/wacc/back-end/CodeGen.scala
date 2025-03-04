@@ -3,6 +3,7 @@ package wacc
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import wacc.Helpers._
+import scala.util.control.Breaks._
 
 
 
@@ -146,6 +147,38 @@ object CodeGen {
     currentBranch = mutable.ListBuffer[IRInstr]() // Reset for next branch
     nBranch += 1
   }
+
+  private def getBranch(label: String): Option[Int] = {
+    var result: Option[Int] = None
+
+    breakable {
+      for ((branch, index) <- branches.zipWithIndex) {
+        branch match {
+          case funcLabel: IRFuncLabel if funcLabel.label.name == label => 
+            result = Some(index)
+            break()
+          case _ =>
+        }
+      }
+    }
+    result
+  }
+
+
+  private def overwriteJump(label: String, newJumpLabel: String): Unit =
+    getBranch(label) match {
+      case Some(i) =>
+        branches(i) match {
+          case funcLabel: IRFuncLabel =>
+            if (funcLabel.instr.nonEmpty) {
+              val newInstrs = funcLabel.instr.init :+ IRJump(newJumpLabel) // Remove the last, add the new one
+              val newBranch = funcLabel.copy(instr = newInstrs)
+              branches.update(i, newBranch) // Overwrite the branch
+            }
+          case _ =>
+        }
+      case _ =>
+    }
 
   def generateFunctionIR(
     stmt: Stmt, 
@@ -452,6 +485,7 @@ object CodeGen {
         addBranch()
 
       case WhileStmt(cond, body) =>
+        val initialBranch = branchLabel(0)
         val bodyBranch = branchLabel(1)
         val condBranch = branchLabel(2)
         currentBranch += IRJump(condBranch) // jump to condition check
@@ -461,6 +495,9 @@ object CodeGen {
         val temp = getTempRegister()
         generateExpr(cond, temp) // if condition true, jump to body
         currentBranch += IRCmpImm(temp.asW, 1) += IRJumpCond(EQ, bodyBranch)
+        if (condBranch != branchLabel(0)) then {
+          overwriteJump(initialBranch, branchLabel(0))
+        }
         freeRegister(temp)
 
       case BodyStmt(body) => generateStmt(body)
