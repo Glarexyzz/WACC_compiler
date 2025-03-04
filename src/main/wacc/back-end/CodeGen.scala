@@ -77,6 +77,12 @@ object CodeGen {
 
   private def addVariable(name: String, t: Type): Option[Either[Register, Int]] = {
     val currentScope = variableRegistersStack.top
+
+    // Don't allocate if it's already in the paramsMap
+    if (paramsMap.contains(name)) {
+      return Some(Left(paramsMap(name)._1))
+    }
+
     if (availableVariableRegisters.nonEmpty) {
       val reg = availableVariableRegisters.pop()
       currentScope(name) = (Left(reg), t)
@@ -439,11 +445,13 @@ object CodeGen {
     if (variableRegistersStack.nonEmpty) {
       val currentScopeVars = variableRegistersStack.pop()
 
-      // Free all registers used in this scope
-      currentScopeVars.values.foreach { 
-        case (Left(reg), _) =>
+      // Only free **local** variables, not function parameters
+      currentScopeVars.foreach {
+        case (name, (Left(reg), _)) if !paramsMap.contains(name) => 
           freeVariableRegister(reg)
-        case _ =>
+        case (name, (Right(off), _)) if !paramsMap.contains(name) => 
+          availableVariableOffsets.push(off)
+        case _ => // Don't free function parameters
       }
     }
   }

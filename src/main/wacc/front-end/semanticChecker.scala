@@ -21,7 +21,7 @@ class SymbolTable {
 
   def getFunctionTable: Map[String, FunctionEntry] = functionTable.toMap
   def getVariableScopes: List[Map[String, VariableEntry]] = variableScopes.toList.map(_.toMap)
-  def getMaxConcurrentVariables: Int = maxConcurrentVariables
+  def getMaxConcurrentVariables: Int = maxConcurrentVariables + functionTable.size
   
   def enterScope(): Unit = {
     nVariableRegs += nVariablesInScope  // Carry over total variables seen so far.
