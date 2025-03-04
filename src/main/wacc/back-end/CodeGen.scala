@@ -21,7 +21,7 @@ object CodeGen {
   private var symbolTable = new SymbolTable()
 
   // Register allocation
-  // We need to account for spill over registers
+  // for temp
   private val tempRegisters: List[Register] = List(X8, X9, X10, X11, X12, X13, X14, X15)
   private val availableTempRegisters = mutable.Stack[Register](X8, X9, X10, X11, X12, X13, X14, X15)
   private val activeTempRegisters = mutable.Set[Register]()
@@ -32,6 +32,10 @@ object CodeGen {
   private val variableRegisters = mutable.Map[String, (Register, Type)]()
   private val variableOffsets = mutable.Map[String, (Int, Type)]()
   private var stackVarPointer = initStackVarsOffset
+  // for variables
+  private val availableVariableRegisters = mutable.Stack[Register]()
+  private val availableVariableOffsets = mutable.Stack[Int]()
+  private val variableRegistersStack = mutable.Stack[mutable.Map[String, (Register, Type)]]()
 
   private def getRegister(): Option[Register] = {
     if (availableRegisters.nonEmpty) {
@@ -74,6 +78,28 @@ object CodeGen {
     }
     activeRegisters -= reg
   } 
+
+  private def lookupVariable(name: String): Option[(Register, Type)] = {
+    variableRegistersStack.iterator.flatMap(_.get(name)).nextOption
+  }
+
+  private def addVariable(name: String, t: Type): Option[Register] = {
+    val currentScope = variableRegistersStack.top
+       if (availableVariableRegisters.nonEmpty) {
+        val reg = availableVariableRegisters.pop()
+        currentScope(name) = (reg, t)
+        Some(reg)
+    } else if (availableVariableOffsets.nonEmpty) {
+        availableVariableOffsets.pop()
+        None
+    } else {
+        throw new RuntimeException("Out of registers and stack offsets for variables!")
+    }
+  }
+
+  private def freeVariableRegister(reg: Register): Unit = {
+    availableVariableRegisters.push(reg)
+  }
 
   def getStackVarOffset(varType: Type): Option[Int] = {
     val varSize: Option[Int] = varType match {
@@ -287,7 +313,9 @@ object CodeGen {
 
     currentBranch ++= prologue
 
+    enterScope()
     generateStmt(stmt) // Generate IR for main function body
+    exitScope()
 
     // Add function epilogue (add to last branch)
     val epilogue = funcLabel match {
@@ -316,34 +344,47 @@ object CodeGen {
     branches.toList
   }
 
+  // Variable Registers
   def initialiseVariables(symTab: SymbolTable): List[Register] = {
-    val allocatedRegs = mutable.ListBuffer[Register]()
-
-    // Iterate over variables in the current scope and allocate registers for them
-    symTab.getVariableScopes.headOption.foreach { currentScope =>
-      currentScope.foreach { case (varName,  VariableEntry(t)) =>
-        val reg = getRegister()
-        reg match {
-          case Some(register) => 
-            variableRegisters(varName) = (register, t)  // map variable names to allocated registers and type
-            allocatedRegs += register                   // track allocated register
-          case _ =>
-            getStackVarOffset(t) match {
-              case Some(off) =>
-                variableOffsets(varName) = (off, t)
-              case _ =>
-            }
-        }
+      val maxVars = symTab.getMaxConcurrentVariables
+      val regsNeeded = math.min(maxVars, availableRegisters.size)
+      val allocated = availableRegisters.take(regsNeeded)
+      availableVariableRegisters.pushAll(allocated)
+      availableRegisters --= allocated
+      // Pre-allocate stack space for the rest
+      val spillVars = maxVars - regsNeeded
+      for (_ <- 0 until spillVars) {
+          getStackVarOffset(BaseType.IntType) match {
+              case Some(off) => availableVariableOffsets.push(off)
+              case None => 
+                  throw new Exception("Ran out of stack offsets for spilling variables!")
+          }
       }
-    }
-    allocatedRegs.toList
+      allocated.toList
   }
+  
 
   def push(reg: Register, off: Int): Unit = {
     if (off < -256) then {
       currentBranch += IRMov(defPushTempReg, off) += IRStrWithReg(reg, FP, defPushTempReg)
     } else {
       currentBranch += IRStur(reg, FP, off)
+    }
+  }
+
+  // Scopes
+  def enterScope() = {
+    variableRegistersStack.push(mutable.Map.empty)
+  }
+
+  def exitScope() = {
+    if (variableRegistersStack.nonEmpty) {
+      val currentScopeVars = variableRegistersStack.pop()
+
+      // Free all registers used in this scope
+      currentScopeVars.values.foreach { case (reg, _) =>
+          freeVariableRegister(reg)
+      }
     }
   }
     
@@ -364,21 +405,20 @@ object CodeGen {
 
       // All declared variables are initialised at the start from the symbol table
       case DeclAssignStmt(t, name, value) =>
-        variableRegisters.get(name) match {
-          case Some((reg, t)) => generateRValue(value, reg, Some(t))
+        addVariable(name, t) match {
+          case Some(reg) => generateRValue(value, reg, Some(t))
           case _ => 
             val (off, t) = variableOffsets(name)
             val temp = getTempRegister().getOrElse(defTempReg)
             generateRValue(value, temp, Some(t))
             push(temp, off)
             freeRegister(temp)
-            
         }
             
       case AssignStmt(lvalue, rvalue) => 
         lvalue match {
           case LValue.LName(name) => 
-            variableRegisters.get(name) match {
+            lookupVariable(name) match {
               case Some((reg, t)) =>
                 generateRValue(rvalue, reg, Some(t))
                 // function parameter update push to stack
@@ -409,10 +449,10 @@ object CodeGen {
                 }
             }
           case LValue.LArray(ArrayElem(name, indices)) =>
-            val (baseReg, arrType) = variableRegisters(name) // Base address
+            val (baseReg, arrType) = lookupVariable(name).get
             generateExpr(indices.head, indexReg) // Get index value
             val varReg = getTempRegister().getOrElse(defArrPairReg)
-            val elemType = variableRegisters(name)._2
+            val elemType = arrType
             generateRValue(rvalue, varReg, Some(elemType))
             currentBranch += IRMovReg(X7, baseReg)
             if (elemType == ArrayType(BaseType.CharType)) {
@@ -436,7 +476,7 @@ object CodeGen {
       case ReadStmt(lvalue) => 
         lvalue match {
           case LValue.LName(name) => 
-            val (regX, t) = variableRegisters(name)
+            val (regX, t) = lookupVariable(name).get
             val reg = regX.asW
             t match {
               case BaseType.IntType => 
@@ -449,7 +489,7 @@ object CodeGen {
             }
 
           case LValue.LPair(PairElem.FstElem(LValue.LName(name))) =>
-            val (reg, t) = variableRegisters(name)
+            val (reg, t) = lookupVariable(name).get
             nullErrorCheck(reg)
             currentBranch += IRLdr(defArrPairReg, reg)
             checkPairType(t, true) match {
@@ -466,7 +506,7 @@ object CodeGen {
               IRStr(arrPairStrReg.asW, reg)
             )
           case LValue.LPair(PairElem.SndElem(LValue.LName(name))) =>
-            val (reg, t) = variableRegisters(name)
+            val (reg, t) = lookupVariable(name).get
             nullErrorCheck(reg)
             currentBranch += IRLdr(defArrPairReg, reg, Some(8))
             checkPairType(t, false) match {
@@ -489,7 +529,7 @@ object CodeGen {
       case FreeStmt(expr) => 
         expr match {
           case (Identifier(name)) =>
-            val (reg, t) = variableRegisters(name)
+            val (reg, t) = lookupVariable(name).get
             t match {
               case ArrayType(_) => currentBranch += IRSubImm(defArrPairReg, reg, stackOffset) += IRBl("free")
               case PairType(_, _)=> 
@@ -584,10 +624,14 @@ object CodeGen {
         generateExpr(cond, temp) // load result in temp register
         currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
         freeRegister(temp)
+        enterScope()
         generateStmt(elseStmt) // else, continue
+        exitScope()
         currentBranch += IRJump(branchLabel(2)) 
         addBranch()
+        enterScope()
         generateStmt(thenStmt)
+        exitScope()
         addBranch()
 
       case WhileStmt(cond, body) =>
@@ -596,7 +640,9 @@ object CodeGen {
         val condBranch = branchLabel(2)
         currentBranch += IRJump(condBranch) // jump to condition check
         addBranch()
+        enterScope()
         generateStmt(body)
+        exitScope()
         addBranch()
         val temp = getTempRegister().getOrElse(defTempReg)
         generateExpr(cond, temp) // if condition true, jump to body
@@ -606,7 +652,10 @@ object CodeGen {
         }
         freeRegister(temp)
 
-      case BodyStmt(body) => generateStmt(body)
+      case BodyStmt(body) => 
+        enterScope()
+        generateStmt(body)
+        exitScope()
 
       case SeqStmt(left, right) => generateStmt(left)
                                    generateStmt(right)
@@ -666,7 +715,7 @@ object CodeGen {
 
       // move the identifier into the destination register
       case Identifier(name) =>
-        variableRegisters.get(name) match {
+        lookupVariable(name) match {
           case Some((reg, t)) => 
             if (destW != reg.asW) {
               t match {
@@ -716,7 +765,7 @@ object CodeGen {
           case UnaryOperator.Length =>
             expr match {
                 case Identifier(name) =>
-                  val varSrcRegW = variableRegisters(name)._1
+                  val varSrcRegW = lookupVariable(name).get._1
                   currentBranch += IRLdur(destW, varSrcRegW, -stackOffset)
                 case _ =>
             }
@@ -727,7 +776,7 @@ object CodeGen {
           case UnaryOperator.Ord => 
             expr match {
               case Identifier(name) => 
-                val r = variableRegisters(name)._1
+                val r = lookupVariable(name).get._1
                 currentBranch += IRMovReg(destW, r.asW)
             }
             BaseType.IntType
@@ -856,7 +905,7 @@ object CodeGen {
 
       case ArrayElem(name, indices) => 
       
-        val (baseReg, arrType) = variableRegisters(name) // Base address
+        val (baseReg, arrType) = lookupVariable(name).get // Base address
         generateExpr(indices.head, indexReg) // Get index value
         arrType match {
           case ArrayType(ArrayType(_)) => 
@@ -886,7 +935,6 @@ object CodeGen {
           currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
         }
         getAccessedArrayType(arrType, indices)
-        
 
       case _ => BaseType.IntType
         
@@ -895,19 +943,19 @@ object CodeGen {
   def retrievePairType(pair: PairElem): Type =
     pair match {
       case PairElem.FstElem(LValue.LName(p)) => 
-        val (_, t) = variableRegisters(p)
+        val (_, t) = lookupVariable(p).get
         checkPairType(t, isFst = true)
       case PairElem.SndElem(LValue.LName(p)) => 
-        val (_, t) = variableRegisters(p)
+        val (_, t) = lookupVariable(p).get
         checkPairType(t, isFst = false)
       case PairElem.FstElem(LValue.LArray(ArrayElem(name, _))) =>
-        val (_, t) = variableRegisters(name)
+        val (_, t) = lookupVariable(name).get
         t match {
           case ArrayType(inner) => inner
           case _ => throw new Exception(s"Variable $name is not an array")
         }
       case PairElem.SndElem(LValue.LArray(ArrayElem(name, _))) =>
-        val (_, t) = variableRegisters(name)
+        val (_, t) = lookupVariable(name).get
         t match {
           case ArrayType(inner) => inner
           case _ => throw new Exception(s"Variable $name is not an array")
@@ -921,7 +969,7 @@ object CodeGen {
   def generateLPair(pair: PairElem, dest: Register, isStr: Boolean, isFirst: Boolean = true): Type =
     pair match {
       case PairElem.FstElem(LValue.LName(p)) =>
-        val (reg, t) = variableRegisters(p)
+        val (reg, t) = lookupVariable(p).get
         nullErrorCheck(reg)
         if (isFirst && isStr) then {
           currentBranch += IRStr(dest, reg)
@@ -930,7 +978,7 @@ object CodeGen {
         }
         t
       case PairElem.SndElem(LValue.LName(p)) => 
-        val (reg, t) = variableRegisters(p)
+        val (reg, t) = lookupVariable(p).get
         nullErrorCheck(reg)
         if (isFirst && isStr) then {
           currentBranch += IRStr(dest, reg, Some(pointerSize))
@@ -1031,8 +1079,8 @@ object CodeGen {
               currentBranch.remove(currentBranch.length - 1)
               element match {
                 case Identifier(name) =>
-                  val elemReg = variableRegisters(name)._1
-                  if (i == firstIndex) { 
+                  val elemReg = lookupVariable(name).get._1
+                  if (i == firstIndex) { // separate case for first element
                     currentBranch += IRStr(elemReg, arrPairStrReg)
                   } else {
                     currentBranch += IRStr(elemReg, arrPairStrReg, Some(i * pointerSize)) 
@@ -1042,8 +1090,8 @@ object CodeGen {
               currentBranch.remove(currentBranch.length - 1)
               element match {
                 case Identifier(name) =>
-                  val elemReg = variableRegisters(name)._1
-                  if (i == firstIndex) { // separate case for first element
+                  val elemReg = lookupVariable(name).get._1
+                  if (i == 0) { // separate case for first element
                     currentBranch += IRStr(elemReg, arrPairStrReg)
                   } else {
                     currentBranch += IRStr(elemReg, arrPairStrReg, Some(i * pointerSize)) 
@@ -1064,7 +1112,7 @@ object CodeGen {
         def addPairElem(expr: Expr, offset: Option[Int]) = {
           expr match {
             case Identifier(name) => 
-              val (reg, t) = variableRegisters(name)
+              val (reg, t) = lookupVariable(name).get
               currentBranch += IRStr(reg, arrPairStrReg, offset)
             case _ => 
               val temp = getTempRegister().getOrElse(defArrPairReg)

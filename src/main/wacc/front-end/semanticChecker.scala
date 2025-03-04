@@ -15,10 +15,16 @@ class SymbolTable {
   var scopeLevel: Int = 0 // Tracks current scope depth
   private var functionStatus: Option[Type] = None // Tracks the return type of the current function
 
+  private var nVariablesInScope = 0        // Number of variables in the **current scope**.
+  private var maxConcurrentVariables = 0   // Global "high-water mark" for variable count.
+  private var nVariableRegs = 0            // Total number of variables across all scopes (for function params etc.)
+
   def getFunctionTable: Map[String, FunctionEntry] = functionTable.toMap
   def getVariableScopes: List[Map[String, VariableEntry]] = variableScopes.toList.map(_.toMap)
+  def getMaxConcurrentVariables: Int = maxConcurrentVariables
   
   def enterScope(): Unit = {
+    nVariableRegs += nVariablesInScope  // Carry over total variables seen so far.
     scopeLevel += 1
     val newScope = if (functionStatus.isDefined && variableScopes.nonEmpty) {
       // If we're inside a function, copy the previous scope
@@ -27,11 +33,16 @@ class SymbolTable {
       mutable.Map[String, VariableEntry]()
     }
     variableScopes.push(newScope)
+    nVariablesInScope = 0
   }
 
   def exitScope(): Unit = {
     if (scopeLevel > 0) {
-      variableScopes.pop()
+      val exitingScope = variableScopes.pop()
+      nVariablesInScope = 0  // The parent scope has 0 new variables at first
+
+      // When we pop a scope, all its variables "die"
+      nVariableRegs -= exitingScope.size
       scopeLevel -= 1
     }
   }
@@ -42,7 +53,13 @@ class SymbolTable {
       if (currentScope.contains(name) && !functionStatus.isDefined) {
         return false // Variable already declared in this scope
       }
-      currentScope(name) = VariableEntry(varType) // Add variable
+      
+      currentScope(name) = VariableEntry(varType)
+      nVariablesInScope += 1
+
+      val totalNowAlive = nVariableRegs + nVariablesInScope
+      maxConcurrentVariables = Math.max(maxConcurrentVariables, totalNowAlive)
+
       return true
     }
     false // No active scope
