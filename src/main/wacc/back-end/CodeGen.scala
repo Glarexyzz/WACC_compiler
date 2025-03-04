@@ -712,15 +712,6 @@ object CodeGen {
 
 
       case ReturnStmt(expr) => 
-        // function: Restore parameters from the stack before returning
-        /*
-        val paramPopInstrs = paramsMap.values.map { case (reg, _) =>
-          List(
-            IRCmt(s"pop {$reg}"),
-            popReg(reg, XZR)
-          )
-        }
-        */
         val paramPopInstrs = if (!paramsMap.isEmpty) {
           popFunctionParams(paramsMap.values.map(_._1).toList)
         } else {
