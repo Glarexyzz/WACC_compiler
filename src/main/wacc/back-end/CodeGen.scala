@@ -354,7 +354,7 @@ object CodeGen {
       // Pre-allocate stack space for the rest
       val spillVars = maxVars - regsNeeded
       for (_ <- 0 until spillVars) {
-          getStackVarOffset(t) match {
+          getStackVarOffset(BaseType.IntType) match {
               case Some(off) => availableVariableOffsets.push(off)
               case None => 
                   throw new Exception("Ran out of stack offsets for spilling variables!")
