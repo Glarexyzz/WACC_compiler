@@ -30,11 +30,11 @@ object CodeGen {
   private val instrBuffer = mutable.ListBuffer[IRInstr]()
   private val variableRegisters = mutable.Map[String, (Register, Type)]()
 
-  private def getRegister(): Register = {
+  private def getRegister(): Option[Register] = {
     if (availableRegisters.nonEmpty) {
       val reg = availableRegisters.pop()
       activeRegisters += reg
-      return reg
+      return Some(reg)
     }
 
     // No registers available - Spill an active register
@@ -43,17 +43,17 @@ object CodeGen {
       instrBuffer += IRStr(regToSpill, SP)  // Spill to stack
       registerStack.push(regToSpill)        // Track it
       activeRegisters -= regToSpill         // Remove from active
-      return regToSpill
+      return Some(regToSpill)
     }
 
-    throw new Exception("No available registers and no registers to spill!")
+    None
   }
 
-    private def getTempRegister(): Register = {
+    private def getTempRegister(): Option[Register] = {
     if (availableTempRegisters.nonEmpty) {
       val reg = availableTempRegisters.pop()
       activeTempRegisters += reg
-      return reg
+      return Some(reg)
     }
     // If no temp registers available, get a normal one
     getRegister()
@@ -256,7 +256,7 @@ object CodeGen {
     // Iterate over variables in the current scope and allocate registers for them
     symTab.getVariableScopes.headOption.foreach { currentScope =>
       currentScope.foreach { case (varName,  VariableEntry(t)) =>
-        val reg = getRegister()
+        val reg = getRegister().getOrElse(X0)
         variableRegisters(varName) = (reg, t)  // map variable names to allocated registers and type
         allocatedRegs += reg              // track allocated register
       }
@@ -305,7 +305,7 @@ object CodeGen {
           case LValue.LArray(ArrayElem(name, indices)) =>
             val (baseReg, arrType) = variableRegisters(name) // Base address
             generateExpr(indices.head, W17) // Get index value
-            val varReg = getTempRegister()
+            val varReg = getTempRegister().getOrElse(X0)
             val elemType = variableRegisters(name)._2
             generateRValue(rvalue, varReg, Some(elemType))
             currentBranch += IRMovReg(X7, baseReg)
@@ -321,7 +321,7 @@ object CodeGen {
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
 
           case LValue.LPair(pairElem) =>
-            val temp = getTempRegister()
+            val temp = getTempRegister().getOrElse(X0)
             generateRValue(rvalue, temp, Some(PairType(NullType, NullType))) 
             generateLPair(pairElem, temp, true)
             freeRegister(temp)
@@ -474,7 +474,7 @@ object CodeGen {
 
 
       case IfStmt(cond, thenStmt, elseStmt) =>
-        val temp = getTempRegister()
+        val temp = getTempRegister().getOrElse(X0)
         generateExpr(cond, temp) // load result in temp register
         currentBranch += IRCmpImm(temp.asW, 1) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
         freeRegister(temp)
@@ -492,7 +492,7 @@ object CodeGen {
         addBranch()
         generateStmt(body)
         addBranch()
-        val temp = getTempRegister()
+        val temp = getTempRegister().getOrElse(X0)
         generateExpr(cond, temp) // if condition true, jump to body
         currentBranch += IRCmpImm(temp.asW, 1) += IRJumpCond(EQ, bodyBranch)
         if (condBranch != branchLabel(0)) then {
@@ -575,7 +575,7 @@ object CodeGen {
         PairType(NullType, NullType)
       
       case UnaryOp(op, expr) => 
-        val srcRegX = getTempRegister()
+        val srcRegX = getTempRegister().getOrElse(X0)
         val srcRegW = srcRegX.asW
         generateExpr(expr, srcRegX)
         val unaryType = op match {
@@ -628,7 +628,7 @@ object CodeGen {
         // 📌 Helpers for comparisons:
         def compareFunc(cond:Condition): Type = {
           val (wreg1, wreg2) = genExprs(expr1, expr2, false)
-          val temp = getTempRegister()
+          val temp = getTempRegister().getOrElse(X0)
           currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp.asW, cond) += IRMovReg(destW, temp.asW)
           freeRegister(temp)
           freeRegister(wreg1.asX)
@@ -637,10 +637,10 @@ object CodeGen {
         }
         // Helper to generate both sides of a binary operator
         def genExprs(expr1: Expr, expr2: Expr, useTemp: Boolean): (Register, Register) = {
-          val xreg1 = if (useTemp) then getTempRegister() else getRegister()
+          val xreg1 = if (useTemp) then getTempRegister().getOrElse(X0) else getRegister().getOrElse(X0)
           val wreg1 = xreg1.asW        
           generateExpr(expr1, xreg1)
-          val xreg2 = if (useTemp) then getTempRegister() else getRegister()
+          val xreg2 = if (useTemp) then getTempRegister().getOrElse(X0) else getRegister().getOrElse(X0)
           val wreg2 = xreg2.asW 
           generateExpr(expr2, xreg2)
           (wreg1, wreg2)
@@ -795,7 +795,7 @@ object CodeGen {
         }
         t
       case PairElem.FstElem(LValue.LPair(innerPair)) => 
-        val temp = getTempRegister()
+        val temp = getTempRegister().getOrElse(X0)
         val t = generateLPair(innerPair, temp, isStr, false)
         nullErrorCheck(temp)
         if (isFirst && isStr) then {
@@ -806,7 +806,7 @@ object CodeGen {
         freeRegister(temp)
         t
       case PairElem.SndElem(LValue.LPair(innerPair)) => 
-        val temp = getTempRegister()
+        val temp = getTempRegister().getOrElse(X0)
         val t = generateLPair(innerPair, temp, isStr, false)
         nullErrorCheck(temp)
         if (isFirst && isStr) then {
@@ -828,7 +828,7 @@ object CodeGen {
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
         val arrayMemory = arrayMemorySize(size, exprType.get)
-        val tempX = getTempRegister()
+        val tempX = getTempRegister().getOrElse(X0)
         val temp = tempX.asW
 
         currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
@@ -902,7 +902,7 @@ object CodeGen {
               val (reg, t) = variableRegisters(name)
               currentBranch += IRStr(reg, X16, offset)
             case _ => 
-              val temp = getTempRegister()
+              val temp = getTempRegister().getOrElse(X0)
               generateExpr(expr, temp)
               currentBranch += IRStr(temp, X16, offset)
               freeRegister(temp)
