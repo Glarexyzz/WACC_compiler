@@ -318,7 +318,6 @@ object CodeGen {
             generateRValue(value, temp, Some(t))
             push(temp, off)
             freeRegister(temp)
-            
         }
             
       case AssignStmt(lvalue, rvalue) => 
