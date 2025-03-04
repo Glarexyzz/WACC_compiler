@@ -4,12 +4,15 @@ object Constants {
   val exitValid            = 0
   val exitInvalidSyntax    = 100
   val exitInvalidSemantics = 200
-  val initStackVarsOffset  = -992
+  val initStackVarsOffset  = -1024
   val defReturnValue       = 0
   val defOffset            = 0
   val defPairNullValue     = 0
   val falseValue           = 0
   val trueValue            = 1
+  val boolSize             = 1
+  val chrSize              = 1
+  val intSize              = 4
   val defArrPairReg        = X0
   val defChrReg            = X0
   val chrRangeCheckReg     = X1
