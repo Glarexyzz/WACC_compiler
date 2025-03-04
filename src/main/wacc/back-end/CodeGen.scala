@@ -75,13 +75,20 @@ object CodeGen {
     activeRegisters -= reg
   } 
 
-  def getStackVarOffset(): Option[Int] = {
-    if (stackVarPointer < -stackOffset) then {
-      val offset = stackVarPointer
-      stackVarPointer += stackOffset
-      return Some(offset)
+  def getStackVarOffset(varType: Type): Option[Int] = {
+    val varSize: Option[Int] = varType match {
+      case BaseType.IntType => Some(intSize)
+      case BaseType.BoolType => Some(boolSize)
+      case BaseType.CharType => Some(charSize)
+      case _ => None
     }
-    None
+    varSize match {
+      case Some(value) if (stackVarPointer < -(value)) => 
+        val offset = stackVarPointer
+        stackVarPointer += value
+        return Some(offset)
+      case _ => return None
+    }
   }
     
 
@@ -321,7 +328,7 @@ object CodeGen {
             variableRegisters(varName) = (register, t)  // map variable names to allocated registers and type
             allocatedRegs += register                   // track allocated register
           case _ =>
-            getStackVarOffset() match {
+            getStackVarOffset(t) match {
               case Some(off) =>
                 variableOffsets(varName) = (off, t)
               case _ =>

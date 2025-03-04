@@ -4,7 +4,7 @@ object Constants {
   val exitValid            = 0
   val exitInvalidSyntax    = 100
   val exitInvalidSemantics = 200
-  val initStackVarsOffset  = -992
+  val initStackVarsOffset  = -1024
   val defReturnValue       = 0
   val defOffset            = 0
   val defPairNullValue     = 0
