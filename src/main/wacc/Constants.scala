@@ -29,4 +29,5 @@ object Constants {
   val intSize              = 4  
   val charSize             = 1            
   val boolSize             = 1
+  val firstIndex           = 0
 }

@@ -933,9 +933,9 @@ object CodeGen {
         val (reg, t) = variableRegisters(p)
         nullErrorCheck(reg)
         if (isFirst && isStr) then {
-          currentBranch += IRStr(dest, reg, Some(8))
+          currentBranch += IRStr(dest, reg, Some(pointerSize))
         } else {
-          currentBranch += IRLdr(dest, reg, Some(8))
+          currentBranch += IRLdr(dest, reg, Some(pointerSize))
         }
         t
       case PairElem.FstElem(LValue.LPair(innerPair)) => 
@@ -954,9 +954,9 @@ object CodeGen {
         val t = generateLPair(innerPair, temp, isStr, false)
         nullErrorCheck(temp)
         if (isFirst && isStr) then {
-          currentBranch += IRStr(dest, temp, Some(8))
+          currentBranch += IRStr(dest, temp, Some(pointerSize))
         } else {
-          currentBranch += IRLdr(dest, temp, Some(8))
+          currentBranch += IRLdr(dest, temp, Some(pointerSize))
         }
         freeRegister(temp)
         t
@@ -977,9 +977,9 @@ object CodeGen {
         val t = generateExpr(arrayElem,  tempX)
         nullErrorCheck(tempX)
         if (isFirst && isStr) then {
-          currentBranch += IRStr(dest, tempX, Some(8))
+          currentBranch += IRStr(dest, tempX, Some(pointerSize))
         } else {
-          currentBranch += IRLdr(dest, tempX, Some(8))
+          currentBranch += IRLdr(dest, tempX, Some(pointerSize))
         }    
         t
     }
@@ -1004,39 +1004,38 @@ object CodeGen {
           val elType = generateExpr(element, temp)
           elType match {
             case BaseType.IntType => 
-              if (i == 0) { // separate case for first element
+              if (i == firstIndex) { // separate case for first element
                 currentBranch += IRStr(temp, arrPairStrReg)
               } else {
               currentBranch += IRStr(temp, arrPairStrReg, Some(i * intSize)) // Store element
               }
             case BaseType.CharType => 
-              //if (expType == BaseType.StrType)
-              if (i == 0) { // separate case for first element
+              if (i == firstIndex) { 
                 currentBranch += IRStrb(temp, arrPairStrReg)
               } else {
-              currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) // Should be strb
+              currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) 
               }
             case BaseType.BoolType => 
-              if (i == 0) { // separate case for first element
+              if (i == firstIndex) { 
                 currentBranch += IRStrb(temp, arrPairStrReg)
               } else {
-                currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) // Store element
+                currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) 
               }
             case BaseType.StrType => 
-              if (i == 0) { // separate case for first element
+              if (i == firstIndex) { 
                 currentBranch += IRStrb(temp, arrPairStrReg)
               } else {
-                currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) // should be str but if char[] then should be strb
+                currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) 
               }
             case PairType(_,_) =>
               currentBranch.remove(currentBranch.length - 1)
               element match {
                 case Identifier(name) =>
                   val elemReg = variableRegisters(name)._1
-                  if (i == 0) { // separate case for first element
+                  if (i == firstIndex) { 
                     currentBranch += IRStr(elemReg, arrPairStrReg)
                   } else {
-                    currentBranch += IRStr(elemReg, arrPairStrReg, Some(i * pointerSize)) // should be str but if char[] then should be strb
+                    currentBranch += IRStr(elemReg, arrPairStrReg, Some(i * pointerSize)) 
                   }
               }
             case ArrayType(inner) =>
@@ -1044,7 +1043,7 @@ object CodeGen {
               element match {
                 case Identifier(name) =>
                   val elemReg = variableRegisters(name)._1
-                  if (i == 0) { // separate case for first element
+                  if (i == firstIndex) { // separate case for first element
                     currentBranch += IRStr(elemReg, arrPairStrReg)
                   } else {
                     currentBranch += IRStr(elemReg, arrPairStrReg, Some(i * pointerSize)) 
