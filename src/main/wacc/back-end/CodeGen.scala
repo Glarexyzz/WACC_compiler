@@ -940,9 +940,9 @@ object CodeGen {
         val (reg, t) = variableRegisters(p)
         nullErrorCheck(reg)
         if (isFirst && isStr) then {
-          currentBranch += IRStr(dest, reg, Some(8))
+          currentBranch += IRStr(dest, reg, Some(pointerSize))
         } else {
-          currentBranch += IRLdr(dest, reg, Some(8))
+          currentBranch += IRLdr(dest, reg, Some(pointerSize))
         }
         t
       case PairElem.FstElem(LValue.LPair(innerPair)) => 
@@ -961,9 +961,9 @@ object CodeGen {
         val t = generateLPair(innerPair, temp, isStr, false)
         nullErrorCheck(temp)
         if (isFirst && isStr) then {
-          currentBranch += IRStr(dest, temp, Some(8))
+          currentBranch += IRStr(dest, temp, Some(pointerSize))
         } else {
-          currentBranch += IRLdr(dest, temp, Some(8))
+          currentBranch += IRLdr(dest, temp, Some(pointerSize))
         }
         freeRegister(temp)
         t
@@ -984,9 +984,9 @@ object CodeGen {
         val t = generateExpr(arrayElem,  tempX)
         nullErrorCheck(tempX)
         if (isFirst && isStr) then {
-          currentBranch += IRStr(dest, tempX, Some(8))
+          currentBranch += IRStr(dest, tempX, Some(pointerSize))
         } else {
-          currentBranch += IRLdr(dest, tempX, Some(8))
+          currentBranch += IRLdr(dest, tempX, Some(pointerSize))
         }    
         t
     }
@@ -1011,39 +1011,38 @@ object CodeGen {
           val elType = generateExpr(element, temp)
           elType match {
             case BaseType.IntType => 
-              if (i == 0) { // separate case for first element
+              if (i == firstIndex) { // separate case for first element
                 currentBranch += IRStr(temp, arrPairStrReg)
               } else {
-              currentBranch += IRStr(temp, arrPairStrReg, Some(i * 4)) // Store element
+              currentBranch += IRStr(temp, arrPairStrReg, Some(i * intSize)) // Store element
               }
             case BaseType.CharType => 
-              //if (expType == BaseType.StrType)
-              if (i == 0) { // separate case for first element
+              if (i == firstIndex) { 
                 currentBranch += IRStrb(temp, arrPairStrReg)
               } else {
-              currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) // Should be strb
+              currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) 
               }
             case BaseType.BoolType => 
-              if (i == 0) { // separate case for first element
+              if (i == firstIndex) { 
                 currentBranch += IRStrb(temp, arrPairStrReg)
               } else {
-                currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) // Store element
+                currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) 
               }
             case BaseType.StrType => 
-              if (i == 0) { // separate case for first element
+              if (i == firstIndex) { 
                 currentBranch += IRStrb(temp, arrPairStrReg)
               } else {
-                currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) // should be str but if char[] then should be strb
+                currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) 
               }
             case PairType(_,_) =>
               currentBranch.remove(currentBranch.length - 1)
               element match {
                 case Identifier(name) =>
                   val elemReg = variableRegisters(name)._1
-                  if (i == 0) { // separate case for first element
+                  if (i == firstIndex) { 
                     currentBranch += IRStr(elemReg, arrPairStrReg)
                   } else {
-                    currentBranch += IRStr(elemReg, arrPairStrReg, Some(i * 8)) // should be str but if char[] then should be strb
+                    currentBranch += IRStr(elemReg, arrPairStrReg, Some(i * pointerSize)) 
                   }
               }
             case ArrayType(inner) =>
@@ -1051,10 +1050,10 @@ object CodeGen {
               element match {
                 case Identifier(name) =>
                   val elemReg = variableRegisters(name)._1
-                  if (i == 0) { // separate case for first element
+                  if (i == firstIndex) { // separate case for first element
                     currentBranch += IRStr(elemReg, arrPairStrReg)
                   } else {
-                    currentBranch += IRStr(elemReg, arrPairStrReg, Some(i * 8)) // should be str but if char[] then should be strb
+                    currentBranch += IRStr(elemReg, arrPairStrReg, Some(i * pointerSize)) 
                   }
               }
               
@@ -1081,12 +1080,11 @@ object CodeGen {
               freeRegister(temp)
           }
         }
-        val pairMemorySize = 16 // 8 bytes for each element
-
+       
         currentBranch += IRMov(defArrPairReg.asW, pairMemorySize)
         += IRBl("_malloc")+= IRMovReg(arrPairStrReg, defArrPairReg)
         addPairElem(fst, None)
-        addPairElem(snd, Some(8))
+        addPairElem(snd, Some(pointerSize))
         currentBranch += IRMovReg(reg, arrPairStrReg) // move pair memory to destination register
 
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
@@ -1111,27 +1109,27 @@ object CodeGen {
 
   def elementSize(expType: Type): Int = {
     expType match {
-      case BaseType.IntType => 4 // Integers are 4 bytes
-      case BaseType.CharType => 1 // Chars are 1 byte
-      case BaseType.BoolType => 1 // Bools are 1 byte
-      case BaseType.StrType => 8 // Strings are pointers (8 bytes)
+      case BaseType.IntType => intSize // Integers are 4 bytes
+      case BaseType.CharType => charSize // Chars are 1 byte
+      case BaseType.BoolType => boolSize // Bools are 1 byte
+      case BaseType.StrType => pointerSize // Strings are pointers (8 bytes)
       case ArrayType(t) => elementSize(t)
       case BaseTElem(t) => elementSize(t)
       case ArrayTElem(t) => elementSize(t) // does the pair contain an array or an element of the array?
-      case PairType(_,_) => 8
+      case PairType(_,_) => pointerSize
       case _ => throw new IllegalArgumentException(s"Unsupported element type: $expType")
     }
   }
 
   def arrayMemorySize(size: Int, expType: Type): Int = {
     expType match {
-      case PairKeyword => 4 + size * 8 // treat pairs as pointer so 8 bytes
-      case ArrayType(ArrayType(t)) => 4 + size * 8
-      case ArrayType(t)  => 4 + (size * elementSize(t))  // Integers are 4 bytes
-      case BaseType.StrType  => 4 + size 
+      case PairKeyword => arrayMetadataSize + size * pointerSize // Pairs are stored as pointers
+      case ArrayType(ArrayType(t)) => arrayMetadataSize + size * pointerSize // Nested arrays use pointers
+      case ArrayType(t)  => arrayMetadataSize + (size * elementSize(t))  // Use elementSize function for flexibility
+      case BaseType.StrType  => arrayMetadataSize + size * charSize // Strings are arrays of chars
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
     }
-}
+  }
 
   def checkPairType(pairType: Type, isFst: Boolean): Type = {
     def toBaseType(t: Type): Type = t match {
