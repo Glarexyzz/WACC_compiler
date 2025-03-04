@@ -133,7 +133,7 @@ object CodeGen {
   private var paramsMap = Map[String, (Register, Type)]()
 
   def assignFuncParams(params: List[Param]):Map[String, (Register, Type)] = {
-    val paramRegisters = List(X0, X1, X2, X3, X4, X5, X6, X7)
+    val paramRegisters = tempRegisters
     params.zip(paramRegisters).map {
       case (param, reg) =>
         (param.name, (reg, param.t))
@@ -174,6 +174,48 @@ object CodeGen {
       }
     }
     result
+  }
+
+  private def adjustLabelBranch(label: String): Unit = {
+    // Find the function label entry and remove it from the list
+    val (funcLabelBranch, remainingBranches) = branches.partition {
+      case IRFuncLabel(IRLabel(name), _) => name == label
+      case _ => false
+    }
+
+    val funcInstrs = funcLabelBranch.head match {
+        case IRFuncLabel(_, instrs) => instrs
+        case _ => throw new RuntimeException("Unexpected type in function label branch")
+    }
+    // Extract all existing labels and their instructions
+    val labelsAndInstrs = remainingBranches.collect {
+        case IRFuncLabel(IRLabel(name), instrs) => (name, instrs)
+    }
+    // Shift labels: Keep the same order, but move the function label to the front
+    val reorderedBranches = mutable.ListBuffer[IRFuncLabel]()
+    // Put function label first with first instr set
+    reorderedBranches += 
+      IRFuncLabel(IRLabel(label), labelsAndInstrs.head._2.map(decrementJumpTargets)) 
+    // Rename labels sequentially
+    reorderedBranches ++=
+      labelsAndInstrs.tail.zipWithIndex.map { case ((name, instrs), idx) =>
+        IRFuncLabel(IRLabel(s".L$idx"), instrs.map(decrementJumpTargets)) 
+      }
+    reorderedBranches += 
+      IRFuncLabel(IRLabel(s".L${labelsAndInstrs.length - 1}"), funcInstrs.map(decrementJumpTargets))
+    // Update branches with reordered labels
+    branches.clear()
+    branches ++= reorderedBranches
+  }
+
+  private def decrementJumpTargets(instr: IRInstr): IRInstr = instr match {
+    case IRJump(label) if label.startsWith(".L") =>
+        val newLabel = label.drop(2).toInt - 1
+        IRJump(s".L$newLabel")
+    case IRJumpCond(cond, label) if label.startsWith(".L") =>
+        val newLabel = label.drop(2).toInt - 1
+        IRJumpCond(cond, s".L$newLabel")
+    case other => other // Leave other instructions unchanged
   }
 
 
@@ -256,8 +298,13 @@ object CodeGen {
 
     currentBranch ++= epilogue
 
-    // ❌ Ensure function label appears first, followed by branch labels inside the function
     addBranch(funcLabel)
+
+    // Reorder branch Ensure function label appears first, 
+    // followed by branch labels inside the function
+    funcLabel
+      .flatMap(label => getBranch("wacc_" + label)
+      .filter(_ != 0).map(_ => adjustLabelBranch("wacc_" + label)))
 
     branches.toList
   }
@@ -1046,9 +1093,9 @@ object CodeGen {
         generateLPair(pairElem, reg, false)
 
       case RValue.RCall(name, Some(args)) => 
-        val paramRegs = List(X0, X1, X2, X3, X4, X5, X6, X7)
+        val paramRegs = tempRegisters
         args.zip(paramRegs).foreach { case (arg, reg) =>
-          generateExpr(arg, reg) // Move argument values into x0-x7
+          generateExpr(arg, reg) // Move argument values into x8-x15
         }
         currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
 
