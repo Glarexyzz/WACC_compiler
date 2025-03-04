@@ -23,4 +23,10 @@ object Constants {
   val defReturnReg         = W0
   val modTempReg           = W1
   val indexReg             = W17
+  val pointerSize          = 8    
+  val pairMemorySize       = 16      
+  val arrayMetadataSize    = 4  
+  val intSize              = 4  
+  val charSize             = 1            
+  val boolSize             = 1
 }
