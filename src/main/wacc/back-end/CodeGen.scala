@@ -176,6 +176,24 @@ object CodeGen {
     result
   }
 
+  private def adjustLabelBranch(label: String): Unit = {
+    // The label name is at the back of the branch list
+    val (newFirst, remaining) = branches.collect {
+      case irFuncLabel @ IRFuncLabel(IRLabel(name), _) if name == label => irFuncLabel
+    }.splitAt(1)
+
+    val labelTuple = newFirst.head // First matching label
+    val shiftedList = remaining.collect { case IRFuncLabel(l, _) => l } // Extract labels
+    val adjustedBranches = mutable.ListBuffer[(IRLabel, List[IRInstr])]()
+    
+    adjustedBranches += 
+      ((labelTuple.label, branches.head.asInstanceOf[IRFuncLabel].instr)) 
+    adjustedBranches ++=
+      shiftedList.zip(remaining.collect { case IRFuncLabel(_, instr) => instr })
+    
+    branches = adjustedBranches.map { case (lbl, instrs) => IRFuncLabel(lbl, instrs) }
+  }
+
 
   private def overwriteJump(label: String, newJumpLabel: String): Unit =
     getBranch(label) match {
@@ -256,8 +274,13 @@ object CodeGen {
 
     currentBranch ++= epilogue
 
-    // ❌ Ensure function label appears first, followed by branch labels inside the function
     addBranch(funcLabel)
+
+    // Reorder branch Ensure function label appears first, 
+    // followed by branch labels inside the function
+    funcLabel.flatMap(
+      label => getBranch(label).filter(_ != 0).map(_ => adjustLabelBranch(label))
+    )
 
     branches.toList
   }
