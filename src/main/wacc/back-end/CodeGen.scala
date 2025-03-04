@@ -76,9 +76,9 @@ object CodeGen {
   } 
 
   def getStackVarOffset(): Option[Int] = {
-    if (stackVarPointer < -4) then {
+    if (stackVarPointer < -stackOffset) then {
       val offset = stackVarPointer
-      stackVarPointer += 4
+      stackVarPointer += stackOffset
       return Some(offset)
     }
     None
@@ -345,7 +345,7 @@ object CodeGen {
       wordLabel(value.length, label, value)
     }.flatten.toList
 
-    List(IRLabel(".data")) ++ dataSection ++ List(IRAlign(4), IRLabel(".text"), IRGlobal("main"))
+    List(IRLabel(".data")) ++ dataSection ++ List(IRAlign(alignmentOffset), IRLabel(".text"), IRGlobal("main"))
   }
 
   def generateHelperIRs(): List[IRInstr] = {
@@ -484,7 +484,7 @@ object CodeGen {
           case (Identifier(name)) =>
             val (reg, t) = variableRegisters(name)
             t match {
-              case ArrayType(_) => currentBranch += IRSubImm(defArrPairReg, reg, 4) += IRBl("free")
+              case ArrayType(_) => currentBranch += IRSubImm(defArrPairReg, reg, stackOffset) += IRBl("free")
               case PairType(_, _)=> 
                 currentBranch += IRMovReg(defArrPairReg, reg) += IRBl("_freepair")
                 helpers.getOrElseUpdate(IRLabel("_freepair"), freepair())
@@ -707,7 +707,7 @@ object CodeGen {
             expr match {
                 case Identifier(name) =>
                   val varSrcRegW = variableRegisters(name)._1
-                  currentBranch += IRLdur(destW, varSrcRegW, -4)
+                  currentBranch += IRLdur(destW, varSrcRegW, -stackOffset)
                 case _ =>
             }
             BaseType.IntType
@@ -853,7 +853,7 @@ object CodeGen {
             helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
             currentBranch += IRMovReg(defArrTempReg, baseReg) += IRBl("_arrLoad8")
-            currentBranch += IRMovReg(defTempReg, defArrTempReg) += IRLdur(defArrPairReg.asW, defTempReg, -4)
+            currentBranch += IRMovReg(defTempReg, defArrTempReg) += IRLdur(defArrPairReg.asW, defTempReg, -stackOffset)
           case ArrayType(PairType(_,_)) =>
             helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
@@ -997,8 +997,8 @@ object CodeGen {
         val temp = tempX.asW
 
         currentBranch += IRMov(defArrPairReg.asW, arrayMemory) += IRBl("_malloc")
-        += IRMovReg(arrPairStrReg, defArrPairReg) += IRAddImmInt(arrPairStrReg, arrPairStrReg, 4)
-        += IRMov(temp, size) += IRStur(temp, arrPairStrReg, -4)
+        += IRMovReg(arrPairStrReg, defArrPairReg) += IRAddImmInt(arrPairStrReg, arrPairStrReg, stackOffset)
+        += IRMov(temp, size) += IRStur(temp, arrPairStrReg, -stackOffset)
         
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
           val elType = generateExpr(element, temp)
