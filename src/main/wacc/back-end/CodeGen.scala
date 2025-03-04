@@ -943,19 +943,19 @@ object CodeGen {
   def retrievePairType(pair: PairElem): Type =
     pair match {
       case PairElem.FstElem(LValue.LName(p)) => 
-        val (_, t) = variableRegisters(p)
+        val (_, t) = lookupVariable(p).get
         checkPairType(t, isFst = true)
       case PairElem.SndElem(LValue.LName(p)) => 
-        val (_, t) = variableRegisters(p)
+        val (_, t) = lookupVariable(p).get
         checkPairType(t, isFst = false)
       case PairElem.FstElem(LValue.LArray(ArrayElem(name, _))) =>
-        val (_, t) = variableRegisters(name)
+        val (_, t) = lookupVariable(name).get
         t match {
           case ArrayType(inner) => inner
           case _ => throw new Exception(s"Variable $name is not an array")
         }
       case PairElem.SndElem(LValue.LArray(ArrayElem(name, _))) =>
-        val (_, t) = variableRegisters(name)
+        val (_, t) = lookupVariable(name).get
         t match {
           case ArrayType(inner) => inner
           case _ => throw new Exception(s"Variable $name is not an array")
