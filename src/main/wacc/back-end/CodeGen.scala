@@ -526,6 +526,7 @@ object CodeGen {
           t match {
             //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
             case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
+            case PairType(_,_) => currentBranch += IRMovReg(destX, reg.asX)
             case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
             case _ => currentBranch += IRMovReg(destW, reg.asW)
           }  
@@ -591,6 +592,20 @@ object CodeGen {
         def compareFunc(cond:Condition): Type = {
           val (wreg1, wreg2) = genExprs(expr1, expr2, false)
           val temp = getTempRegister()
+          // if (expr1.isInstanceOf[PairType]) {
+          //   currentBranch += IRCmp(wreg1.asX, wreg2.asX)
+          // } else {
+          //   currentBranch += IRCmp(wreg1, wreg2) 
+          // }
+          expr1 match {
+            case Identifier(name) =>
+              val expType = variableRegisters(name)._2
+              if (expType.isInstanceOf[PairType]) {
+                currentBranch += IRCmp(wreg1.asX, wreg2.asX)
+              } else {
+                currentBranch += IRCmp(wreg1, wreg2) 
+              }
+          }
           currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp.asW, cond) += IRMovReg(destW, temp.asW)
           freeRegister(temp)
           freeRegister(wreg1.asX)
