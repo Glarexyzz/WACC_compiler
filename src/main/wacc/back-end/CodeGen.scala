@@ -986,7 +986,7 @@ object CodeGen {
             helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
             currentBranch += IRMovReg(defArrTempReg, baseReg) += IRBl("_arrLoad8")
-            currentBranch += IRMovReg(defTempReg, defArrTempReg) += IRLdur(defArrPairReg.asW, defTempReg, -stackOffset)
+            currentBranch += IRMovReg(defTempReg, defArrTempReg) //+= IRLdur(defArrPairReg.asW, defTempReg, -stackOffset)
           case ArrayType(PairType(_,_)) =>
             helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
