@@ -590,8 +590,9 @@ object CodeGen {
         // 📌 Helpers for comparisons:
         def compareFunc(cond:Condition): Type = {
           val (wreg1, wreg2) = genExprs(expr1, expr2, false)
-          val temp = W8 // Use X8 as temporary register
+          val temp = getTempRegister()
           currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp, cond) += IRMovReg(destW, temp)
+          freeRegister(temp)
           freeRegister(wreg1.asX)
           freeRegister(wreg2.asX)
           BaseType.BoolType
@@ -776,37 +777,38 @@ object CodeGen {
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
         val arrayMemory = arrayMemorySize(size, exprType.get)
+        val temp = getTempRegister()
 
         currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
-        += IRAddImmInt(X16, X16, 4) += IRMov(W8, size) += IRStur(W8, X16, -4)
+        += IRAddImmInt(X16, X16, 4) += IRMov(temp, size) += IRStur(temp, X16, -4)
         // val registers = 
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
-          val elType = generateExpr(element, W8)
+          val elType = generateExpr(element, temp)
           elType match {
             case BaseType.IntType => 
               if (i == 0) { // separate case for first element
-                currentBranch += IRStr(W8, X16)
+                currentBranch += IRStr(temp, X16)
               } else {
-              currentBranch += IRStr(W8, X16, Some(i * 4)) // Store element
+              currentBranch += IRStr(temp, X16, Some(i * 4)) // Store element
               }
             case BaseType.CharType => 
               //if (expType == BaseType.StrType)
               if (i == 0) { // separate case for first element
-                currentBranch += IRStrb(W8, X16)
+                currentBranch += IRStrb(temp, X16)
               } else {
-              currentBranch += IRStrb(W8, X16, Some(i)) // Should be strb
+              currentBranch += IRStrb(temp, X16, Some(i)) // Should be strb
               }
             case BaseType.BoolType => 
               if (i == 0) { // separate case for first element
-                currentBranch += IRStrb(W8, X16)
+                currentBranch += IRStrb(temp, X16)
               } else {
-                currentBranch += IRStrb(W8, X16, Some(i)) // Store element
+                currentBranch += IRStrb(temp, X16, Some(i)) // Store element
               }
             case BaseType.StrType => 
               if (i == 0) { // separate case for first element
-                currentBranch += IRStrb(W8, X16)
+                currentBranch += IRStrb(temp, X16)
               } else {
-                currentBranch += IRStrb(W8, X16, Some(i)) // should be str but if char[] then should be strb
+                currentBranch += IRStrb(temp, X16, Some(i)) // should be str but if char[] then should be strb
               }
             case PairType(_,_) =>
               currentBranch.remove(currentBranch.length - 1)
