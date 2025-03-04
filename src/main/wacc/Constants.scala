@@ -12,6 +12,7 @@ object Constants {
   val trueValue            = 1
   val alignmentOffset      = 4
   val stackOffset          = 4
+  
   val defArrPairReg        = X0
   val defChrReg            = X0
   val chrRangeCheckReg     = X1
@@ -25,6 +26,7 @@ object Constants {
   val defReturnReg         = W0
   val modTempReg           = W1
   val indexReg             = W17
+
   val pointerSize          = 8    
   val pairMemorySize       = 16      
   val arrayMetadataSize    = 4  
@@ -32,4 +34,10 @@ object Constants {
   val charSize             = 1            
   val boolSize             = 1
   val firstIndex           = 0
+
+  val max16BitUnsigned     = 65535            
+  val min32BitSigned       = -2147483647
+  val min8BitSigned        = 0xFFFFFF80        
+  val lower16Mask          = 0xFFFF                
+  val upper16Shift         = 16
 }

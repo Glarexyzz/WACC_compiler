@@ -634,17 +634,20 @@ object CodeGen {
     val destW = dest.asW
     expr match {
       case IntLiteral(value) =>
-        if (value.abs <= 65535 || value <= -2147483647) {
+        if (value.abs <= max16BitUnsigned || value <= min32BitSigned) {
           currentBranch += IRMov(destW, value.toInt)
           BaseType.IntType
         } else {
-          val lower16 = (value & 0xFFFF).toInt          // Extract lower 16 bits
-          val upper16 = ((value >> 16) & 0xFFFF).toInt  // Extract upper 16 bits should be fine to use toInt since should be 16 bits anyway?
+          val lower16 = (value & lower16Mask).toInt          // Extract lower 16 bits
+          val upper16 = ((value >> upper16Shift) & lower16Mask).toInt  
+
           currentBranch +=
-            IRMov(destW, lower16) +=        // MOV dest, #lower16
-            IRMovk(destW, upper16, 16)   // MOVK dest, #upper16, LSL #16
+            IRMov(destW, lower16) +=        
+            IRMovk(destW, upper16, upper16Shift)   
+
           BaseType.IntType
-        }
+}
+
 
       case BoolLiteral(value) =>
         currentBranch += IRMov(destW, if (value) trueValue else falseValue)
@@ -731,7 +734,7 @@ object CodeGen {
 
           case UnaryOperator.Chr =>
             helpers.getOrElseUpdate(IRLabel("_errBadChar"), errBadChar())
-            currentBranch += IRTst(srcRegW, 0xffffff80)     // Test if value is within ASCII range (0-127)
+            currentBranch += IRTst(srcRegW, min8BitSigned)     // Test if value is within ASCII range (0-127)
                     += IRCsel(chrRangeCheckReg, defChrReg, chrRangeCheckReg, NE) // Conditional move if out of range
                     += IRJumpCond(NE , "_errBadChar") // Branch if invalid
                     += IRMovReg(destW, srcRegW)          // Move the value into W0 (truncate to char)
@@ -883,16 +886,6 @@ object CodeGen {
           currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
         }
         getAccessedArrayType(arrType, indices)
-        
-        
-        
-
-        
-        
-        // arrType match {
-        //   case ArrayType(inner) => inner
-        //   case _ => throw new Exception()
-        // }
         
 
       case _ => BaseType.IntType
