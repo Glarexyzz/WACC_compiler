@@ -314,10 +314,15 @@ object Helpers{
 
     
      
-    def arrStore(label: String, reg: Register, isWord: Boolean): List[IRInstr] = {
+    def arrStore(label: String, reg: Register, shift: Int): List[IRInstr] = {
         val storeInstr = 
-            if (isWord) IRStrsb(reg, X7, X17, 2) // Word-sized store (4 bytes)
-            else IRStrbReg(reg, X7, X17)         // Byte-sized store (1 byte)
+            if (shift == 2) {
+                IRStrsb(reg, X7, X17, 2) 
+            } else if (shift == 3) {
+                IRStrsb(reg, X7, X17, 3)
+            } else {
+                IRStrbReg(reg, X7, X17)      
+            }       
 
         val instructions: List[IRInstr] = List(
             pushReg(LR, XZR), 
@@ -340,8 +345,9 @@ object Helpers{
         }
 
     // Define arrStore4 and arrStore1 using the generalized function
-    def arrStore4(reg: Register): List[IRInstr] = arrStore("_arrStore4", reg, isWord = true)
-    def arrStore1(reg: Register): List[IRInstr] = arrStore("_arrStore1", reg, isWord = false)
+    def arrStore8(reg: Register): List[IRInstr] = arrStore("_arrStore8", reg, shift = 3)
+    def arrStore4(reg: Register): List[IRInstr] = arrStore("_arrStore4", reg, shift = 2)
+    def arrStore1(reg: Register): List[IRInstr] = arrStore("_arrStore1", reg, shift = 0)
 
         
     // 📌 Freeing Pairs

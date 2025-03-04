@@ -15,13 +15,14 @@ import wacc.Constants._
 */
 object CodeGen {
 
-  private val stringLiterals: mutable.Map[String, String] = mutable.Map() // Store unique string labels
+  private val stringLiterals: mutable.LinkedHashMap[String, String] = mutable.LinkedHashMap() // Store unique string labels
   def nextLabel(): String = s".L.str${stringLiterals.size}"
 
   private var symbolTable = new SymbolTable()
 
   // Register allocation
-  // for temp
+  // We need to account for spill over registers
+  private val argumentRegisters: List[Register] = List(X0, X1, X2, X3, X4, X5, X6, X7)
   private val tempRegisters: List[Register] = List(X8, X9, X10, X11, X12, X13, X14, X15)
   private val availableTempRegisters = mutable.Stack[Register](X8, X9, X10, X11, X12, X13, X14, X15)
   private val activeTempRegisters = mutable.Set[Register]()
@@ -155,14 +156,89 @@ object CodeGen {
   }
 
   // for storing parameters of functions
-  private var paramsMap = Map[String, (Register, Type)]()
+  private var paramsMap = mutable.Map[String, (Register, Type)]()
 
   def assignFuncParams(params: List[Param]):Map[String, (Register, Type)] = {
-    val paramRegisters = tempRegisters
-    params.zip(paramRegisters).map {
-      case (param, reg) =>
-        (param.name, (reg, param.t))
+    val paramRegisters = argumentRegisters
+
+    val registerMapping = params.zip(paramRegisters).map {
+      case (param, reg) => (param.name, (reg, param.t))
     }.toMap
+
+    registerMapping
+  }
+
+  def pushFunctionParams(params: List[Register]): List[IRInstr] = {
+    if (params.isEmpty) return List()
+
+    val numParams = params.length
+    if (numParams <= 1) {
+      return List() // No need to push a single parameter
+    }
+    val stackSize = (numParams + 1) / 2 * 16  // Always round up to nearest multiple of 16
+
+    val groupedParams: List[List[Register]] = 
+      params.sorted(Ordering.by(argumentRegisters.indexOf)).grouped(2).toList // Group into pairs
+    
+    // First pair should decrement SP and store
+    val firstPush = groupedParams.head match {
+      case List(reg1, reg2) =>
+        List(
+          IRCmt(s"push {$reg1, $reg2}"),
+          IRStp(reg1, reg2, -stackSize, true) // First pair decrements SP!
+        )
+      case List(reg1) =>
+        List(
+          IRCmt(s"push {$reg1}"),
+          IRStp(reg1, XZR, -stackSize, true) // Store single register
+        )
+      case _ => List()
+    }   
+
+    // Remaining pairs use positive offsets
+    val remainingPushes = groupedParams.tail.zipWithIndex.flatMap { case (regs, index) =>
+      val offset = (index + 1) * 16 // Start at #16, then #32, etc.
+      regs match {
+        case List(reg1, reg2) =>
+          List(
+            IRCmt(s"push {$reg1, $reg2}"),
+            IRStp(reg1, reg2, offset) // Use positive offsets
+          )
+        case List(reg1) =>
+          List(
+            IRCmt(s"push {$reg1}"),
+            IRStp(reg1, XZR, offset) // Store single register
+          )
+        case _ => List()
+      }
+    }
+
+    firstPush ++ remainingPushes ++ List(IRMovReg(X16, SP))
+  }
+
+  def popFunctionParams(params: List[Register]): List[IRInstr] = {
+    if (params.isEmpty) return List()
+    val numParams = params.length
+    if (numParams <= 1) {
+      return List() // No need to pop if only one parameter (it remains in x0)
+    }
+
+    val sortedParams = params.sorted(Ordering.by(argumentRegisters.indexOf)) // Ensure correct order
+    val groupedParams: List[List[Register]] = sortedParams.grouped(2).toList // Group into pairs
+
+    groupedParams.flatMap {
+      case List(reg1: Register, reg2: Register) =>
+        List(
+          IRCmt(s"# pop {$reg1, $reg2}"),
+          IRLdp(reg1, reg2) // Restore from stack
+        )
+      case List(reg1: Register) =>
+        List(
+          IRCmt(s"# pop {$reg1}"),
+          IRLdur(reg1, SP, 0) // Peek single value
+        )
+      case _ => List()
+    }
   }
   
   // Branches for main function
@@ -267,24 +343,13 @@ object CodeGen {
     branches = mutable.ListBuffer[IRInstr]() // cleanup the branches
 
     
-    paramRegs match {
-      case Some(params) =>
-        paramsMap = assignFuncParams(params)
-        variableRegisters ++= paramsMap  // add parameters
-      case None =>
-        None  // unchanged
-    }
+    paramsMap = mutable.Map.from(paramRegs.map(assignFuncParams).getOrElse(Map()))
+    variableRegisters ++= paramsMap  // Store parameter registers in variable map
 
     val allocatedRegs = initialiseVariables(symbolTable)
 
     // function: Save parameters onto the stack to allow modification
-    val paramPushInstrs = paramsMap.values.map { case (reg, _) => 
-      List(
-        IRCmt(s"push {$reg}"),
-        pushReg(reg, XZR),
-        IRMovReg(paramsReg, SP)
-      )
-    }
+    val paramPushInstrs = pushFunctionParams(paramsMap.values.map(_._1).toList)
 
     // Generate prologue (Add to first branch)
     val prologue = funcLabel match {
@@ -293,7 +358,7 @@ object CodeGen {
           IRCmt("Function prologue"),
           pushReg(FP, LR),
           IRMovReg(FP, SP)
-        ) ++ paramPushInstrs.flatten
+        ) ++ paramPushInstrs
       case None =>
         List(
           IRCmt("Main/Branch prologue"),
@@ -456,26 +521,27 @@ object CodeGen {
                 }
             }
           case LValue.LArray(ArrayElem(name, indices)) =>
-            lookupVariable(name).get match {
-              case (Left(baseReg), arrType) =>
+            lookupVariable(name) match {
+              case (Some(Left(baseReg), arrType)) =>
                 generateExpr(indices.head, indexReg) // Get index value
                 val varReg = getTempRegister().getOrElse(defArrPairReg)
                 val elemType = arrType
                 generateRValue(rvalue, varReg, Some(elemType))
-                currentBranch += IRMovReg(defArrTempReg, baseReg)
+                currentBranch += IRMovReg(X7, baseReg)
                 if (elemType == ArrayType(BaseType.CharType)) {
                   currentBranch += IRBl("_arrStore1")
                   helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore1(varReg.asW))
-                } else {
+                } else if (elemType == ArrayType(ArrayType(BaseType.IntType))) {
+                  currentBranch += IRBl("_arrStore8")
+                  helpers.getOrElseUpdate(IRLabel("_arrStore8"), arrStore8(varReg.asX))
+                }
+                else {
                   currentBranch += IRBl("_arrStore4")
                   helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore4(varReg.asW))
                   
                 }
-                freeRegister(varReg)
-                helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
               case _ =>
             }
-            
 
           case LValue.LPair(pairElem) =>
             val temp = getTempRegister().getOrElse(defArrPairReg)
@@ -624,7 +690,9 @@ object CodeGen {
         expr match {
           case Identifier(name) if paramsMap.contains(name) =>
             val (reg, t) = paramsMap(name)
+
             // function parameter pop
+            paramsMap -= name 
             currentBranch ++= List(
               IRCmt(s"pop {$reg}"),
               popReg(reg, XZR)
@@ -636,17 +704,24 @@ object CodeGen {
 
       case ReturnStmt(expr) => 
         // function: Restore parameters from the stack before returning
+        /*
         val paramPopInstrs = paramsMap.values.map { case (reg, _) =>
           List(
             IRCmt(s"pop {$reg}"),
             popReg(reg, XZR)
           )
         }
-        generateExpr(expr, defReturnReg)
+        */
+        val paramPopInstrs = if (!paramsMap.isEmpty) {
+          popFunctionParams(paramsMap.values.map(_._1).toList)
+        } else {
+          List()
+        }
+        generateExpr(expr, W0)
         currentBranch ++= (
           List(
             IRCmt("Function epilogue: reset stack pointer")
-          ) ++ paramPopInstrs.flatten ++ List(
+          ) ++ paramPopInstrs ++ List(
             IRMovReg(SP, FP), // Reset stack pointer before returning
             popReg(FP, LR),
             IRRet()
@@ -1194,7 +1269,7 @@ object CodeGen {
         generateLPair(pairElem, reg, false)
 
       case RValue.RCall(name, Some(args)) => 
-        val paramRegs = tempRegisters
+        val paramRegs = argumentRegisters
         args.zip(paramRegs).foreach { case (arg, reg) =>
           generateExpr(arg, reg) // Move argument values into x8-x15
         }
