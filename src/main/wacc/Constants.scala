@@ -5,6 +5,11 @@ object Constants {
   val exitInvalidSyntax    = 100
   val exitInvalidSemantics = 200
   val initStackVarsOffset  = -992
+  val defReturnValue       = 0
+  val defOffset            = 0
+  val defPairNullValue     = 0
+  val falseValue           = 0
+  val trueValue            = 1
   val defArrPairReg        = X0
   val defChrReg            = X0
   val chrRangeCheckReg     = X1

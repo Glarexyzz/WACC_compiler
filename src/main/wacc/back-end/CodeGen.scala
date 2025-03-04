@@ -289,7 +289,7 @@ object CodeGen {
       case None =>
         List(
           IRCmt("Main/Branch epilogue"),
-          IRMov(defReturnReg.asX, 0) // Default return code
+          IRMov(defReturnReg.asX, defReturnValue) // Default return code
         ) ++ popRegs(allocatedRegs) ++ List(
           popReg(FP, LR),
           IRRet()
@@ -502,7 +502,7 @@ object CodeGen {
             // function parameter push
             currentBranch ++= List(
               IRCmt(s"pop/peek {$reg}"),
-              IRLdur(reg, SP, 0),
+              IRLdur(reg, SP, defOffset),
               IRMovReg(paramsReg, SP)
             )
           case _ =>
@@ -575,7 +575,7 @@ object CodeGen {
       case IfStmt(cond, thenStmt, elseStmt) =>
         val temp = getTempRegister().getOrElse(defTempReg)
         generateExpr(cond, temp) // load result in temp register
-        currentBranch += IRCmpImm(temp.asW, 1) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
+        currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
         freeRegister(temp)
         generateStmt(elseStmt) // else, continue
         currentBranch += IRJump(branchLabel(2)) 
@@ -593,7 +593,7 @@ object CodeGen {
         addBranch()
         val temp = getTempRegister().getOrElse(defTempReg)
         generateExpr(cond, temp) // if condition true, jump to body
-        currentBranch += IRCmpImm(temp.asW, 1) += IRJumpCond(EQ, bodyBranch)
+        currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, bodyBranch)
         if (condBranch != branchLabel(0)) then {
           overwriteJump(initialBranch, branchLabel(0))
         }
@@ -640,7 +640,7 @@ object CodeGen {
         }
 
       case BoolLiteral(value) =>
-        currentBranch += IRMov(destW, if (value) 1 else 0)
+        currentBranch += IRMov(destW, if (value) trueValue else falseValue)
         BaseType.BoolType
 
       case CharLiteral(value) =>
@@ -688,7 +688,7 @@ object CodeGen {
         // compare if the dest and src are the same value or not to reduce redundancy
 
       case PairLiteral =>
-        currentBranch += IRMov(destX, 0) // 0 is the null value
+        currentBranch += IRMov(destX, defPairNullValue) // 0 is the null value
         PairType(NullType, NullType)
       
       case UnaryOp(op, expr) => 
@@ -701,7 +701,7 @@ object CodeGen {
             genOverflow()
             BaseType.IntType 
           case UnaryOperator.Not =>
-            currentBranch += IRCmpImm(srcRegW, 1) += IRCset(destW, NE)
+            currentBranch += IRCmpImm(srcRegW, trueValue) += IRCset(destW, NE)
             BaseType.BoolType
           case UnaryOperator.Length =>
             expr match {
@@ -799,14 +799,14 @@ object CodeGen {
 
           case BinaryOperator.Divide => 
             val (wreg1, wreg2) = genExprs(expr1, expr2, true)
-            currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(destW, wreg1, wreg2)
+            currentBranch += IRCmpImm(wreg2, falseValue) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(destW, wreg1, wreg2)
             freeRegister(wreg1.asX)
             freeRegister(wreg2.asX)
             BaseType.IntType
 
           case BinaryOperator.Modulus => 
             val (wreg1, wreg2) = genExprs(expr1, expr2, true)
-            currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero")
+            currentBranch += IRCmpImm(wreg2, falseValue) += IRJumpCond(EQ, "_errDivZero")
             currentBranch += IRSDiv(modTempReg, wreg1, wreg2) += IRMSub(destW, modTempReg, wreg2, wreg1)
             freeRegister(wreg1.asX)
             freeRegister(wreg2.asX)
@@ -827,15 +827,15 @@ object CodeGen {
 
           case BinaryOperator.Or =>
             val (wreg1, wreg2) = genExprs(expr1, expr2, false)
-            currentBranch += IRCmpImm(wreg1, 1) += IRCset(wreg1, EQ)
-            currentBranch += IRCmpImm(wreg2, 1)  += IRCset(wreg2, EQ) += IROr(destW, wreg1, wreg2)
+            currentBranch += IRCmpImm(wreg1, trueValue) += IRCset(wreg1, EQ)
+            currentBranch += IRCmpImm(wreg2, trueValue)  += IRCset(wreg2, EQ) += IROr(destW, wreg1, wreg2)
             freeRegister(wreg1.asX)
             freeRegister(wreg2.asX)
             BaseType.BoolType
           
           case BinaryOperator.And =>
             val (wreg1, wreg2) = genExprs(expr1, expr2, false)
-            currentBranch += IRCmpImm(wreg1, 1) += IRJumpCond(NE, branchLabel(1)) += IRCmpImm(wreg2, 1)
+            currentBranch += IRCmpImm(wreg1, trueValue) += IRJumpCond(NE, branchLabel(1)) += IRCmpImm(wreg2, trueValue)
             addBranch()
             currentBranch += IRCset(destW, EQ)
             freeRegister(wreg1.asX)
@@ -1163,7 +1163,7 @@ object CodeGen {
   def nullErrorCheck(reg: Register): Unit = {
     helpers.getOrElseUpdate(IRLabel("_prints"), prints())
     helpers.getOrElseUpdate(IRLabel("_errNull"), errNull())
-    currentBranch += IRCmpImm(reg, 0) += IRJumpCond(EQ, "_errNull")
+    currentBranch += IRCmpImm(reg, falseValue) += IRJumpCond(EQ, "_errNull")
   }
 
   def getAccessedArrayType(arrType: Type, indices: List[Expr]): Type = {
