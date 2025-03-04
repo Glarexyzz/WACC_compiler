@@ -1180,7 +1180,6 @@ object CodeGen {
   def generateRValue(rvalue: RValue, reg: Register, exprType: Option[Type] = None): Unit = {
     rvalue match {
       case RValue.RExpr(expr) => 
-        println(s"🟡 DEBUG: Calling generateExpr from generateRValue with $expr (${expr.getClass})")
         generateExpr(expr, reg) 
 
       case RValue.RArrayLiter(arrayLiter) => 
