@@ -10,9 +10,6 @@ object Constants {
   val defPairNullValue     = 0
   val falseValue           = 0
   val trueValue            = 1
-  val boolSize             = 1
-  val chrSize              = 1
-  val intSize              = 4
   val defArrPairReg        = X0
   val defChrReg            = X0
   val chrRangeCheckReg     = X1
