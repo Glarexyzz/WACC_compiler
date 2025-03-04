@@ -1,5 +1,7 @@
 package wacc
 import scala.collection.mutable
+import wacc.Constants.alignmentOffset
+import wacc.Constants.stackOffset
 // import wacc.Constants._
 
 object Helpers{
@@ -111,7 +113,7 @@ object Helpers{
     private def print(label: String, asciz: String, func: IRFuncLabel): List[IRInstr] = {
         val str0label = strLabel(label, 0)
         val length = asciz.length
-        wordLabel(length, str0label, asciz) :+ IRAlign(4) :+ func
+        wordLabel(length, str0label, asciz) :+ IRAlign(alignmentOffset) :+ func
     }
 
     def printi(): List[IRInstr] = {
@@ -128,7 +130,7 @@ object Helpers{
         val instructions: List[IRInstr] = List(
             pushReg(LR, XZR),
             IRMovReg(X2, X0),
-            IRLdur(W1, X0, -4),
+            IRLdur(W1, X0, -stackOffset),
             IRAdr(X0, str0label),
             IRBl("printf"),
             IRMov(X0, 0),
@@ -151,7 +153,7 @@ object Helpers{
         ).flatten
 
         data ++ List (
-            IRAlign(4),
+            IRAlign(alignmentOffset),
             IRFuncLabel(IRLabel(label), List(
                 pushReg(LR, XZR),
                 IRCmpImm(W0, 0),
@@ -163,7 +165,7 @@ object Helpers{
                 IRAdr(X2, strLabel(label, 1))
             )),
             IRFuncLabel(IRLabel(".L_printb1"), List(
-                IRLdur(W1, X2, -4),
+                IRLdur(W1, X2, -stackOffset),
                 IRAdr(X0, strLabel(label, 2)),
                 IRBl ("printf"),
                 IRMov(X0, 0),
@@ -203,7 +205,7 @@ object Helpers{
             popReg(LR, XZR),
             IRRet()
         )
-        wordLabel(0, str0label, "") :+ IRAlign(4) :+ IRFuncLabel(IRLabel("_println"), instructions)
+        wordLabel(0, str0label, "") :+ IRAlign(alignmentOffset) :+ IRFuncLabel(IRLabel("_println"), instructions)
     }
 
     // 📌 Helpers for Reading
@@ -218,7 +220,7 @@ object Helpers{
         ) ++ popRegs(List(X0, LR)) ++ List(
             IRRet()
         )
-        wordLabel(asciz.length, str0label, asciz) :+ IRAlign(4) :+ IRFuncLabel(IRLabel(label), instructions)
+        wordLabel(asciz.length, str0label, asciz) :+ IRAlign(alignmentOffset) :+ IRFuncLabel(IRLabel(label), instructions)
     }
 
     def readi(): List[IRInstr] = {
@@ -241,7 +243,7 @@ object Helpers{
         ) else List(
             IRBl("_prints")
         )
-        errWord :+ IRAlign(4) :+ IRFuncLabel(IRLabel(name), base ++ midsection ++ List(IRMov(W0, -1), IRBl("exit")))
+        errWord :+ IRAlign(alignmentOffset) :+ IRFuncLabel(IRLabel(name), base ++ midsection ++ List(IRMov(W0, -1), IRBl("exit")))
     }
 
 
@@ -292,7 +294,7 @@ object Helpers{
             IRCsel(X1, X17, X1, LT), 
             IRJumpCond(LT, "_errOutOfBounds"), 
 
-            IRLdur(W30, X7, -4), 
+            IRLdur(W30, X7, -stackOffset), 
             IRCmp(W17, W30), 
             IRCsel(X1, X17, X1, GE), 
             IRJumpCond(GE, "_errOutOfBounds"), 
@@ -323,7 +325,7 @@ object Helpers{
             IRCsel(X1, X17, X1, LT), 
             IRJumpCond(LT, "_errOutOfBounds"), 
 
-            IRLdur(W30, X7, -4), 
+            IRLdur(W30, X7, -stackOffset), 
             IRCmp(W17, W30), 
             IRCsel(X1, X17, X1, GE), 
             IRJumpCond(GE, "_errOutOfBounds"),
