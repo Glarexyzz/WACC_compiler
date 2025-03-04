@@ -391,8 +391,8 @@ object CodeGen {
           helpers.getOrElseUpdate(IRLabel("_printb"), printb())
           currentBranch +=  IRBl("_printb")
         } else if (exprType == ArrayType(BaseType.IntType)) {
-          helpers.getOrElseUpdate(IRLabel("_printp"), printp())
-          currentBranch +=  IRBl("_printp")
+          helpers.getOrElseUpdate(IRLabel("_printi"), printi()) //printp
+          currentBranch +=  IRBl("_printi")
         } else if (exprType.isInstanceOf[PairType]) {
           helpers.getOrElseUpdate(IRLabel("_printp"), printp())
           currentBranch +=  IRBl("_printp")
@@ -702,9 +702,21 @@ object CodeGen {
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
             currentBranch += IRMovReg(X7, baseReg) 
             currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
-          
-        
         }
+        if (indices.size > 1) {
+          helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
+          helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+          currentBranch.remove(currentBranch.size - 1)
+          currentBranch += pushReg(X8, XZR)
+          generateExpr(indices.apply(1), W17)
+          currentBranch += popReg(X7, XZR)
+          currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
+        }
+        
+        
+        
+
+        
         
         arrType match {
           case ArrayType(inner) => inner
@@ -900,7 +912,8 @@ object CodeGen {
 
   def arrayMemorySize(size: Int, expType: Type): Int = {
     expType match {
-      case PairType(_, _) => 4 + size * 8 // treat pairs as pointer so 8 bytes
+      case ArrayType(PairType(_, _)) => 4 + size * 8 // treat pairs as pointer so 8 bytes
+      case ArrayType(ArrayType(t)) => 4 + size * 8
       case ArrayType(t)  => 4 + (size * elementSize(t))  // Integers are 4 bytes
       case BaseType.StrType  => 4 + size 
       case _ => throw new IllegalArgumentException(s"Unsupported array type: $expType")
