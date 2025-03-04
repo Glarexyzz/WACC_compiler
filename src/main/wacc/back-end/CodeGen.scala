@@ -276,7 +276,7 @@ object CodeGen {
             val elemType = variableRegisters(name)._2
             generateRValue(rvalue, varReg, Some(elemType))
             currentBranch += IRMovReg(X7, baseReg)
-            if (elemType == BaseType.CharType) {
+            if (elemType == ArrayType(BaseType.CharType)) {
               currentBranch += IRBl("_arrStore1")
               helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore1(varReg.asW))
             } else {
