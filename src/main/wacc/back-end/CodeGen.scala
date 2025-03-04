@@ -805,6 +805,12 @@ object CodeGen {
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
             currentBranch += IRMovReg(X7, baseReg) 
             currentBranch += IRBl("_arrLoad8") += IRMovReg(X8, X7) += IRLdur(W0, X8, -4)
+          case ArrayType(PairType(_,_)) =>
+            helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
+            helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+            currentBranch += IRMovReg(X7, baseReg) 
+            currentBranch += IRBl("_arrLoad8") += IRMovReg(dest, X7)
+
           case _ =>
             helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
@@ -912,14 +918,35 @@ object CodeGen {
         }
         freeRegister(temp)
         t
-      case _ => BaseType.IntType // Nothing yet - add arrays later
+
+      case PairElem.FstElem(LValue.LArray(arrayElem)) =>
+        val tempX = getTempRegister().getOrElse(X0)
+        val t = generateExpr(arrayElem,  tempX)
+        nullErrorCheck(tempX)
+        if (isFirst && isStr) then {
+          currentBranch += IRStr(dest, tempX)
+        } else {
+          currentBranch += IRLdr(dest, tempX)
+        }
+        t
+
+      case PairElem.SndElem(LValue.LArray(arrayElem)) =>
+        val tempX = getTempRegister().getOrElse(X0)
+        val t = generateExpr(arrayElem,  tempX)
+        nullErrorCheck(tempX)
+        if (isFirst && isStr) then {
+          currentBranch += IRStr(dest, tempX, Some(8))
+        } else {
+          currentBranch += IRLdr(dest, tempX, Some(8))
+        }    
+        t
     }
   
 
   def generateRValue(rvalue: RValue, reg: Register, exprType: Option[Type] = None): Unit = {
     rvalue match {
-      case RValue.RExpr(expr) => generateExpr(expr, reg)
-      // unimplemented
+      case RValue.RExpr(expr) => generateExpr(expr, reg) 
+
       case RValue.RArrayLiter(arrayLiter) => 
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
@@ -929,7 +956,7 @@ object CodeGen {
 
         currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
         += IRAddImmInt(X16, X16, 4) += IRMov(temp, size) += IRStur(temp, X16, -4)
-        // val registers = 
+        
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
           val elType = generateExpr(element, temp)
           elType match {
@@ -1040,7 +1067,7 @@ object CodeGen {
       case ArrayType(t) => elementSize(t)
       case BaseTElem(t) => elementSize(t)
       case ArrayTElem(t) => elementSize(t) // does the pair contain an array or an element of the array?
-      case PairType(_,_) => 16
+      case PairType(_,_) => 8
       case _ => throw new IllegalArgumentException(s"Unsupported element type: $expType")
     }
   }
