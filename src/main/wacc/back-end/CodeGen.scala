@@ -374,7 +374,7 @@ object CodeGen {
 
           case LValue.LPair(pairElem) =>
             val temp = getTempRegister().getOrElse(X0)
-            generateRValue(rvalue, temp, Some(PairType(NullType, NullType))) 
+            generateRValue(rvalue, temp, Some(retrievePairType(pairElem))) 
             generateLPair(pairElem, temp, true)
             freeRegister(temp)
         }
@@ -843,6 +843,32 @@ object CodeGen {
         case _ =>
     } 
     BaseType.IntType
+  
+  def retrievePairType(pair: PairElem): Type =
+    pair match {
+      case PairElem.FstElem(LValue.LName(p)) => 
+        val (_, t) = variableRegisters(p)
+        checkPairType(t, isFst = true)
+      case PairElem.SndElem(LValue.LName(p)) => 
+        val (_, t) = variableRegisters(p)
+        checkPairType(t, isFst = false)
+      case PairElem.FstElem(LValue.LArray(ArrayElem(name, _))) =>
+        val (_, t) = variableRegisters(name)
+        t match {
+          case ArrayType(inner) => inner
+          case _ => throw new Exception(s"Variable $name is not an array")
+        }
+      case PairElem.SndElem(LValue.LArray(ArrayElem(name, _))) =>
+        val (_, t) = variableRegisters(name)
+        t match {
+          case ArrayType(inner) => inner
+          case _ => throw new Exception(s"Variable $name is not an array")
+        }
+      case PairElem.FstElem(LValue.LPair(innerPair)) =>
+        retrievePairType(innerPair)
+      case PairElem.SndElem(LValue.LPair(innerPair)) =>
+        retrievePairType(innerPair)
+    }
 
   def generateLPair(pair: PairElem, dest: Register, isStr: Boolean, isFirst: Boolean = true): Type =
     pair match {
@@ -1021,7 +1047,7 @@ object CodeGen {
 
   def arrayMemorySize(size: Int, expType: Type): Int = {
     expType match {
-      case ArrayType(PairType(_, _)) => 4 + size * 8 // treat pairs as pointer so 8 bytes
+      case PairKeyword => 4 + size * 8 // treat pairs as pointer so 8 bytes
       case ArrayType(ArrayType(t)) => 4 + size * 8
       case ArrayType(t)  => 4 + (size * elementSize(t))  // Integers are 4 bytes
       case BaseType.StrType  => 4 + size 
