@@ -443,7 +443,7 @@ object CodeGen {
       case IfStmt(cond, thenStmt, elseStmt) =>
         val temp = getTempRegister()
         generateExpr(cond, temp) // load result in temp register
-        currentBranch += IRCmpImm(temp, 1) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
+        currentBranch += IRCmpImm(temp.asW, 1) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
         freeRegister(temp)
         generateStmt(elseStmt) // else, continue
         currentBranch += IRJump(branchLabel(2)) 
@@ -460,7 +460,7 @@ object CodeGen {
         addBranch()
         val temp = getTempRegister()
         generateExpr(cond, temp) // if condition true, jump to body
-        currentBranch += IRCmpImm(temp, 1) += IRJumpCond(EQ, bodyBranch)
+        currentBranch += IRCmpImm(temp.asW, 1) += IRJumpCond(EQ, bodyBranch)
         freeRegister(temp)
 
       case BodyStmt(body) => generateStmt(body)
@@ -591,7 +591,7 @@ object CodeGen {
         def compareFunc(cond:Condition): Type = {
           val (wreg1, wreg2) = genExprs(expr1, expr2, false)
           val temp = getTempRegister()
-          currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp, cond) += IRMovReg(destW, temp)
+          currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp.asW, cond) += IRMovReg(destW, temp.asW)
           freeRegister(temp)
           freeRegister(wreg1.asX)
           freeRegister(wreg2.asX)
@@ -777,7 +777,8 @@ object CodeGen {
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
         val arrayMemory = arrayMemorySize(size, exprType.get)
-        val temp = getTempRegister()
+        val tempX = getTempRegister()
+        val temp = tempX.asW
 
         currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
         += IRAddImmInt(X16, X16, 4) += IRMov(temp, size) += IRStur(temp, X16, -4)
@@ -835,9 +836,8 @@ object CodeGen {
               
             case _ =>
           }
-        
-          
         }
+        freeRegister(tempX)
         currentBranch += IRMovReg(reg, X16) 
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
