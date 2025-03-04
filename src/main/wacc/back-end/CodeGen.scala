@@ -549,6 +549,7 @@ object CodeGen {
                 currentBranch += IRMovReg(X7, baseReg)
                 if (elemType == ArrayType(BaseType.CharType)) {
                   currentBranch += IRBl("_arrStore1")
+                  helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
                   helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore1(varReg.asW))
                 } else if (elemType == ArrayType(ArrayType(BaseType.IntType))) {
                   currentBranch += IRBl("_arrStore8")
