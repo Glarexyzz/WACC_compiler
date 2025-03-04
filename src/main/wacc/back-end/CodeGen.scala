@@ -257,7 +257,7 @@ object CodeGen {
       List(
         IRCmt(s"push {$reg}"),
         pushReg(reg, XZR),
-        IRMovReg(X16, SP)
+        IRMovReg(paramsReg, SP)
       )
     }
 
@@ -289,7 +289,7 @@ object CodeGen {
       case None =>
         List(
           IRCmt("Main/Branch epilogue"),
-          IRMov(X0, 0) // Default return code
+          IRMov(defReturnReg.asX, 0) // Default return code
         ) ++ popRegs(allocatedRegs) ++ List(
           popReg(FP, LR),
           IRRet()
@@ -334,7 +334,7 @@ object CodeGen {
 
   def push(reg: Register, off: Int): Unit = {
     if (off < -256) then {
-      currentBranch += IRMov(X17, off) += IRStrWithReg(reg, FP, X17)
+      currentBranch += IRMov(defPushTempReg, off) += IRStrWithReg(reg, FP, defPushTempReg)
     } else {
       currentBranch += IRStur(reg, FP, off)
     }
@@ -361,7 +361,7 @@ object CodeGen {
           case Some((reg, t)) => generateRValue(value, reg, Some(t))
           case _ => 
             val (off, t) = variableOffsets(name)
-            val temp = getTempRegister().getOrElse(X8)
+            val temp = getTempRegister().getOrElse(defTempReg)
             generateRValue(value, temp, Some(t))
             push(temp, off)
             freeRegister(temp)
@@ -379,20 +379,20 @@ object CodeGen {
                   currentBranch ++= List(
                     IRCmt(s"push {$reg}"),
                     pushReg(reg, XZR),
-                    IRMovReg(X16, SP)
+                    IRMovReg(paramsReg, SP)
                   )
                 }
               case None =>
                 variableOffsets.get(name) match {
                   case Some((off, t)) =>
-                    val temp = getTempRegister().getOrElse(X8)
+                    val temp = getTempRegister().getOrElse(defTempReg)
                     generateRValue(rvalue, temp, Some(t))
                     push(temp, off)
                     if (paramsMap.contains(name)) {
                       currentBranch ++= List(
                         IRCmt(s"push {$temp}"),
                         pushReg(temp, XZR),
-                        IRMovReg(X16, SP)
+                        IRMovReg(paramsReg, SP)
                       )
                     }
                     freeRegister(temp)
@@ -403,8 +403,8 @@ object CodeGen {
             }
           case LValue.LArray(ArrayElem(name, indices)) =>
             val (baseReg, arrType) = variableRegisters(name) // Base address
-            generateExpr(indices.head, W17) // Get index value
-            val varReg = getTempRegister().getOrElse(X0)
+            generateExpr(indices.head, indexReg) // Get index value
+            val varReg = getTempRegister().getOrElse(defArrPairReg)
             val elemType = variableRegisters(name)._2
             generateRValue(rvalue, varReg, Some(elemType))
             currentBranch += IRMovReg(X7, baseReg)
@@ -420,7 +420,7 @@ object CodeGen {
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
 
           case LValue.LPair(pairElem) =>
-            val temp = getTempRegister().getOrElse(X0)
+            val temp = getTempRegister().getOrElse(defArrPairReg)
             generateRValue(rvalue, temp, Some(retrievePairType(pairElem))) 
             generateLPair(pairElem, temp, true)
             freeRegister(temp)
@@ -434,17 +434,17 @@ object CodeGen {
             t match {
               case BaseType.IntType => 
                 helpers.getOrElseUpdate(IRLabel("_readi"), readi())
-                currentBranch ++= List(IRMovReg(W0, reg), IRBl("_readi"), IRMovReg(reg, W0))
+                currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readi"), IRMovReg(reg, tempIOReg))
               case BaseType.CharType => 
                 helpers.getOrElseUpdate(IRLabel("_readc"), readc())
-                currentBranch ++= List(IRMovReg(W0, reg), IRBl("_readc"), IRMovReg(reg, W0))
+                currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readc"), IRMovReg(reg, tempIOReg))
               case _ => List()
             }
 
           case LValue.LPair(PairElem.FstElem(LValue.LName(name))) =>
             val (reg, t) = variableRegisters(name)
             nullErrorCheck(reg)
-            currentBranch += IRLdr(X0, reg)
+            currentBranch += IRLdr(defArrPairReg, reg)
             checkPairType(t, true) match {
               case BaseType.IntType =>
                 helpers.getOrElseUpdate(IRLabel("_readi"), readi())
@@ -455,13 +455,13 @@ object CodeGen {
               case _ => List()
             }
             currentBranch ++= List(
-              IRMovReg(W16, W0),
-              IRStr(W16, reg)
+              IRMovReg(arrPairStrReg.asW, tempIOReg),
+              IRStr(arrPairStrReg.asW, reg)
             )
           case LValue.LPair(PairElem.SndElem(LValue.LName(name))) =>
             val (reg, t) = variableRegisters(name)
             nullErrorCheck(reg)
-            currentBranch += IRLdr(X0, reg, Some(8))
+            currentBranch += IRLdr(defArrPairReg, reg, Some(8))
             checkPairType(t, false) match {
               case BaseType.IntType =>
                 helpers.getOrElseUpdate(IRLabel("_readi"), readi())
@@ -472,8 +472,8 @@ object CodeGen {
               case _ => List()
             }
             currentBranch ++= List(
-              IRMovReg(W16, W0),
-              IRStr(W16, reg, Some(8))
+              IRMovReg(arrPairStrReg.asW, tempIOReg),
+              IRStr(arrPairStrReg.asW, reg, Some(8))
             )
             
           case _ => List()
@@ -484,9 +484,9 @@ object CodeGen {
           case (Identifier(name)) =>
             val (reg, t) = variableRegisters(name)
             t match {
-              case ArrayType(_) => currentBranch += IRSubImm(X0, reg, 4) += IRBl("free")
+              case ArrayType(_) => currentBranch += IRSubImm(defArrPairReg, reg, 4) += IRBl("free")
               case PairType(_, _)=> 
-                currentBranch += IRMovReg(X0, reg) += IRBl("_freepair")
+                currentBranch += IRMovReg(defArrPairReg, reg) += IRBl("_freepair")
                 helpers.getOrElseUpdate(IRLabel("_freepair"), freepair())
                 helpers.getOrElseUpdate(IRLabel("_errNull"), errNull())
                 helpers.getOrElseUpdate(IRLabel("_prints"), prints())
@@ -503,7 +503,7 @@ object CodeGen {
             currentBranch ++= List(
               IRCmt(s"pop/peek {$reg}"),
               IRLdur(reg, SP, 0),
-              IRMovReg(X16, SP)
+              IRMovReg(paramsReg, SP)
             )
           case _ =>
             None
@@ -556,7 +556,7 @@ object CodeGen {
             popReg(reg, XZR)
           )
         }
-        generateExpr(expr, W0)
+        generateExpr(expr, defReturnReg)
         currentBranch ++= (
           List(
             IRCmt("Function epilogue: reset stack pointer")
@@ -573,7 +573,7 @@ object CodeGen {
 
 
       case IfStmt(cond, thenStmt, elseStmt) =>
-        val temp = getTempRegister().getOrElse(X0)
+        val temp = getTempRegister().getOrElse(defTempReg)
         generateExpr(cond, temp) // load result in temp register
         currentBranch += IRCmpImm(temp.asW, 1) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
         freeRegister(temp)
@@ -591,7 +591,7 @@ object CodeGen {
         addBranch()
         generateStmt(body)
         addBranch()
-        val temp = getTempRegister().getOrElse(X0)
+        val temp = getTempRegister().getOrElse(defTempReg)
         generateExpr(cond, temp) // if condition true, jump to body
         currentBranch += IRCmpImm(temp.asW, 1) += IRJumpCond(EQ, bodyBranch)
         if (condBranch != branchLabel(0)) then {
@@ -622,7 +622,7 @@ object CodeGen {
       case _ => None
     }
 
-  def generateExpr(expr: Expr, dest: Register = X0): Type = 
+  def generateExpr(expr: Expr, dest: Register = defReturnReg): Type = 
     val destX = dest.asX
     val destW = dest.asW
     expr match {
@@ -670,7 +670,7 @@ object CodeGen {
             t
           case None =>
             val (off,t) = variableOffsets(name)
-            val temp = getTempRegister().getOrElse(X8)
+            val temp = getTempRegister().getOrElse(defTempReg)
             currentBranch += IRLdr(temp, FP, Some(off))
             if (destW != temp.asW) {
               t match {
@@ -692,7 +692,7 @@ object CodeGen {
         PairType(NullType, NullType)
       
       case UnaryOp(op, expr) => 
-        val srcRegX = getTempRegister().getOrElse(X0)
+        val srcRegX = getTempRegister().getOrElse(defTempReg)
         val srcRegW = srcRegX.asW
         generateExpr(expr, srcRegX)
         val unaryType = op match {
@@ -725,7 +725,7 @@ object CodeGen {
           case UnaryOperator.Chr =>
             helpers.getOrElseUpdate(IRLabel("_errBadChar"), errBadChar())
             currentBranch += IRTst(srcRegW, 0xffffff80)     // Test if value is within ASCII range (0-127)
-                    += IRCsel(X1, X0, X1, NE) // Conditional move if out of range
+                    += IRCsel(chrRangeCheckReg, defChrReg, chrRangeCheckReg, NE) // Conditional move if out of range
                     += IRJumpCond(NE , "_errBadChar") // Branch if invalid
                     += IRMovReg(destW, srcRegW)          // Move the value into W0 (truncate to char)
             BaseType.CharType
@@ -745,7 +745,7 @@ object CodeGen {
         // 📌 Helpers for comparisons:
         def compareFunc(cond:Condition): Type = {
           val (wreg1, wreg2) = genExprs(expr1, expr2, false)
-          val temp = getTempRegister().getOrElse(X0)
+          val temp = getTempRegister().getOrElse(defTempReg)
           currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp.asW, cond) += IRMovReg(destW, temp.asW)
           freeRegister(temp)
           freeRegister(wreg1.asX)
@@ -754,10 +754,10 @@ object CodeGen {
         }
         // Helper to generate both sides of a binary operator
         def genExprs(expr1: Expr, expr2: Expr, useTemp: Boolean): (Register, Register) = {
-          val xreg1 = if (useTemp) then getTempRegister().getOrElse(X0) else getRegister().getOrElse(X0)
+          val xreg1 = if (useTemp) then getTempRegister().getOrElse(defTempReg) else getRegister().getOrElse(defNormReg)
           val wreg1 = xreg1.asW        
           generateExpr(expr1, xreg1)
-          val xreg2 = if (useTemp) then getTempRegister().getOrElse(X0) else getRegister().getOrElse(X0)
+          val xreg2 = if (useTemp) then getTempRegister().getOrElse(defTempReg) else getRegister().getOrElse(defNormReg)
           val wreg2 = xreg2.asW 
           generateExpr(expr2, xreg2)
           (wreg1, wreg2)
@@ -806,7 +806,8 @@ object CodeGen {
 
           case BinaryOperator.Modulus => 
             val (wreg1, wreg2) = genExprs(expr1, expr2, true)
-            currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(W1, wreg1, wreg2) += IRMSub(destW, W1, wreg2, wreg1)
+            currentBranch += IRCmpImm(wreg2, 0) += IRJumpCond(EQ, "_errDivZero")
+            currentBranch += IRSDiv(modTempReg, wreg1, wreg2) += IRMSub(destW, modTempReg, wreg2, wreg1)
             freeRegister(wreg1.asX)
             freeRegister(wreg2.asX)
             BaseType.IntType
@@ -826,7 +827,8 @@ object CodeGen {
 
           case BinaryOperator.Or =>
             val (wreg1, wreg2) = genExprs(expr1, expr2, false)
-            currentBranch += IRCmpImm(wreg1, 1) += IRCset(wreg1, EQ) += IRCmpImm(wreg2, 1) += IRCset(wreg2, EQ) += IROr(destW, wreg1, wreg2)
+            currentBranch += IRCmpImm(wreg1, 1) += IRCset(wreg1, EQ)
+            currentBranch += IRCmpImm(wreg2, 1)  += IRCset(wreg2, EQ) += IROr(destW, wreg1, wreg2)
             freeRegister(wreg1.asX)
             freeRegister(wreg2.asX)
             BaseType.BoolType
@@ -845,33 +847,33 @@ object CodeGen {
       case ArrayElem(name, indices) => 
       
         val (baseReg, arrType) = variableRegisters(name) // Base address
-        generateExpr(indices.head, W17) // Get index value
+        generateExpr(indices.head, indexReg) // Get index value
         arrType match {
           case ArrayType(ArrayType(_)) => 
             helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-            currentBranch += IRMovReg(X7, baseReg) 
-            currentBranch += IRBl("_arrLoad8") += IRMovReg(X8, X7) += IRLdur(W0, X8, -4)
+            currentBranch += IRMovReg(defArrTempReg, baseReg) += IRBl("_arrLoad8")
+            currentBranch += IRMovReg(defTempReg, defArrTempReg) += IRLdur(defArrPairReg.asW, defTempReg, -4)
           case ArrayType(PairType(_,_)) =>
             helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-            currentBranch += IRMovReg(X7, baseReg) 
-            currentBranch += IRBl("_arrLoad8") += IRMovReg(dest, X7)
+            currentBranch += IRMovReg(defArrTempReg, baseReg) 
+            currentBranch += IRBl("_arrLoad8") += IRMovReg(dest, defArrTempReg)
 
           case _ =>
             helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-            currentBranch += IRMovReg(X7, baseReg) 
-            currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
+            currentBranch += IRMovReg(defArrTempReg, baseReg) 
+            currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
         }
         if (indices.size > 1) {
           helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
           helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
           currentBranch.remove(currentBranch.size - 1)
-          currentBranch += pushReg(X8, XZR)
-          generateExpr(indices.apply(1), W17)
-          currentBranch += popReg(X7, XZR)
-          currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
+          currentBranch += pushReg(defTempReg, XZR)
+          generateExpr(indices.apply(1), indexReg)
+          currentBranch += popReg(defArrTempReg, XZR)
+          currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
         }
         getAccessedArrayType(arrType, indices)
         
@@ -944,7 +946,7 @@ object CodeGen {
         }
         t
       case PairElem.FstElem(LValue.LPair(innerPair)) => 
-        val temp = getTempRegister().getOrElse(X0)
+        val temp = getTempRegister().getOrElse(defArrPairReg)
         val t = generateLPair(innerPair, temp, isStr, false)
         nullErrorCheck(temp)
         if (isFirst && isStr) then {
@@ -955,7 +957,7 @@ object CodeGen {
         freeRegister(temp)
         t
       case PairElem.SndElem(LValue.LPair(innerPair)) => 
-        val temp = getTempRegister().getOrElse(X0)
+        val temp = getTempRegister().getOrElse(defArrPairReg)
         val t = generateLPair(innerPair, temp, isStr, false)
         nullErrorCheck(temp)
         if (isFirst && isStr) then {
@@ -967,7 +969,7 @@ object CodeGen {
         t
 
       case PairElem.FstElem(LValue.LArray(arrayElem)) =>
-        val tempX = getTempRegister().getOrElse(X0)
+        val tempX = getTempRegister().getOrElse(defArrPairReg)
         val t = generateExpr(arrayElem,  tempX)
         nullErrorCheck(tempX)
         if (isFirst && isStr) then {
@@ -978,7 +980,7 @@ object CodeGen {
         t
 
       case PairElem.SndElem(LValue.LArray(arrayElem)) =>
-        val tempX = getTempRegister().getOrElse(X0)
+        val tempX = getTempRegister().getOrElse(defArrPairReg)
         val t = generateExpr(arrayElem,  tempX)
         nullErrorCheck(tempX)
         if (isFirst && isStr) then {
@@ -998,39 +1000,40 @@ object CodeGen {
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
         val size = elementsIR.size // number of elements 
         val arrayMemory = arrayMemorySize(size, exprType.get)
-        val tempX = getTempRegister().getOrElse(X0)
+        val tempX = getTempRegister().getOrElse(defArrPairReg)
         val temp = tempX.asW
 
-        currentBranch += IRMov(W0, arrayMemory) += IRBl("_malloc") += IRMovReg(X16, X0) 
-        += IRAddImmInt(X16, X16, 4) += IRMov(temp, size) += IRStur(temp, X16, -4)
+        currentBranch += IRMov(defArrPairReg.asW, arrayMemory) += IRBl("_malloc")
+        += IRMovReg(arrPairStrReg, defArrPairReg) += IRAddImmInt(arrPairStrReg, arrPairStrReg, 4)
+        += IRMov(temp, size) += IRStur(temp, arrPairStrReg, -4)
         
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
           val elType = generateExpr(element, temp)
           elType match {
             case BaseType.IntType => 
               if (i == 0) { // separate case for first element
-                currentBranch += IRStr(temp, X16)
+                currentBranch += IRStr(temp, arrPairStrReg)
               } else {
-              currentBranch += IRStr(temp, X16, Some(i * 4)) // Store element
+              currentBranch += IRStr(temp, arrPairStrReg, Some(i * 4)) // Store element
               }
             case BaseType.CharType => 
               //if (expType == BaseType.StrType)
               if (i == 0) { // separate case for first element
-                currentBranch += IRStrb(temp, X16)
+                currentBranch += IRStrb(temp, arrPairStrReg)
               } else {
-              currentBranch += IRStrb(temp, X16, Some(i)) // Should be strb
+              currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) // Should be strb
               }
             case BaseType.BoolType => 
               if (i == 0) { // separate case for first element
-                currentBranch += IRStrb(temp, X16)
+                currentBranch += IRStrb(temp, arrPairStrReg)
               } else {
-                currentBranch += IRStrb(temp, X16, Some(i)) // Store element
+                currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) // Store element
               }
             case BaseType.StrType => 
               if (i == 0) { // separate case for first element
-                currentBranch += IRStrb(temp, X16)
+                currentBranch += IRStrb(temp, arrPairStrReg)
               } else {
-                currentBranch += IRStrb(temp, X16, Some(i)) // should be str but if char[] then should be strb
+                currentBranch += IRStrb(temp, arrPairStrReg, Some(i)) // should be str but if char[] then should be strb
               }
             case PairType(_,_) =>
               currentBranch.remove(currentBranch.length - 1)
@@ -1038,9 +1041,9 @@ object CodeGen {
                 case Identifier(name) =>
                   val elemReg = variableRegisters(name)._1
                   if (i == 0) { // separate case for first element
-                    currentBranch += IRStr(elemReg, X16)
+                    currentBranch += IRStr(elemReg, arrPairStrReg)
                   } else {
-                    currentBranch += IRStr(elemReg, X16, Some(i * 8)) // should be str but if char[] then should be strb
+                    currentBranch += IRStr(elemReg, arrPairStrReg, Some(i * 8)) // should be str but if char[] then should be strb
                   }
               }
             case ArrayType(inner) =>
@@ -1049,9 +1052,9 @@ object CodeGen {
                 case Identifier(name) =>
                   val elemReg = variableRegisters(name)._1
                   if (i == 0) { // separate case for first element
-                    currentBranch += IRStr(elemReg, X16)
+                    currentBranch += IRStr(elemReg, arrPairStrReg)
                   } else {
-                    currentBranch += IRStr(elemReg, X16, Some(i * 8)) // should be str but if char[] then should be strb
+                    currentBranch += IRStr(elemReg, arrPairStrReg, Some(i * 8)) // should be str but if char[] then should be strb
                   }
               }
               
@@ -1059,7 +1062,7 @@ object CodeGen {
           }
         }
         freeRegister(tempX)
-        currentBranch += IRMovReg(reg, X16) 
+        currentBranch += IRMovReg(reg, arrPairStrReg) 
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
         helpers.getOrElseUpdate(IRLabel("_errOutOfMemory"), errOutOfMemory())
@@ -1070,20 +1073,21 @@ object CodeGen {
           expr match {
             case Identifier(name) => 
               val (reg, t) = variableRegisters(name)
-              currentBranch += IRStr(reg, X16, offset)
+              currentBranch += IRStr(reg, arrPairStrReg, offset)
             case _ => 
-              val temp = getTempRegister().getOrElse(X0)
+              val temp = getTempRegister().getOrElse(defArrPairReg)
               generateExpr(expr, temp)
-              currentBranch += IRStr(temp, X16, offset)
+              currentBranch += IRStr(temp, arrPairStrReg, offset)
               freeRegister(temp)
           }
         }
         val pairMemorySize = 16 // 8 bytes for each element
 
-        currentBranch += IRMov(W0, pairMemorySize) += IRBl("_malloc") += IRMovReg(X16, X0)
+        currentBranch += IRMov(defArrPairReg.asW, pairMemorySize)
+        += IRBl("_malloc")+= IRMovReg(arrPairStrReg, defArrPairReg)
         addPairElem(fst, None)
         addPairElem(snd, Some(8))
-        currentBranch += IRMovReg(reg, X16) // move pair memory to destination register
+        currentBranch += IRMovReg(reg, arrPairStrReg) // move pair memory to destination register
 
         helpers.getOrElseUpdate(IRLabel("_prints"), prints())
         helpers.getOrElseUpdate(IRLabel("_malloc"), malloc())
@@ -1097,10 +1101,10 @@ object CodeGen {
         args.zip(paramRegs).foreach { case (arg, reg) =>
           generateExpr(arg, reg) // Move argument values into x8-x15
         }
-        currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
+        currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, defReturnReg))
 
       case RValue.RCall(name, None) =>
-        currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))    }
+        currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, defReturnReg))    }
 
     
   }
