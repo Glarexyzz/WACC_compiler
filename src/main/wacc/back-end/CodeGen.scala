@@ -133,7 +133,7 @@ object CodeGen {
   private var paramsMap = Map[String, (Register, Type)]()
 
   def assignFuncParams(params: List[Param]):Map[String, (Register, Type)] = {
-    val paramRegisters = List(X0, X1, X2, X3, X4, X5, X6, X7)
+    val paramRegisters = tempRegisters
     params.zip(paramRegisters).map {
       case (param, reg) =>
         (param.name, (reg, param.t))
@@ -993,9 +993,9 @@ object CodeGen {
         generateLPair(pairElem, reg, false)
 
       case RValue.RCall(name, Some(args)) => 
-        val paramRegs = List(X0, X1, X2, X3, X4, X5, X6, X7)
+        val paramRegs = tempRegisters
         args.zip(paramRegs).foreach { case (arg, reg) =>
-          generateExpr(arg, reg) // Move argument values into x0-x7
+          generateExpr(arg, reg) // Move argument values into x8-x15
         }
         currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, W0))
 
