@@ -79,7 +79,7 @@ object CodeGen {
     val varSize: Option[Int] = varType match {
       case BaseType.IntType => Some(intSize)
       case BaseType.BoolType => Some(boolSize)
-      case BaseType.CharType => Some(chrSize)
+      case BaseType.CharType => Some(charSize)
       case _ => None
     }
     varSize match {
