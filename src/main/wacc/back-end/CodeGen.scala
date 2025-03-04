@@ -2,8 +2,9 @@ package wacc
 
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
-import wacc.Helpers._
 import scala.util.control.Breaks._
+import wacc.Helpers._
+import wacc.Constants._
 
 
 
@@ -29,6 +30,8 @@ object CodeGen {
   private val registerStack = mutable.Stack[Register]()  // Stack for spilled registers
   private val instrBuffer = mutable.ListBuffer[IRInstr]()
   private val variableRegisters = mutable.Map[String, (Register, Type)]()
+  private val variableOffsets = mutable.Map[String, (Int, Type)]()
+  private var stackVarPointer = initStackVarsOffset
 
   private def getRegister(): Option[Register] = {
     if (availableRegisters.nonEmpty) {
@@ -49,7 +52,7 @@ object CodeGen {
     None
   }
 
-    private def getTempRegister(): Option[Register] = {
+  private def getTempRegister(): Option[Register] = {
     if (availableTempRegisters.nonEmpty) {
       val reg = availableTempRegisters.pop()
       activeTempRegisters += reg
@@ -71,6 +74,15 @@ object CodeGen {
     }
     activeRegisters -= reg
   } 
+
+  def getStackVarOffset(): Option[Int] = {
+    if (stackVarPointer < -4) then {
+      val offset = stackVarPointer
+      stackVarPointer += 4
+      return Some(offset)
+    }
+    None
+  }
     
 
   // Helper functions generated 
@@ -256,14 +268,31 @@ object CodeGen {
     // Iterate over variables in the current scope and allocate registers for them
     symTab.getVariableScopes.headOption.foreach { currentScope =>
       currentScope.foreach { case (varName,  VariableEntry(t)) =>
-        val reg = getRegister().getOrElse(X0)
-        variableRegisters(varName) = (reg, t)  // map variable names to allocated registers and type
-        allocatedRegs += reg              // track allocated register
+        val reg = getRegister()
+        reg match {
+          case Some(register) => 
+            variableRegisters(varName) = (register, t)  // map variable names to allocated registers and type
+            allocatedRegs += register                   // track allocated register
+          case _ =>
+            getStackVarOffset() match {
+              case Some(off) =>
+                variableOffsets(varName) = (off, t)
+              case _ =>
+            }
+        }
       }
     }
     allocatedRegs.toList
   }
 
+  def push(reg: Register, off: Int): Unit = {
+    if (off < -256) then {
+      currentBranch += IRMov(X17, off) += IRStrWithReg(reg, FP, X17)
+    } else {
+      currentBranch += IRStur(reg, FP, off)
+    }
+  }
+    
   def generateHeadIR(): List[IRInstr] = {
     val dataSection = stringLiterals.map { case (label, value) =>
       wordLabel(value.length, label, value)
@@ -281,8 +310,16 @@ object CodeGen {
 
       // All declared variables are initialised at the start from the symbol table
       case DeclAssignStmt(t, name, value) =>
-        val (reg, t) = variableRegisters(name)
-        generateRValue(value, reg, Some(t))
+        variableRegisters.get(name) match {
+          case Some((reg, t)) => generateRValue(value, reg, Some(t))
+          case _ => 
+            val (off, t) = variableOffsets(name)
+            val temp = getTempRegister().getOrElse(X8)
+            generateRValue(value, temp, Some(t))
+            push(temp, off)
+            freeRegister(temp)
+            
+        }
             
       case AssignStmt(lvalue, rvalue) => 
         lvalue match {
@@ -299,8 +336,23 @@ object CodeGen {
                   )
                 }
               case None =>
-                // should never reach here
-                throw new Exception(s"Variable $name used before declaration")
+                variableOffsets.get(name) match {
+                  case Some((off, t)) =>
+                    val temp = getTempRegister().getOrElse(X8)
+                    generateRValue(rvalue, temp, Some(t))
+                    push(temp, off)
+                    if (paramsMap.contains(name)) {
+                      currentBranch ++= List(
+                        IRCmt(s"push {$temp}"),
+                        pushReg(temp, XZR),
+                        IRMovReg(X16, SP)
+                      )
+                    }
+                    freeRegister(temp)
+                  case None => 
+                    // This should not be reached
+                    throw new Exception(s"Variable $name used before declaration")
+                }
             }
           case LValue.LArray(ArrayElem(name, indices)) =>
             val (baseReg, arrType) = variableRegisters(name) // Base address
@@ -523,7 +575,7 @@ object CodeGen {
       case _ => None
     }
 
-  def generateExpr(expr: Expr, dest: Register = X0, temp: Register = X0): Type = 
+  def generateExpr(expr: Expr, dest: Register = X0): Type = 
     val destX = dest.asX
     val destW = dest.asW
     expr match {
@@ -557,18 +609,36 @@ object CodeGen {
 
       // move the identifier into the destination register
       case Identifier(name) =>
-        val (reg, t) = variableRegisters(name)
-        // compare if the dest and src are the same value or not to reduce redundancy
-        if (destW != reg.asW) {
-          t match {
-            //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
-            case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
-            case PairType(_,_) => currentBranch += IRMovReg(destX, reg.asX)
-            case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
-            case _ => currentBranch += IRMovReg(destW, reg.asW)
-          }  
+        variableRegisters.get(name) match {
+          case Some((reg, t)) => 
+            if (destW != reg.asW) {
+              t match {
+                //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
+                case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
+                case PairType(_,_) => currentBranch += IRMovReg(destX, reg.asX)
+                case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
+                case _ => currentBranch += IRMovReg(destW, reg.asW)
+              }
+            }
+            t
+          case None =>
+            val (off,t) = variableOffsets(name)
+            val temp = getTempRegister().getOrElse(X8)
+            currentBranch += IRLdr(temp, FP, Some(off))
+            if (destW != temp.asW) {
+              t match {
+                //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
+                case ArrayType(_) => currentBranch += IRMovReg(destX, temp.asX)
+                case PairType(_,_) => currentBranch += IRMovReg(destX, temp.asX)
+                case BaseType.StrType => currentBranch += IRMovReg(destX, temp.asX)
+                case _ => currentBranch += IRMovReg(destW, temp.asW)
+              }
+            }
+            freeRegister(temp)
+            t
+
         }
-        t
+        // compare if the dest and src are the same value or not to reduce redundancy
 
       case PairLiteral =>
         currentBranch += IRMov(destX, 0) // 0 is the null value
