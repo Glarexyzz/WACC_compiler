@@ -72,7 +72,14 @@ object CodeGen {
   } 
 
   private def lookupVariable(name: String): Option[(Either[Register, Int], Type)] = {
-    variableRegistersStack.iterator.flatMap(_.get(name)).nextOption
+    // Check function parameters first
+    paramsMap.get(name) match {
+      case Some((reg, t)) => 
+        Some((Left(reg), t)) // Parameters are stored in registers
+      case None =>
+        // If not in params, check local variables in scopes
+        variableRegistersStack.reverseIterator.flatMap(_.get(name)).find(_ => true)
+    }
   }
 
   private def addVariable(name: String, t: Type): Option[Either[Register, Int]] = {
@@ -246,6 +253,8 @@ object CodeGen {
       case _ => List()
     }
   }
+
+  private val poppedParams = mutable.Set[String]()
   
   // Branches for main function
   private var nBranch = 0 // Track number of branching sections
@@ -346,6 +355,7 @@ object CodeGen {
     funcLabel: Option[String] = None, 
     paramRegs: Option[List[wacc.Param]] = None
   ): List[IRInstr] = {
+    
     branches = mutable.ListBuffer[IRInstr]() // cleanup the branches
 
     
@@ -486,6 +496,7 @@ object CodeGen {
       case AssignStmt(lvalue, rvalue) => 
         lvalue match {
           case LValue.LName(name) => 
+            
             lookupVariable(name) match {
               case Some((Left(reg), t)) =>
                 generateRValue(rvalue, reg, Some(t))
@@ -700,7 +711,7 @@ object CodeGen {
             val (reg, t) = paramsMap(name)
 
             // function parameter pop
-            paramsMap -= name 
+            poppedParams += name
             currentBranch ++= List(
               IRCmt(s"pop {$reg}"),
               popReg(reg, XZR)
@@ -711,20 +722,15 @@ object CodeGen {
 
 
       case ReturnStmt(expr) => 
-        // function: Restore parameters from the stack before returning
-        /*
-        val paramPopInstrs = paramsMap.values.map { case (reg, _) =>
-          List(
-            IRCmt(s"pop {$reg}"),
-            popReg(reg, XZR)
-          )
-        }
-        */
-        val paramPopInstrs = if (!paramsMap.isEmpty) {
-          popFunctionParams(paramsMap.values.map(_._1).toList)
-        } else {
-          List()
-        }
+        val paramPopInstrs = paramsMap
+          .view.filterKeys(!poppedParams.contains(_)).toMap // Only pop parameters that weren't already popped
+          .values
+          .map { case (reg, _) =>
+            List(
+              IRCmt(s"pop {$reg}"),
+              popReg(reg, XZR)
+            )
+          }.toList.flatten
         generateExpr(expr, W0)
         currentBranch ++= (
           List(
@@ -800,7 +806,7 @@ object CodeGen {
       case _ => None
     }
 
-  def generateExpr(expr: Expr, dest: Register = defReturnReg): Type = 
+  def generateExpr(expr: Expr, dest: Register = defReturnReg): Type = {
     val destX = dest.asX
     val destW = dest.asW
     expr match {
@@ -817,7 +823,8 @@ object CodeGen {
             IRMovk(destW, upper16, upper16Shift)   
 
           BaseType.IntType
-}
+        }
+        
 
 
       case BoolLiteral(value) =>
@@ -898,6 +905,8 @@ object CodeGen {
 
           case UnaryOperator.Ord => 
             expr match {
+              case CharLiteral(value) =>
+                currentBranch += IRMov(destW, value.toInt) // Convert char to integer
               case Identifier(name) => 
                 lookupVariable(name) match {
                   case Some((Left(r), _)) => currentBranch += IRMovReg(destW, r.asW)
@@ -1066,6 +1075,7 @@ object CodeGen {
       case _ => BaseType.IntType
         
     }
+  }
   
   def retrievePairType(pair: PairElem): Type =
     pair match {
@@ -1168,7 +1178,9 @@ object CodeGen {
 
   def generateRValue(rvalue: RValue, reg: Register, exprType: Option[Type] = None): Unit = {
     rvalue match {
-      case RValue.RExpr(expr) => generateExpr(expr, reg) 
+      case RValue.RExpr(expr) => 
+        println(s"🟡 DEBUG: Calling generateExpr from generateRValue with $expr (${expr.getClass})")
+        generateExpr(expr, reg) 
 
       case RValue.RArrayLiter(arrayLiter) => 
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
