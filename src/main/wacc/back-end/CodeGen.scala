@@ -391,8 +391,8 @@ object CodeGen {
           helpers.getOrElseUpdate(IRLabel("_printb"), printb())
           currentBranch +=  IRBl("_printb")
         } else if (exprType == ArrayType(BaseType.IntType)) {
-          helpers.getOrElseUpdate(IRLabel("_printi"), printi()) //printp
-          currentBranch +=  IRBl("_printi")
+          helpers.getOrElseUpdate(IRLabel("_printp"), printp()) //printp
+          currentBranch +=  IRBl("_printp")
         } else if (exprType.isInstanceOf[PairType]) {
           helpers.getOrElseUpdate(IRLabel("_printp"), printp())
           currentBranch +=  IRBl("_printp")
@@ -712,16 +712,17 @@ object CodeGen {
           currentBranch += popReg(X7, XZR)
           currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, W7)
         }
+        getAccessedArrayType(arrType, indices)
         
         
         
 
         
         
-        arrType match {
-          case ArrayType(inner) => inner
-          case _ => throw new Exception()
-        }
+        // arrType match {
+        //   case ArrayType(inner) => inner
+        //   case _ => throw new Exception()
+        // }
         
 
       case _ => BaseType.IntType
@@ -952,5 +953,15 @@ object CodeGen {
     helpers.getOrElseUpdate(IRLabel("_errNull"), errNull())
     currentBranch += IRCmpImm(reg, 0) += IRJumpCond(EQ, "_errNull")
   }
+
+  def getAccessedArrayType(arrType: Type, indices: List[Expr]): Type = {
+  indices match {
+    case Nil => arrType  // No indices, return the original type
+    case _ :: rest => arrType match {
+      case ArrayType(inner) => getAccessedArrayType(inner, rest) // Recursively go deeper
+      case _ => throw new Exception("Too many indices for type")
+    }
+  }
+}
 
 }
