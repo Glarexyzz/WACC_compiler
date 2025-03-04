@@ -892,13 +892,6 @@ object CodeGen {
         
     }
   
-  def generateLValue (name: String, lvalue: LValue, reg: Register): Type =
-    lvalue match {
-        case LValue.LName(name) => 
-        case _ =>
-    } 
-    BaseType.IntType
-  
   def retrievePairType(pair: PairElem): Type =
     pair match {
       case PairElem.FstElem(LValue.LName(p)) => 
