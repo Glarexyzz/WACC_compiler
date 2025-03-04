@@ -530,13 +530,11 @@ object CodeGen {
                 currentBranch += IRMovReg(X7, baseReg)
                 if (elemType == ArrayType(BaseType.CharType)) {
                   currentBranch += IRBl("_arrStore1")
+                  helpers.getOrElseUpdate(IRLabel("_errOutofBounds"), errOutOfBounds())
                   helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore1(varReg.asW))
-                } else if (elemType == ArrayType(ArrayType(BaseType.IntType))) {
-                  currentBranch += IRBl("_arrStore8")
-                  helpers.getOrElseUpdate(IRLabel("_arrStore8"), arrStore8(varReg.asX))
-                }
-                else {
+                } else {
                   currentBranch += IRBl("_arrStore4")
+                  helpers.getOrElseUpdate(IRLabel("_errOutofBounds"), errOutOfBounds())
                   helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore4(varReg.asW))
                   
                 }
@@ -922,6 +920,9 @@ object CodeGen {
         def compareFunc(cond:Condition): Type = {
           val (wreg1, wreg2) = genExprs(expr1, expr2, false)
           val temp = getTempRegister().getOrElse(defTempReg)
+          expr1 match {
+            case ArrayElem(_,_) => currentBranch += IRCmp(wreg1.asX, wreg2.asX) += IRCset(temp.asW, cond) += IRMovReg(destW, temp.asW)
+          }
           currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp.asW, cond) += IRMovReg(destW, temp.asW)
           freeRegister(temp)
           freeRegister(wreg1.asX)
