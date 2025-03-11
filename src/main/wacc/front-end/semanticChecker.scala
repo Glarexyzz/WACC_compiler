@@ -263,7 +263,9 @@ object semanticChecker {
     // must be either type int or type char
     case ReadStmt(lvalue) => lvalue match {
       case LValue.LName(name) => symbolTable.lookup(name) match {
-        case Some(VariableEntry(BaseType.IntType)) => None
+        case Some(VariableEntry(BaseType.IntType)) => 
+          removeConstant(name)
+          None
         case Some(VariableEntry(BaseType.CharType)) => None
         case Some(t) => Some(s"Semantic Error in Read: Identifier $name must be of type int or char, but got $t instead")
         case None => Some(s"Semantic Error in Read: Identifier $name not declared")
