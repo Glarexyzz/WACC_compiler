@@ -33,6 +33,7 @@ object CodeGen {
   private val variableRegisters = mutable.Map[String, (Register, Type)]()
   private val variableOffsets = mutable.Map[String, (Int, Type)]()
   private var stackVarPointer = initStackVarsOffset
+  private var constants = mutable.Map[String, Int]()
   // for variables
   private val availableVariableRegisters = mutable.Stack[Register]()
   private val availableVariableOffsets = mutable.Stack[Int]()
@@ -128,10 +129,11 @@ object CodeGen {
   private val helpers = mutable.Map[IRLabel, List[IRInstr]]()
 
   // Main function
-  def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable): Unit = {
+  def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable, constantVars: mutable.Map[String, Int]): Unit = {
     println("Compiling...")
     // initialise symbol table
     symbolTable = newSymbolTable
+    constants = constantVars
     val ir = generateIR(prog)
 
     // AArch64 assembly conversion
@@ -845,33 +847,39 @@ object CodeGen {
 
       // move the identifier into the destination register
       case Identifier(name) =>
-        lookupVariable(name) match {
-          case Some((Left(reg), t)) => 
-            if (destW != reg.asW) {
-              t match {
-                //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
-                case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
-                case PairType(_,_) => currentBranch += IRMovReg(destX, reg.asX)
-                case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
-                case _ => currentBranch += IRMovReg(destW, reg.asW)
-              }
+        constants.get(name) match {
+          case Some(value) => 
+            currentBranch += IRMov(destW, value)
+            BaseType.IntType
+          case _ =>
+            lookupVariable(name) match {
+              case Some((Left(reg), t)) => 
+                if (destW != reg.asW) {
+                  t match {
+                    //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
+                    case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
+                    case PairType(_,_) => currentBranch += IRMovReg(destX, reg.asX)
+                    case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
+                    case _ => currentBranch += IRMovReg(destW, reg.asW)
+                  }
+                }
+                t
+              case Some((Right(off),t)) =>
+                val temp = getTempRegister().getOrElse(defTempReg)
+                currentBranch += IRLdr(temp, FP, Some(off))
+                if (destW != temp.asW) {
+                  t match {
+                    //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
+                    case ArrayType(_) => currentBranch += IRMovReg(destX, temp.asX)
+                    case PairType(_,_) => currentBranch += IRMovReg(destX, temp.asX)
+                    case BaseType.StrType => currentBranch += IRMovReg(destX, temp.asX)
+                    case _ => currentBranch += IRMovReg(destW, temp.asW)
+                  }
+                }
+                freeRegister(temp)
+                t
+              case _ => NullType
             }
-            t
-          case Some((Right(off),t)) =>
-            val temp = getTempRegister().getOrElse(defTempReg)
-            currentBranch += IRLdr(temp, FP, Some(off))
-            if (destW != temp.asW) {
-              t match {
-                //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
-                case ArrayType(_) => currentBranch += IRMovReg(destX, temp.asX)
-                case PairType(_,_) => currentBranch += IRMovReg(destX, temp.asX)
-                case BaseType.StrType => currentBranch += IRMovReg(destX, temp.asX)
-                case _ => currentBranch += IRMovReg(destW, temp.asW)
-              }
-            }
-            freeRegister(temp)
-            t
-          case _ => NullType
         }
         // compare if the dest and src are the same value or not to reduce redundancy
 

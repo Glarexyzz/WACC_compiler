@@ -1,5 +1,6 @@
 package wacc
 import scala.collection.mutable
+import wacc.Constants._
 
 sealed trait SymbolEntry
 
@@ -107,10 +108,19 @@ class SymbolTable {
 
 object semanticChecker {
 
+  private val constants: mutable.Map[String, Int] = mutable.Map()
   val symbolTable: SymbolTable = new SymbolTable
 
-  def checkSemantic(parsed: Any): Either[String, SymbolTable] = parsed match {
-    case program: Program => checkProgram(program).toLeft(symbolTable)
+  def addConstant(name: String, value: Int): Unit = {
+    constants(name) = value
+  }
+
+  def removeConstant(name: String) = {
+    constants -= name
+  }
+
+  def checkSemantic(parsed: Any): Either[String, (SymbolTable, mutable.Map[String, Int])] = parsed match {
+    case program: Program => checkProgram(program).toLeft(symbolTable, constants)
     case _ => Left(s"Unknown parsed structure")
   }
   
@@ -182,6 +192,20 @@ object semanticChecker {
           if (isCompatibleTo(rType, t)) {
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate)
+              t match {
+                case BaseType.IntType => 
+                  value match {
+                    case RValue.RExpr(IntLiteral(n)) => addConstant(name, n.toInt)
+                    case _ =>
+                  }
+                case BaseType.BoolType =>
+                  value match {
+                    case RValue.RExpr(BoolLiteral(true)) => addConstant(name, trueValue)
+                    case RValue.RExpr(BoolLiteral(false)) => addConstant(name, falseValue)
+                    case _ =>
+                  }
+                case _ =>
+              }
               None
             else Some(s"Semantic Error in Declaration: Variable $name is already declared")
            }
@@ -198,6 +222,7 @@ object semanticChecker {
             case LValue.LName(name) => symbolTable.lookupVariable(name) match {
               case Some(VariableEntry(lType)) => 
                 if (isCompatibleTo(rType, lType)) {
+                  removeConstant(name)
                   None
                 } else {
                   Some(s"Semantic Error in Assignment of identifier $name: $rType is not compatible to $lType identifier $name")
