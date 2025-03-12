@@ -204,6 +204,11 @@ object semanticChecker {
                     case RValue.RExpr(BoolLiteral(false)) => addConstant(name, falseValue)
                     case _ =>
                   }
+                case BaseType.CharType =>
+                  value match {
+                    case RValue.RExpr(CharLiteral(c)) => addConstant(name, c.toInt)
+                    case _ =>
+                  }
                 case _ =>
               }
               None
