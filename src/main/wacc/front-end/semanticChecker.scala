@@ -108,10 +108,10 @@ class SymbolTable {
 
 object semanticChecker {
 
-  private val constants: mutable.Map[String, Int] = mutable.Map()
+  private val constants: mutable.Map[String, Any] = mutable.Map()
   val symbolTable: SymbolTable = new SymbolTable
 
-  def addConstant(name: String, value: Int): Unit = {
+  def addConstant(name: String, value: Any): Unit = {
     constants(name) = value
   }
 
@@ -119,7 +119,7 @@ object semanticChecker {
     constants -= name
   }
 
-  def checkSemantic(parsed: Any): Either[String, (SymbolTable, mutable.Map[String, Int])] = parsed match {
+  def checkSemantic(parsed: Any): Either[String, (SymbolTable, mutable.Map[String, Any])] = parsed match {
     case program: Program => checkProgram(program).toLeft(symbolTable, constants)
     case _ => Left(s"Unknown parsed structure")
   }
@@ -195,7 +195,10 @@ object semanticChecker {
               t match {
                 case BaseType.IntType => 
                   value match {
-                    case RValue.RExpr(IntLiteral(n)) => addConstant(name, n.toInt)
+                    case RValue.RExpr(IntLiteral(n)) => 
+                      if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+                        addConstant(name, n.toInt)
+                      }
                     case _ =>
                   }
                 case BaseType.BoolType =>
@@ -271,7 +274,9 @@ object semanticChecker {
         case Some(VariableEntry(BaseType.IntType)) => 
           removeConstant(name)
           None
-        case Some(VariableEntry(BaseType.CharType)) => None
+        case Some(VariableEntry(BaseType.CharType)) =>
+          removeConstant(name)
+          None
         case Some(t) => Some(s"Semantic Error in Read: Identifier $name must be of type int or char, but got $t instead")
         case None => Some(s"Semantic Error in Read: Identifier $name not declared")
       }
