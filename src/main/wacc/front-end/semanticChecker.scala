@@ -108,10 +108,10 @@ class SymbolTable {
 
 object semanticChecker {
 
-  private val constants: mutable.Map[String, Any] = mutable.Map()
+  private val constants: mutable.Map[String, (Type, Any)] = mutable.Map()
   val symbolTable: SymbolTable = new SymbolTable
 
-  def addConstant(name: String, value: Any): Unit = {
+  def addConstant(name: String, value: (Type, Any)): Unit = {
     constants(name) = value
   }
 
@@ -119,7 +119,7 @@ object semanticChecker {
     constants -= name
   }
 
-  def checkSemantic(parsed: Any): Either[String, (SymbolTable, mutable.Map[String, Any])] = parsed match {
+  def checkSemantic(parsed: Any): Either[String, (SymbolTable, mutable.Map[String, (Type, Any)])] = parsed match {
     case program: Program => checkProgram(program).toLeft(symbolTable, constants)
     case _ => Left(s"Unknown parsed structure")
   }
@@ -197,19 +197,19 @@ object semanticChecker {
                   value match {
                     case RValue.RExpr(IntLiteral(n)) => 
                       if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
-                        addConstant(name, n.toInt)
+                        addConstant(name, (BaseType.IntType, n.toInt))
                       }
                     case _ =>
                   }
                 case BaseType.BoolType =>
                   value match {
-                    case RValue.RExpr(BoolLiteral(true)) => addConstant(name, trueValue)
-                    case RValue.RExpr(BoolLiteral(false)) => addConstant(name, falseValue)
+                    case RValue.RExpr(BoolLiteral(true)) => addConstant(name, (BaseType.BoolType, trueValue))
+                    case RValue.RExpr(BoolLiteral(false)) => addConstant(name, (BaseType.BoolType, falseValue))
                     case _ =>
                   }
                 case BaseType.CharType =>
                   value match {
-                    case RValue.RExpr(CharLiteral(c)) => addConstant(name, c.toInt)
+                    case RValue.RExpr(CharLiteral(c)) => addConstant(name, (BaseType.CharType, c.toInt))
                     case _ =>
                   }
                 case _ =>

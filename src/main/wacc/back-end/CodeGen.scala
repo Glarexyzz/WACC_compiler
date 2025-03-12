@@ -33,7 +33,7 @@ object CodeGen {
   private val variableRegisters = mutable.Map[String, (Register, Type)]()
   private val variableOffsets = mutable.Map[String, (Int, Type)]()
   private var stackVarPointer = initStackVarsOffset
-  private var constants = mutable.Map[String, Any]()
+  private var constants = mutable.Map[String, (Type, Any)]()
   // for variables
   private val availableVariableRegisters = mutable.Stack[Register]()
   private val availableVariableOffsets = mutable.Stack[Int]()
@@ -129,7 +129,7 @@ object CodeGen {
   private val helpers = mutable.Map[IRLabel, List[IRInstr]]()
 
   // Main function
-  def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable, constantVars: mutable.Map[String, Any]): Unit = {
+  def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable, constantVars: mutable.Map[String, (Type, Any)]): Unit = {
     println("Compiling...")
     // initialise symbol table
     symbolTable = newSymbolTable
@@ -848,9 +848,15 @@ object CodeGen {
       // move the identifier into the destination register
       case Identifier(name) =>
         constants.get(name) match {
-          case Some(value: Int) => 
+          case Some((BaseType.IntType, value: Int)) => 
             currentBranch += IRMov(destW, value)
             BaseType.IntType
+          case Some((BaseType.BoolType, value: Int)) => 
+            currentBranch += IRMov(destW, value)
+            BaseType.BoolType
+          case Some((BaseType.CharType, value: Int)) => 
+            currentBranch += IRMov(destW, value)
+            BaseType.CharType
           case _ =>
             lookupVariable(name) match {
               case Some((Left(reg), t)) => 
