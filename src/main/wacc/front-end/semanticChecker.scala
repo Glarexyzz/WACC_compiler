@@ -187,7 +187,7 @@ object semanticChecker {
     case CharLiteral(c) => c.toInt
     case Identifier(name) => constants.get(name) match {
       case Some((_, n: Int)) => n
-      case _ => throw Exception("FUck this shit niqqa")
+      case _ => throw Exception("This should not be reached - WIP")
     }
     case UnaryOp(op, expr) => op match {
       case UnaryOperator.Negate => -(evaluateExpr(expr))
@@ -228,10 +228,10 @@ object semanticChecker {
         }
       case BaseType.BoolType =>
         val n = evaluateExpr(extractExpr(value))
-        addConstant(name, (BaseType.BoolType, n))
+        if (n == trueValue || n == falseValue) addConstant(name, (BaseType.BoolType, n))
       case BaseType.CharType =>
         val n = evaluateExpr(extractExpr(value))
-        addConstant(name, (BaseType.CharType, n))
+        if (n >= 0 && n <= 127) addConstant(name, (BaseType.CharType, n))
       case _ =>
     }
   }
