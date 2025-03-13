@@ -485,14 +485,18 @@ object CodeGen {
 
       // All declared variables are initialised at the start from the symbol table
       case DeclAssignStmt(t, name, value) =>
-        addVariable(name, t) match {
-          case Some(Left(reg)) => generateRValue(value, reg, Some(t))
-          case Some(Right(off)) => 
-            val temp = getTempRegister().getOrElse(defTempReg)
-            generateRValue(value, temp, Some(t))
-            push(temp, off)
-            freeRegister(temp)
-          case _ =>
+        constants.get(name) match {
+          case Some(_) =>
+          case None =>
+            addVariable(name, t) match {
+              case Some(Left(reg)) => generateRValue(value, reg, Some(t))
+              case Some(Right(off)) => 
+                val temp = getTempRegister().getOrElse(defTempReg)
+                generateRValue(value, temp, Some(t))
+                push(temp, off)
+                freeRegister(temp)
+              case _ =>
+            }
         }
             
       case AssignStmt(lvalue, rvalue) => 

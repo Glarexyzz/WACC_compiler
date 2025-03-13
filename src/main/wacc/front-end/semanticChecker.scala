@@ -181,6 +181,61 @@ object semanticChecker {
     bodyCheckResult
   }
 
+  def evaluateToInt(value: Expr): Int = value match {
+    case IntLiteral(n) => n.toInt
+    case BoolLiteral(b) => if (b) trueValue else falseValue
+    case CharLiteral(c) => c.toInt
+    case Identifier(name) => constants.get(name) match {
+      case Some((_, n: Int)) => n
+      case _ => throw Exception("Unsupported calling of non-constants when evaluating constants")
+    }
+    case UnaryOp(op, expr) => op match {
+      case UnaryOperator.Negate => -(evaluateToInt(expr))
+      case UnaryOperator.Not => (evaluateToInt(expr) - 1).abs
+      case UnaryOperator.Ord => evaluateToInt(expr)
+      case UnaryOperator.Chr => evaluateToInt(expr)
+      case _ => 0
+    }
+    case BinaryOp(expr1, op, expr2) => op match {
+      case BinaryOperator.Add          => evaluateToInt(expr1) + evaluateToInt(expr2)
+      case BinaryOperator.Subtract     => evaluateToInt(expr1) - evaluateToInt(expr2)
+      case BinaryOperator.Multiply     => evaluateToInt(expr1) * evaluateToInt(expr2)
+      case BinaryOperator.Divide       => evaluateToInt(expr1) / evaluateToInt(expr2)
+      case BinaryOperator.Modulus      => evaluateToInt(expr1) % evaluateToInt(expr2)
+      case BinaryOperator.And          => if (evaluateToInt(expr1) == trueValue && evaluateToInt(expr2) == trueValue) trueValue else falseValue
+      case BinaryOperator.Or           => if (evaluateToInt(expr1) == trueValue || evaluateToInt(expr2) == trueValue) trueValue else falseValue
+      case BinaryOperator.Greater      => if (evaluateToInt(expr1) >  evaluateToInt(expr2)) trueValue else falseValue
+      case BinaryOperator.GreaterEqual => if (evaluateToInt(expr1) >= evaluateToInt(expr2)) trueValue else falseValue
+      case BinaryOperator.Less         => if (evaluateToInt(expr1) <  evaluateToInt(expr2)) trueValue else falseValue
+      case BinaryOperator.LessEqual    => if (evaluateToInt(expr1) <= evaluateToInt(expr2)) trueValue else falseValue
+      case BinaryOperator.Equal        => if (evaluateToInt(expr1) == evaluateToInt(expr2)) trueValue else falseValue
+      case BinaryOperator.NotEqual     => if (evaluateToInt(expr1) != evaluateToInt(expr2)) trueValue else falseValue
+    }
+
+  }
+
+  def extractExpr(value: RValue): Expr = value match {
+    case RValue.RExpr(expr) => expr
+    case _ => throw Exception("Oh no! The constants aren't working perfectly yet!")
+  }
+
+  def checkAndAddConstant(t: Type, name: String, value: RValue) = {
+    t match {
+      case BaseType.IntType => 
+        val n = evaluateToInt(extractExpr(value))
+        if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+          addConstant(name, (BaseType.IntType, n))
+        }
+      case BaseType.BoolType =>
+        val n = evaluateToInt(extractExpr(value))
+        addConstant(name, (BaseType.BoolType, n))
+      case BaseType.CharType =>
+        val n = evaluateToInt(extractExpr(value))
+        addConstant(name, (BaseType.CharType, n))
+      case _ =>
+    }
+  }
+
   def checkStatement(stmt: Stmt): Option[String] = stmt match {
     case SkipStmt => None
 
@@ -191,30 +246,10 @@ object semanticChecker {
 
           if (isCompatibleTo(rType, t)) {
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
-            if (can_add_if_no_duplicate)
-              t match {
-                case BaseType.IntType => 
-                  value match {
-                    case RValue.RExpr(IntLiteral(n)) => 
-                      if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
-                        addConstant(name, (BaseType.IntType, n.toInt))
-                      }
-                    case _ =>
-                  }
-                case BaseType.BoolType =>
-                  value match {
-                    case RValue.RExpr(BoolLiteral(true)) => addConstant(name, (BaseType.BoolType, trueValue))
-                    case RValue.RExpr(BoolLiteral(false)) => addConstant(name, (BaseType.BoolType, falseValue))
-                    case _ =>
-                  }
-                case BaseType.CharType =>
-                  value match {
-                    case RValue.RExpr(CharLiteral(c)) => addConstant(name, (BaseType.CharType, c.toInt))
-                    case _ =>
-                  }
-                case _ =>
-              }
+            if (can_add_if_no_duplicate) {
+              checkAndAddConstant(t, name, value)
               None
+            }
             else Some(s"Semantic Error in Declaration: Variable $name is already declared")
            }
           else Some(s"Semantic Error in Declaration: $rType is not compatible with $t for variable $name")
