@@ -315,6 +315,7 @@ object semanticChecker {
             case LValue.LArray(ArrayElem(name, _)) => symbolTable.lookupVariable(name) match {
               case Some(VariableEntry(ArrayType(lType))) => 
                 if (isCompatibleTo(rType, lType)) {
+                  removeConstant(name)
                   None
                 } else {
                   Some(s"Semantic Error in Assignment of array $name: $rType is not compatible to $lType")
