@@ -220,14 +220,39 @@ object semanticChecker {
     case _ => None
   }
 
-  def extractExpr(value: RValue): Option[Expr] = value match {
+  def evaluateArray(array: ArrayLiter): Option[List[Any]] = array.elements match {
+    case Some(exprList) =>
+      val evaluated = exprList.map {
+        case expr: Expr => expr match {
+          case Identifier(name) => constants.get(name) match {
+            case Some((_, arr: List[Any])) => Some(arr)
+            case _ => evaluateExpr(expr)
+          }
+          case arr: ArrayLiter => evaluateArray(arr)
+          case _ => evaluateExpr(expr)
+        }
+      }
+      if (evaluated.contains(None)) None else Some(evaluated.map(_.get))
+    case None => Some(List())
+  }
+
+  def extract(value: RValue): Option[Any] = value match {
     case RValue.RExpr(expr) => Some(expr)
+    case RValue.RArrayLiter(array) => Some(array)
     case _ => None
   }
 
+  def allowedArrayType(t: Type): Boolean = t match {
+    case ArrayType(innertype) => allowedArrayType(innertype)
+    case BaseType.IntType => true
+    case BaseType.BoolType => true
+    // case BaseType.CharType => true
+    case _ => false
+  }
+
   def checkAndAddConstant(t: Type, name: String, value: RValue) = {
-    extractExpr(value) match {
-      case Some(expr) => evaluateExpr(expr) match {
+    extract(value) match {
+      case Some(expr: Expr) => evaluateExpr(expr) match {
         case Some(n) => t match {
           case BaseType.IntType => 
             if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
@@ -241,7 +266,12 @@ object semanticChecker {
         }
         case _ =>
       }
-      case None => 
+      case Some(array: ArrayLiter) => evaluateArray(array) match {
+        case Some(list) => 
+          if (allowedArrayType(t)) addConstant(name, (t, list))
+        case None =>
+      }
+      case _ =>
     }
   }
 
