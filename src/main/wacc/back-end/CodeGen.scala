@@ -927,9 +927,13 @@ object CodeGen {
               case CharLiteral(value) =>
                 currentBranch += IRMov(destW, value.toInt) // Convert char to integer
               case Identifier(name) => 
-                lookupVariable(name) match {
-                  case Some((Left(r), _)) => currentBranch += IRMovReg(destW, r.asW)
+                constants.get(name) match {
+                  case Some((_,value: Int)) => currentBranch += IRMov(destW, value)
                   case _ =>
+                    lookupVariable(name) match {
+                      case Some((Left(r), _)) => currentBranch += IRMovReg(destW, r.asW)
+                      case _ =>
+                    }
                 }
             }
             BaseType.IntType

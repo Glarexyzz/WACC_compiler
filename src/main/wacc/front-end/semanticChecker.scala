@@ -181,35 +181,35 @@ object semanticChecker {
     bodyCheckResult
   }
 
-  def evaluateToInt(value: Expr): Int = value match {
+  def evaluateExpr(value: Expr): Int = value match {
     case IntLiteral(n) => n.toInt
     case BoolLiteral(b) => if (b) trueValue else falseValue
     case CharLiteral(c) => c.toInt
     case Identifier(name) => constants.get(name) match {
       case Some((_, n: Int)) => n
-      case _ => throw Exception("Unsupported calling of non-constants when evaluating constants")
+      case _ => throw Exception("FUck this shit niqqa")
     }
     case UnaryOp(op, expr) => op match {
-      case UnaryOperator.Negate => -(evaluateToInt(expr))
-      case UnaryOperator.Not => (evaluateToInt(expr) - 1).abs
-      case UnaryOperator.Ord => evaluateToInt(expr)
-      case UnaryOperator.Chr => evaluateToInt(expr)
+      case UnaryOperator.Negate => -(evaluateExpr(expr))
+      case UnaryOperator.Not => (evaluateExpr(expr) - 1).abs
+      case UnaryOperator.Ord => evaluateExpr(expr)
+      case UnaryOperator.Chr => evaluateExpr(expr)
       case _ => 0
     }
     case BinaryOp(expr1, op, expr2) => op match {
-      case BinaryOperator.Add          => evaluateToInt(expr1) + evaluateToInt(expr2)
-      case BinaryOperator.Subtract     => evaluateToInt(expr1) - evaluateToInt(expr2)
-      case BinaryOperator.Multiply     => evaluateToInt(expr1) * evaluateToInt(expr2)
-      case BinaryOperator.Divide       => evaluateToInt(expr1) / evaluateToInt(expr2)
-      case BinaryOperator.Modulus      => evaluateToInt(expr1) % evaluateToInt(expr2)
-      case BinaryOperator.And          => if (evaluateToInt(expr1) == trueValue && evaluateToInt(expr2) == trueValue) trueValue else falseValue
-      case BinaryOperator.Or           => if (evaluateToInt(expr1) == trueValue || evaluateToInt(expr2) == trueValue) trueValue else falseValue
-      case BinaryOperator.Greater      => if (evaluateToInt(expr1) >  evaluateToInt(expr2)) trueValue else falseValue
-      case BinaryOperator.GreaterEqual => if (evaluateToInt(expr1) >= evaluateToInt(expr2)) trueValue else falseValue
-      case BinaryOperator.Less         => if (evaluateToInt(expr1) <  evaluateToInt(expr2)) trueValue else falseValue
-      case BinaryOperator.LessEqual    => if (evaluateToInt(expr1) <= evaluateToInt(expr2)) trueValue else falseValue
-      case BinaryOperator.Equal        => if (evaluateToInt(expr1) == evaluateToInt(expr2)) trueValue else falseValue
-      case BinaryOperator.NotEqual     => if (evaluateToInt(expr1) != evaluateToInt(expr2)) trueValue else falseValue
+      case BinaryOperator.Add          => evaluateExpr(expr1) + evaluateExpr(expr2)
+      case BinaryOperator.Subtract     => evaluateExpr(expr1) - evaluateExpr(expr2)
+      case BinaryOperator.Multiply     => evaluateExpr(expr1) * evaluateExpr(expr2)
+      case BinaryOperator.Divide       => evaluateExpr(expr1) / evaluateExpr(expr2)
+      case BinaryOperator.Modulus      => evaluateExpr(expr1) % evaluateExpr(expr2)
+      case BinaryOperator.And          => if (evaluateExpr(expr1) == trueValue && evaluateExpr(expr2) == trueValue) trueValue else falseValue
+      case BinaryOperator.Or           => if (evaluateExpr(expr1) == trueValue || evaluateExpr(expr2) == trueValue) trueValue else falseValue
+      case BinaryOperator.Greater      => if (evaluateExpr(expr1) >  evaluateExpr(expr2)) trueValue else falseValue
+      case BinaryOperator.GreaterEqual => if (evaluateExpr(expr1) >= evaluateExpr(expr2)) trueValue else falseValue
+      case BinaryOperator.Less         => if (evaluateExpr(expr1) <  evaluateExpr(expr2)) trueValue else falseValue
+      case BinaryOperator.LessEqual    => if (evaluateExpr(expr1) <= evaluateExpr(expr2)) trueValue else falseValue
+      case BinaryOperator.Equal        => if (evaluateExpr(expr1) == evaluateExpr(expr2)) trueValue else falseValue
+      case BinaryOperator.NotEqual     => if (evaluateExpr(expr1) != evaluateExpr(expr2)) trueValue else falseValue
     }
 
   }
@@ -222,15 +222,15 @@ object semanticChecker {
   def checkAndAddConstant(t: Type, name: String, value: RValue) = {
     t match {
       case BaseType.IntType => 
-        val n = evaluateToInt(extractExpr(value))
+        val n = evaluateExpr(extractExpr(value))
         if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
           addConstant(name, (BaseType.IntType, n))
         }
       case BaseType.BoolType =>
-        val n = evaluateToInt(extractExpr(value))
+        val n = evaluateExpr(extractExpr(value))
         addConstant(name, (BaseType.BoolType, n))
       case BaseType.CharType =>
-        val n = evaluateToInt(extractExpr(value))
+        val n = evaluateExpr(extractExpr(value))
         addConstant(name, (BaseType.CharType, n))
       case _ =>
     }
