@@ -181,58 +181,67 @@ object semanticChecker {
     bodyCheckResult
   }
 
-  def evaluateExpr(value: Expr): Int = value match {
-    case IntLiteral(n) => n.toInt
-    case BoolLiteral(b) => if (b) trueValue else falseValue
-    case CharLiteral(c) => c.toInt
+  def evaluateExpr(value: Expr): Option[Int] = value match {
+    case IntLiteral(n) => Some(n.toInt)
+    case BoolLiteral(b) => if (b) Some(trueValue) else Some(falseValue)
+    case CharLiteral(c) => Some(c.toInt)
     case Identifier(name) => constants.get(name) match {
-      case Some((_, n: Int)) => n
-      case _ => throw Exception("This should not be reached - WIP")
+      case Some((_, n: Int)) => Some(n)
+      case _ => None
     }
-    case UnaryOp(op, expr) => op match {
-      case UnaryOperator.Negate => -(evaluateExpr(expr))
-      case UnaryOperator.Not => (evaluateExpr(expr) - 1).abs
-      case UnaryOperator.Ord => evaluateExpr(expr)
-      case UnaryOperator.Chr => evaluateExpr(expr)
-      case _ => 0
+    case UnaryOp(op, expr) => evaluateExpr(expr) match {
+      case Some(result) => op match {
+        case UnaryOperator.Negate => Some((-result))
+        case UnaryOperator.Not => Some(((result - 1).abs))
+        case UnaryOperator.Ord => Some(result)
+        case UnaryOperator.Chr => Some(result)
+        case _ => None
+      }
+      case _ => None
     }
-    case BinaryOp(expr1, op, expr2) => op match {
-      case BinaryOperator.Add          => evaluateExpr(expr1) + evaluateExpr(expr2)
-      case BinaryOperator.Subtract     => evaluateExpr(expr1) - evaluateExpr(expr2)
-      case BinaryOperator.Multiply     => evaluateExpr(expr1) * evaluateExpr(expr2)
-      case BinaryOperator.Divide       => evaluateExpr(expr1) / evaluateExpr(expr2)
-      case BinaryOperator.Modulus      => evaluateExpr(expr1) % evaluateExpr(expr2)
-      case BinaryOperator.And          => if (evaluateExpr(expr1) == trueValue && evaluateExpr(expr2) == trueValue) trueValue else falseValue
-      case BinaryOperator.Or           => if (evaluateExpr(expr1) == trueValue || evaluateExpr(expr2) == trueValue) trueValue else falseValue
-      case BinaryOperator.Greater      => if (evaluateExpr(expr1) >  evaluateExpr(expr2)) trueValue else falseValue
-      case BinaryOperator.GreaterEqual => if (evaluateExpr(expr1) >= evaluateExpr(expr2)) trueValue else falseValue
-      case BinaryOperator.Less         => if (evaluateExpr(expr1) <  evaluateExpr(expr2)) trueValue else falseValue
-      case BinaryOperator.LessEqual    => if (evaluateExpr(expr1) <= evaluateExpr(expr2)) trueValue else falseValue
-      case BinaryOperator.Equal        => if (evaluateExpr(expr1) == evaluateExpr(expr2)) trueValue else falseValue
-      case BinaryOperator.NotEqual     => if (evaluateExpr(expr1) != evaluateExpr(expr2)) trueValue else falseValue
+    case BinaryOp(expr1, op, expr2) => (evaluateExpr(expr1), evaluateExpr(expr2)) match {
+      case (Some(result1), Some(result2)) => op match {
+          case BinaryOperator.Add          => Some(result1 + result2)
+          case BinaryOperator.Subtract     => Some(result1 - result2)
+          case BinaryOperator.Multiply     => Some(result1 * result2)
+          case BinaryOperator.Divide       => if (result2 != 0) Some(result1 / result2) else None
+          case BinaryOperator.Modulus      => if (result2 != 0) Some(result1 % result2) else None
+          case BinaryOperator.And          => if (result1 == trueValue && result2 == trueValue) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.Or           => if (result1 == trueValue || result2 == trueValue) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.Greater      => if (result1 >  result2) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.GreaterEqual => if (result1 >= result2) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.Less         => if (result1 <  result2) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.LessEqual    => if (result1 <= result2) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.Equal        => if (result1 == result2) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.NotEqual     => if (result1 != result2) Some(trueValue) else Some(falseValue)
+        }
+      case _ => None
     }
-
+    case _ => None
   }
 
-  def extractExpr(value: RValue): Expr = value match {
-    case RValue.RExpr(expr) => expr
-    case _ => throw Exception("Oh no! The constants aren't working perfectly yet!")
+  def extractExpr(value: RValue): Option[Expr] = value match {
+    case RValue.RExpr(expr) => Some(expr)
+    case _ => None
   }
 
   def checkAndAddConstant(t: Type, name: String, value: RValue) = {
-    t match {
-      case BaseType.IntType => 
-        val n = evaluateExpr(extractExpr(value))
-        if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
-          addConstant(name, (BaseType.IntType, n))
+    extractExpr(value) match {
+      case Some(expr) => evaluateExpr(expr) match {
+        case Some(n) => t match {
+          case BaseType.IntType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              addConstant(name, (BaseType.IntType, n))
+            }
+          case BaseType.BoolType =>
+            if (n == trueValue || n == falseValue) addConstant(name, (BaseType.BoolType, n))
+          case BaseType.CharType =>
+            if (n >= 0 && n <= 127) addConstant(name, (BaseType.CharType, n))
+          case _ =>
         }
-      case BaseType.BoolType =>
-        val n = evaluateExpr(extractExpr(value))
-        if (n == trueValue || n == falseValue) addConstant(name, (BaseType.BoolType, n))
-      case BaseType.CharType =>
-        val n = evaluateExpr(extractExpr(value))
-        if (n >= 0 && n <= 127) addConstant(name, (BaseType.CharType, n))
-      case _ =>
+        case _ =>
+      }
+      case None => 
     }
   }
 
