@@ -913,6 +913,10 @@ object CodeGen {
           case UnaryOperator.Length =>
             expr match {
                 case Identifier(name) =>
+                  constants.get(name) match {
+                    case Some((_, arr : List[Any])) => currentBranch += IRMov(destW, arr.length)
+                    case _ =>
+                  }
                   lookupVariable(name) match {
                     case Some((Left(reg), _)) => currentBranch += IRLdur(destW, reg, -stackOffset)
                     case _ =>
@@ -1127,6 +1131,16 @@ object CodeGen {
           helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
           currentBranch += IRJump("_errOutOfBounds")
           None
+      }
+      case ArrayElem(name, is) => constants.get(name) match {
+        case Some((_, outerlist: List[Any])) => getArrayItem(outerlist, is) match {
+          case Some(n) => (arr, n) match {
+            case (list: List[Any], n: Int) if n >= 0 && n < list.length => getArrayItem(list(n.toInt), rest)
+            case _ => None
+          }
+          case _ => None
+        }
+        case _ => None
       }
     }
   }

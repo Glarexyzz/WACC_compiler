@@ -461,7 +461,9 @@ object semanticChecker {
       case None => Some(s"Error in checking left value: $name is not declared")
     }
     case LValue.LArray(ArrayElem(name, indices)) => symbolTable.lookupVariable(name) match {
-      case Some(VariableEntry(ArrayType(_))) => None
+      case Some(VariableEntry(ArrayType(_))) => 
+        removeConstant(name)
+        None
       case Some(VariableEntry(t)) => Some(s"Error in checking left value of $name: expected array, but got $t instead")
       case None => Some(s"Error in checking left value: $name is not declared")
     }
@@ -602,17 +604,25 @@ object semanticChecker {
     case _ => NullType 
   }
 
-  def constantArrayAccessValid(indices: List[Expr]): Boolean = indices match {
+  def constantArrayAccessValid(name: String, indices: List[Expr]): Boolean = indices match {
     case Nil => true
     case expr :: rest => expr match {
-      case IntLiteral(_) => constantArrayAccessValid(rest)
-      case Identifier(name) => constants.get(name) match {
-        case Some((BaseType.IntType, _)) => constantArrayAccessValid(rest)
-        case Some(_) => false
-        case None => false
+      case IntLiteral(n) => indexInRange(name, n.toInt) && constantArrayAccessValid(name, rest)
+      case Identifier(innername) => constants.get(innername) match {
+        case Some((BaseType.IntType, n: Int)) => indexInRange(name, n) && constantArrayAccessValid(name, rest)
+        case _ => false
+      }
+      case ArrayElem(innername, is) => constants.get(innername) match {
+        case Some(_) => constantArrayAccessValid(innername, is)
+        case _ => false
       }
       case _ => false
     }
+  }
+
+  def indexInRange(name: String, n: Int): Boolean = constants.get(name) match {
+    case Some(_, list: List[Any]) => list.length > n && n >= 0
+    case _ => false
   }
 
   def checkExprType(expr: Expr, env: SymbolTable): Either[String, Type] = expr match {
@@ -633,7 +643,7 @@ object semanticChecker {
     // // <ident> ('[ <expr> ']')+
 // case class ArrayElem(name: String, indices: List[Expr]) extends Expr
     case ArrayElem(name, indices) => 
-      if (!constantArrayAccessValid(indices)) {
+      if (!constantArrayAccessValid(name, indices)) {
         removeConstant(name)
       }
       // all Expr in indices must be compatible with IntExpr
