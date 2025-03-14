@@ -1113,14 +1113,20 @@ object CodeGen {
       case Identifier(name) => constants.get(name) match {
         case Some((BaseType.IntType, index)) => (arr, index) match {
           case (list: List[Any], n: Int) if n >= 0 && n < list.length => getArrayItem(list(n), rest)
-          case _ => None
+          case _ => 
+            helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+            currentBranch += IRJump("_errOutOfBounds")
+            None
         }
         case Some(_) => None
         case _ => None
       }
       case IntLiteral(n) => arr match {
         case list: List[Any] if n >= 0 && n < list.length => getArrayItem(list(n.toInt), rest)
-        case _ => None
+        case _ => 
+          helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+          currentBranch += IRJump("_errOutOfBounds")
+          None
       }
     }
   }
