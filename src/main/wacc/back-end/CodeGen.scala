@@ -657,8 +657,9 @@ object CodeGen {
 
       case FreeStmt(expr) => 
         expr match {
-          case (Identifier(name)) =>
-            lookupVariable(name).get match {
+          case (Identifier(name)) => constants.get(name) match {
+            case Some(_) =>
+            case None => lookupVariable(name).get match {
               case (Left(reg), t) =>
                 t match {
                 case ArrayType(_) => currentBranch += IRSubImm(defArrPairReg, reg, stackOffset) += IRBl("free")
@@ -672,6 +673,7 @@ object CodeGen {
 
               case _ =>
             }
+          }
         }
 
       case PrintStmt(expr) =>
