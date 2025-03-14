@@ -130,6 +130,7 @@ object CodeGen {
 
   // Main function
   def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable, constantVars: mutable.Map[String, (Type, Any)]): Unit = {
+    println(constantVars)
     println("Compiling...")
     // initialise symbol table
     symbolTable = newSymbolTable
@@ -1061,42 +1062,66 @@ object CodeGen {
         binaryInstrs  
 
       case ArrayElem(name, indices) => 
-      
-        lookupVariable(name) match {
-          case Some((Left(baseReg), arrType)) => // Base address
-            generateExpr(indices.head, indexReg) // Get index value
-            arrType match {
-              case ArrayType(ArrayType(_)) => 
-                helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
-                helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-                currentBranch += IRMovReg(defArrTempReg, baseReg) += IRBl("_arrLoad8")
-                currentBranch += IRMovReg(defTempReg, defArrTempReg) += IRLdur(defArrPairReg.asW, defTempReg, -stackOffset)
-              case ArrayType(PairType(_,_)) =>
-                helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
-                helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-                currentBranch += IRMovReg(defArrTempReg, baseReg) 
-                currentBranch += IRBl("_arrLoad8") += IRMovReg(dest, defArrTempReg)
+        constants.get(name) match {
+          case Some(arrType, array) => getArrayItem(array, indices) match {
+            case Some(n: Int) => currentBranch += IRMov(destW, n)
+            case _ =>
+          }
+            getAccessedArrayType(arrType, indices)
+          case None => lookupVariable(name) match {
+            case Some((Left(baseReg), arrType)) => // Base address
+              generateExpr(indices.head, indexReg) // Get index value
+              arrType match {
+                case ArrayType(ArrayType(_)) => 
+                  helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
+                  helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+                  currentBranch += IRMovReg(defArrTempReg, baseReg) += IRBl("_arrLoad8")
+                  currentBranch += IRMovReg(defTempReg, defArrTempReg) += IRLdur(defArrPairReg.asW, defTempReg, -stackOffset)
+                case ArrayType(PairType(_,_)) =>
+                  helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
+                  helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+                  currentBranch += IRMovReg(defArrTempReg, baseReg) 
+                  currentBranch += IRBl("_arrLoad8") += IRMovReg(dest, defArrTempReg)
 
-              case _ =>
+                case _ =>
+                  helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
+                  helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+                  currentBranch += IRMovReg(defArrTempReg, baseReg) 
+                  currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
+              }
+              if (indices.size > 1) {
                 helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
                 helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-                currentBranch += IRMovReg(defArrTempReg, baseReg) 
+                currentBranch.remove(currentBranch.size - 1)
+                currentBranch += pushReg(defTempReg, XZR)
+                generateExpr(indices.apply(1), indexReg)
+                currentBranch += popReg(defArrTempReg, XZR)
                 currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
-            }
-            if (indices.size > 1) {
-              helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
-              helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-              currentBranch.remove(currentBranch.size - 1)
-              currentBranch += pushReg(defTempReg, XZR)
-              generateExpr(indices.apply(1), indexReg)
-              currentBranch += popReg(defArrTempReg, XZR)
-              currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
-            }
-            getAccessedArrayType(arrType, indices)
-          case _ => BaseType.IntType
+              }
+              getAccessedArrayType(arrType, indices)
+            case _ => BaseType.IntType
+          }
         }
       case _ => BaseType.IntType
         
+    }
+  }
+  
+  def getArrayItem(arr: Any, indices: List[Expr]): Option[Any] = indices match {
+    case Nil => Some(arr)
+    case i :: rest => i match {
+      case Identifier(name) => constants.get(name) match {
+        case Some((BaseType.IntType, index)) => (arr, index) match {
+          case (list: List[Any], n: Int) if n >= 0 && n < list.length => getArrayItem(list(n), rest)
+          case _ => None
+        }
+        case Some(_) => None
+        case _ => None
+      }
+      case IntLiteral(n) => arr match {
+        case list: List[Any] if n >= 0 && n < list.length => getArrayItem(list(n.toInt), rest)
+        case _ => None
+      }
     }
   }
   

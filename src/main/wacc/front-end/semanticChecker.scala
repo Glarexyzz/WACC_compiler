@@ -220,29 +220,29 @@ object semanticChecker {
     case _ => None
   }
 
-  // def evaluateArray(array: ArrayLiter): Option[List[Any]] = array.elements match {
-  //   case Some(exprList) =>
-  //     val evaluated = exprList.map {
-  //       case expr: Expr => expr match {
-  //         case Identifier(name) => constants.get(name) match {
-  //           case Some((_, arr: List[Any])) => Some(arr)
-  //           case _ => evaluateExpr(expr)
-  //         }
-  //         case arr: ArrayLiter => evaluateArray(arr)
-  //         case _ => evaluateExpr(expr)
-  //       }
-  //     }
-  //     if (evaluated.contains(None)) None else Some(evaluated.map(_.get))
-  //   case None => Some(List())
-  // }
+  def evaluateArray(array: ArrayLiter): Option[List[Any]] = array.elements match {
+    case Some(exprList) =>
+      val evaluated = exprList.map {
+        case expr: Expr => expr match {
+          case Identifier(name) => constants.get(name) match {
+            case Some((_, arr: List[Any])) => Some(arr)
+            case _ => evaluateExpr(expr)
+          }
+          case arr: ArrayLiter => evaluateArray(arr)
+          case _ => evaluateExpr(expr)
+        }
+      }
+      if (evaluated.contains(None)) None else Some(evaluated.map(_.get))
+    case None => Some(List())
+  }
 
-  // def allowedArrayType(t: Type): Boolean = t match {
-  //   case ArrayType(innertype) => allowedArrayType(innertype)
-  //   case BaseType.IntType => true
-  //   case BaseType.BoolType => true
-  //   // case BaseType.CharType => true
-  //   case _ => false
-  // }
+  def allowedArrayType(t: Type): Boolean = t match {
+    case ArrayType(innertype) => allowedArrayType(innertype)
+    case BaseType.IntType => true
+    case BaseType.BoolType => true
+    // case BaseType.CharType => true
+    case _ => false
+  }
 
   def extract(value: RValue): Option[Any] = value match {
     case RValue.RExpr(expr) => Some(expr)
@@ -266,11 +266,11 @@ object semanticChecker {
         }
         case _ =>
       }
-      // case Some(array: ArrayLiter) => evaluateArray(array) match {
-      //   case Some(list) => 
-      //     if (allowedArrayType(t)) addConstant(name, (t, list))
-      //   case None =>
-      // }
+      case Some(array: ArrayLiter) => evaluateArray(array) match {
+        case Some(list) => 
+          if (allowedArrayType(t)) addConstant(name, (t, list))
+        case None =>
+      }
       case _ =>
     }
   }
@@ -602,6 +602,19 @@ object semanticChecker {
     case _ => NullType 
   }
 
+  def constantArrayAccessValid(indices: List[Expr]): Boolean = indices match {
+    case Nil => true
+    case expr :: rest => expr match {
+      case IntLiteral(_) => constantArrayAccessValid(rest)
+      case Identifier(name) => constants.get(name) match {
+        case Some((BaseType.IntType, _)) => constantArrayAccessValid(rest)
+        case Some(_) => false
+        case None => false
+      }
+      case _ => false
+    }
+  }
+
   def checkExprType(expr: Expr, env: SymbolTable): Either[String, Type] = expr match {
     
     case IntLiteral(_) => Right(BaseType.IntType)
@@ -620,6 +633,9 @@ object semanticChecker {
     // // <ident> ('[ <expr> ']')+
 // case class ArrayElem(name: String, indices: List[Expr]) extends Expr
     case ArrayElem(name, indices) => 
+      if (!constantArrayAccessValid(indices)) {
+        removeConstant(name)
+      }
       // all Expr in indices must be compatible with IntExpr
       indices.foldLeft[Either[String, Type]](Right(BaseType.IntType)) {
         case (acc, index) =>
