@@ -604,26 +604,35 @@ object semanticChecker {
     case _ => NullType 
   }
 
-  def constantArrayAccessValid(name: String, indices: List[Expr]): Boolean = indices match {
-    case Nil => true
-    case expr :: rest => expr match {
-      case IntLiteral(n) => indexInRange(name, n.toInt) && constantArrayAccessValid(name, rest)
-      case Identifier(innername) => constants.get(innername) match {
-        case Some((BaseType.IntType, n: Int)) => indexInRange(name, n) && constantArrayAccessValid(name, rest)
-        case _ => false
+  def getArrayItem(arr: Any, indices: List[Expr]): Option[Any] = indices match {
+    case Nil => Some(arr)
+    case i :: rest => i match {
+      case Identifier(name) => constants.get(name) match {
+        case Some((BaseType.IntType, index)) => (arr, index) match {
+          case (list: List[Any], n: Int) if indexInRange(list, n) => getArrayItem(list(n), rest)
+          case _ => None
+        }
+        case Some(_) => None
+        case _ => None
       }
-      case ArrayElem(innername, is) => constants.get(innername) match {
-        case Some(_) => constantArrayAccessValid(innername, is)
-        case _ => false
+      case IntLiteral(n) => arr match {
+        case list: List[Any] if indexInRange(list, n.toInt) => getArrayItem(list(n.toInt), rest)
+        case _ => None
       }
-      case _ => false
+      case ArrayElem(name, is) => constants.get(name) match {
+        case Some((_, outerlist: List[Any])) => getArrayItem(outerlist, is) match {
+          case Some(n) => (arr, n) match {
+            case (list: List[Any], n: Int) if indexInRange(list, n) => getArrayItem(list(n.toInt), rest)
+            case _ => None
+          }
+          case _ => None
+        }
+        case _ => None
+      }
     }
   }
 
-  def indexInRange(name: String, n: Int): Boolean = constants.get(name) match {
-    case Some(_, list: List[Any]) => list.length > n && n >= 0
-    case _ => false
-  }
+  def indexInRange(list: List[Any], n: Int): Boolean = n < list.length && n >= 0
 
   def checkExprType(expr: Expr, env: SymbolTable): Either[String, Type] = expr match {
     
@@ -642,10 +651,10 @@ object semanticChecker {
 
     // // <ident> ('[ <expr> ']')+
 // case class ArrayElem(name: String, indices: List[Expr]) extends Expr
-    case ArrayElem(name, indices) => 
-      if (!constantArrayAccessValid(name, indices)) {
-        removeConstant(name)
-      }
+    case ArrayElem(name, indices) => constants.get(name) match {
+      case Some((_, arr)) => if (getArrayItem(arr, indices) == None) removeConstant(name)
+      case _ =>
+    }
       // all Expr in indices must be compatible with IntExpr
       indices.foldLeft[Either[String, Type]](Right(BaseType.IntType)) {
         case (acc, index) =>
