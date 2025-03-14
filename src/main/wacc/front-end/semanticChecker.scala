@@ -220,34 +220,34 @@ object semanticChecker {
     case _ => None
   }
 
-  def evaluateArray(array: ArrayLiter): Option[List[Any]] = array.elements match {
-    case Some(exprList) =>
-      val evaluated = exprList.map {
-        case expr: Expr => expr match {
-          case Identifier(name) => constants.get(name) match {
-            case Some((_, arr: List[Any])) => Some(arr)
-            case _ => evaluateExpr(expr)
-          }
-          case arr: ArrayLiter => evaluateArray(arr)
-          case _ => evaluateExpr(expr)
-        }
-      }
-      if (evaluated.contains(None)) None else Some(evaluated.map(_.get))
-    case None => Some(List())
-  }
+  // def evaluateArray(array: ArrayLiter): Option[List[Any]] = array.elements match {
+  //   case Some(exprList) =>
+  //     val evaluated = exprList.map {
+  //       case expr: Expr => expr match {
+  //         case Identifier(name) => constants.get(name) match {
+  //           case Some((_, arr: List[Any])) => Some(arr)
+  //           case _ => evaluateExpr(expr)
+  //         }
+  //         case arr: ArrayLiter => evaluateArray(arr)
+  //         case _ => evaluateExpr(expr)
+  //       }
+  //     }
+  //     if (evaluated.contains(None)) None else Some(evaluated.map(_.get))
+  //   case None => Some(List())
+  // }
+
+  // def allowedArrayType(t: Type): Boolean = t match {
+  //   case ArrayType(innertype) => allowedArrayType(innertype)
+  //   case BaseType.IntType => true
+  //   case BaseType.BoolType => true
+  //   // case BaseType.CharType => true
+  //   case _ => false
+  // }
 
   def extract(value: RValue): Option[Any] = value match {
     case RValue.RExpr(expr) => Some(expr)
     case RValue.RArrayLiter(array) => Some(array)
     case _ => None
-  }
-
-  def allowedArrayType(t: Type): Boolean = t match {
-    case ArrayType(innertype) => allowedArrayType(innertype)
-    case BaseType.IntType => true
-    case BaseType.BoolType => true
-    // case BaseType.CharType => true
-    case _ => false
   }
 
   def checkAndAddConstant(t: Type, name: String, value: RValue) = {
@@ -266,11 +266,11 @@ object semanticChecker {
         }
         case _ =>
       }
-      case Some(array: ArrayLiter) => evaluateArray(array) match {
-        case Some(list) => 
-          if (allowedArrayType(t)) addConstant(name, (t, list))
-        case None =>
-      }
+      // case Some(array: ArrayLiter) => evaluateArray(array) match {
+      //   case Some(list) => 
+      //     if (allowedArrayType(t)) addConstant(name, (t, list))
+      //   case None =>
+      // }
       case _ =>
     }
   }
