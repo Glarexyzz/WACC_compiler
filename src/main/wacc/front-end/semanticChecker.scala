@@ -4,7 +4,7 @@ import scala.collection.mutable
 sealed trait SymbolEntry
 
 case class VariableEntry(varType: Type) extends SymbolEntry
-case class FunctionEntry(returnType: Type, params: Option[List[Param]]) extends SymbolEntry
+case class FunctionEntry(returnType: Type, params: List[Param]) extends SymbolEntry
 
 
 class SymbolTable {
@@ -12,9 +12,11 @@ class SymbolTable {
   // Variables are stored in a mutable Stack (to handle scopes), while functions are stored directly.
   private val functionTable: mutable.Map[String, FunctionEntry] = mutable.Map()
   private val variableScopes: mutable.Stack[mutable.Map[String, VariableEntry]] = mutable.Stack()
-  var scopeLevel: Int = 0 // Tracks current scope depth
+  private val functionParams: mutable.Map[String, mutable.Map[String, VariableEntry]] = mutable.Map()
   private var functionStatus: Option[Type] = None // Tracks the return type of the current function
+  private var currentFunction: Option[String] = None // Tracks current function
 
+  var scopeLevel: Int = 0 // Tracks current scope depth
   private var nVariablesInScope = 0        // Number of variables in the **current scope**.
   private var maxConcurrentVariables = 0   // Global "high-water mark" for variable count.
   private var nVariableRegs = 0            // Total number of variables across all scopes (for function params etc.)
@@ -46,6 +48,24 @@ class SymbolTable {
       scopeLevel -= 1
     }
   }
+
+  def enterFunctionScope(name: String, returnType: Type, params: List[Param]): Boolean = {
+    if (functionTable.contains(name)) return false
+    functionTable(name) = FunctionEntry(returnType, params)
+
+    val paramScope = mutable.Map[String, VariableEntry]()
+    params.foreach(param => paramScope(param.name) = VariableEntry(param.t))
+    functionParams(name) = paramScope
+
+    currentFunction = Some(name)
+    enterScope()
+    true
+  }
+
+  def exitFunctionScope(): Unit = {
+    currentFunction = None
+    exitScope()
+  }
   
   def addVariable(name: String, varType: Type): Boolean = {
     if (variableScopes.nonEmpty) {
@@ -70,7 +90,11 @@ class SymbolTable {
     // Check if the function already exists in the table
     if (functionTable.contains(name)) return false
     // Add the function entry
-    val functionEntry = FunctionEntry(returnType, params)
+    val paramsList: List[Param] = params match {
+      case Some(parameters) => parameters
+      case None => List()
+    }
+    val functionEntry = FunctionEntry(returnType, paramsList)
     functionTable(name) = functionEntry
     true
   }
@@ -406,12 +430,12 @@ object semanticChecker {
       symbolTable.lookupFunction(name) match {
         case Some(FunctionEntry(returnType, params)) => 
           params match {
-            case None =>
+            case List() =>
               argList match {
                 case None => Right(returnType)
                 case Some(_) => Left(s"Semantic Error: Too many arguments in function call of $name")
               }
-            case Some(paramList) =>
+            case paramList =>
               argList match {
                 case None => Left(s"Semantic Error: Too few arguments in function call of $name")
                 case Some(args) =>
