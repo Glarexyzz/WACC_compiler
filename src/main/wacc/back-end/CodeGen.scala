@@ -175,13 +175,9 @@ object CodeGen {
   private var paramsMap = mutable.Map[String, (Register, Type)]()
 
   def assignFuncParams(params: List[Param]):Map[String, (Register, Type)] = {
-    val paramRegisters = argumentRegisters
-
-    val registerMapping = params.zip(paramRegisters).map {
+    params.zip(argumentRegisters).map {
       case (param, reg) => (param.name, (reg, param.t))
     }.toMap
-
-    registerMapping
   }
 
   def pushFunctionParams(params: List[Register]): List[IRInstr] = {
@@ -358,14 +354,13 @@ object CodeGen {
     funcLabel: Option[String] = None, 
     paramRegs: Option[List[wacc.Param]] = None
   ): List[IRInstr] = {
-    
     branches = mutable.ListBuffer[IRInstr]() // cleanup the branches
 
     
     paramsMap = mutable.Map.from(paramRegs.map(assignFuncParams).getOrElse(Map()))
     variableRegisters ++= paramsMap  // Store parameter registers in variable map
 
-    val allocatedRegs = initialiseVariables(symbolTable)
+    val allocatedRegs = initialiseVariables(symbolTable, funcLabel)
 
     // function: Save parameters onto the stack to allow modification
     val paramPushInstrs = pushFunctionParams(paramsMap.values.map(_._1).toList)
@@ -421,14 +416,28 @@ object CodeGen {
   }
 
   // Variable Registers
-  def initialiseVariables(symTab: SymbolTable): List[Register] = {
+  def initialiseVariables(symTab: SymbolTable, funcName: Option[String] = None): List[Register] = {
+      // Functions parameters initiation
+      val allocatedParamsRegs = mutable.Stack[Register]()
+      var maxParams = 0
+      var paramsRegsNeeded = 0
+      funcName match {
+        case Some(name) =>
+          maxParams = symTab.getCurrentFunctionParamsNum(name)
+          paramsRegsNeeded = math.min(maxParams, argumentRegisters.size)
+          allocatedParamsRegs ++= argumentRegisters.take(paramsRegsNeeded)
+        case None => 
+      }
+      
+      // Scope variables initiation
       val maxVars = symTab.getMaxConcurrentVariables
+      println(s"ConcurrentVariableNums: $maxVars")
       val regsNeeded = math.min(maxVars, availableRegisters.size)
       val allocated = availableRegisters.take(regsNeeded)
       availableVariableRegisters.pushAll(allocated)
       availableRegisters --= allocated
       // Pre-allocate stack space for the rest
-      val spillVars = maxVars - regsNeeded
+      val spillVars = (maxVars - regsNeeded) + (maxParams - paramsRegsNeeded)
       for (_ <- 0 until spillVars) {
           getStackVarOffset(BaseType.IntType) match {
               case Some(off) => 
@@ -437,7 +446,9 @@ object CodeGen {
                   throw new Exception("Ran out of stack offsets for spilling variables!")
           }
       }
-      allocated.toList
+      println(s"parameters: $allocatedParamsRegs\n")
+      println(s"variables: $allocated\n")
+      (allocated ++= allocatedParamsRegs).toList
   }
   
 
@@ -533,7 +544,6 @@ object CodeGen {
       case AssignStmt(lvalue, rvalue) => 
         lvalue match {
           case LValue.LName(name) => 
-            
             lookupVariable(name) match {
               case Some((Left(reg), t)) =>
                 generateRValue(rvalue, reg, Some(t))
@@ -1276,9 +1286,7 @@ object CodeGen {
 
   def generateRValue(rvalue: RValue, reg: Register, exprType: Option[Type] = None): Unit = {
     rvalue match {
-      case RValue.RExpr(expr) => 
-        println(s"🟡 DEBUG: Calling generateExpr from generateRValue with $expr (${expr.getClass})")
-        generateExpr(expr, reg) 
+      case RValue.RExpr(expr) => generateExpr(expr, reg) 
 
       case RValue.RArrayLiter(arrayLiter) => 
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
