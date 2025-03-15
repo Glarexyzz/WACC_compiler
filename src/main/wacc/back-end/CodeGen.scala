@@ -1138,13 +1138,15 @@ object CodeGen {
         
     }
   }
+
+  def checkBounds(list: List[Any], i: Int): Boolean = i >= 0 && i < list.length
   
   def getArrayItem(arr: Any, indices: List[Expr]): Option[Any] = indices match {
     case Nil => Some(arr)
     case i :: rest => i match {
       case Identifier(name) => constants.get(name) match {
         case Some((BaseType.IntType, index)) => (arr, index) match {
-          case (list: List[Any], n: Int) if n >= 0 && n < list.length => getArrayItem(list(n), rest)
+          case (list: List[Any], n: Int) if checkBounds(list, n) => getArrayItem(list(n), rest)
           case _ => 
             helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
             currentBranch += IRJump("_errOutOfBounds")
@@ -1154,7 +1156,7 @@ object CodeGen {
         case _ => None
       }
       case IntLiteral(n) => arr match {
-        case list: List[Any] if n >= 0 && n < list.length => getArrayItem(list(n.toInt), rest)
+        case list: List[Any] if checkBounds(list, n.toInt) => getArrayItem(list(n.toInt), rest)
         case _ => 
           helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
           currentBranch += IRJump("_errOutOfBounds")
@@ -1163,7 +1165,7 @@ object CodeGen {
       case ArrayElem(name, is) => constants.get(name) match {
         case Some((_, outerlist: List[Any])) => getArrayItem(outerlist, is) match {
           case Some(n) => (arr, n) match {
-            case (list: List[Any], n: Int) if n >= 0 && n < list.length => getArrayItem(list(n.toInt), rest)
+            case (list: List[Any], n: Int) if checkBounds(list, n) => getArrayItem(list(n), rest)
             case _ => None
           }
           case _ => None
