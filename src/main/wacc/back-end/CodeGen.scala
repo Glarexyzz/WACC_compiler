@@ -172,9 +172,7 @@ object CodeGen {
   private var paramsMap = mutable.Map[String, (Register, Type)]()
 
   def assignFuncParams(params: List[Param]):Map[String, (Register, Type)] = {
-    val paramRegisters = argumentRegisters
-
-    val registerMapping = params.zip(paramRegisters).map {
+    params.zip(argumentRegisters).map {
       case (param, reg) => (param.name, (reg, param.t))
     }.toMap
 
