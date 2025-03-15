@@ -175,8 +175,6 @@ object CodeGen {
     params.zip(argumentRegisters).map {
       case (param, reg) => (param.name, (reg, param.t))
     }.toMap
-
-    registerMapping
   }
 
   def pushFunctionParams(params: List[Register]): List[IRInstr] = {
