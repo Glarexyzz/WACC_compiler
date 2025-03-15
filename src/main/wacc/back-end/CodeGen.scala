@@ -33,6 +33,7 @@ object CodeGen {
   private val variableRegisters = mutable.Map[String, (Register, Type)]()
   private val variableOffsets = mutable.Map[String, (Int, Type)]()
   private var stackVarPointer = initStackVarsOffset
+  private var constants = mutable.Map[String, (Type, Any)]()
   // for variables
   private val availableVariableRegisters = mutable.Stack[Register]()
   private val availableVariableOffsets = mutable.Stack[Int]()
@@ -128,10 +129,12 @@ object CodeGen {
   private val helpers = mutable.Map[IRLabel, List[IRInstr]]()
 
   // Main function
-  def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable): Unit = {
+  def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable, constantVars: mutable.Map[String, (Type, Any)]): Unit = {
+    println(constantVars)
     println("Compiling...")
     // initialise symbol table
     symbolTable = newSymbolTable
+    constants = constantVars
     val ir = generateIR(prog)
 
     // AArch64 assembly conversion
@@ -489,19 +492,53 @@ object CodeGen {
     helpers.values.toList.flatten
   }
 
+  def stringToHex(input: String): String = {
+    val hexString = input.map(_.toInt.toHexString).mkString
+    val trimmedHex = hexString.takeRight(8)
+    "0x" + ("0" * (8 - trimmedHex.length)) + trimmedHex
+  }
+
+  def genAndPrintExpr(expr: Expr): Unit = {
+    val exprType = generateExpr(expr)
+    
+    if (exprType == BaseType.IntType) {
+    helpers.getOrElseUpdate(IRLabel("_printi"), printi())
+      currentBranch +=  IRBl("_printi")
+    } else if (exprType == BaseType.CharType) {
+      helpers.getOrElseUpdate(IRLabel("_printc"), printc())
+      currentBranch +=  IRBl("_printc")
+    } else if (exprType == BaseType.StrType || exprType == ArrayType(BaseType.CharType)) {
+      helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+      currentBranch +=  IRBl("_prints")
+    } else if (exprType == BaseType.BoolType) {
+      helpers.getOrElseUpdate(IRLabel("_printb"), printb())
+      currentBranch +=  IRBl("_printb")
+    } else if (exprType == ArrayType(BaseType.IntType)) {
+      helpers.getOrElseUpdate(IRLabel("_printp"), printp()) //printp
+      currentBranch +=  IRBl("_printp")
+    } else if (exprType.isInstanceOf[PairType]) {
+      helpers.getOrElseUpdate(IRLabel("_printp"), printp())
+      currentBranch +=  IRBl("_printp")
+    }
+  }
+
   def generateStmt(stmt: Stmt): Unit = stmt match {
       case SkipStmt =>
 
       // All declared variables are initialised at the start from the symbol table
       case DeclAssignStmt(t, name, value) =>
-        addVariable(name, t) match {
-          case Some(Left(reg)) => generateRValue(value, reg, Some(t))
-          case Some(Right(off)) => 
-            val temp = getTempRegister().getOrElse(defTempReg)
-            generateRValue(value, temp, Some(t))
-            push(temp, off)
-            freeRegister(temp)
-          case _ =>
+        constants.get(name) match {
+          case Some(_) =>
+          case None =>
+            addVariable(name, t) match {
+              case Some(Left(reg)) => generateRValue(value, reg, Some(t))
+              case Some(Right(off)) => 
+                val temp = getTempRegister().getOrElse(defTempReg)
+                generateRValue(value, temp, Some(t))
+                push(temp, off)
+                freeRegister(temp)
+              case _ =>
+            }
         }
             
       case AssignStmt(lvalue, rvalue) => 
@@ -660,8 +697,9 @@ object CodeGen {
 
       case FreeStmt(expr) => 
         expr match {
-          case (Identifier(name)) =>
-            lookupVariable(name).get match {
+          case (Identifier(name)) => constants.get(name) match {
+            case Some(_) =>
+            case None => lookupVariable(name).get match {
               case (Left(reg), t) =>
                 t match {
                 case ArrayType(_) => currentBranch += IRSubImm(defArrPairReg, reg, stackOffset) += IRBl("free")
@@ -675,6 +713,7 @@ object CodeGen {
 
               case _ =>
             }
+          }
         }
 
       case PrintStmt(expr) =>
@@ -687,29 +726,18 @@ object CodeGen {
               IRLdur(reg, SP, defOffset),
               IRMovReg(paramsReg, SP)
             )
-          case _ =>
+            genAndPrintExpr(expr)
+
+          case Identifier(name) if (constants.get(name) != None) => constants.get(name) match {
+            case Some((ArrayType(_), _)) =>
+              generateExpr(StrLiteral(stringToHex(name)))
+              helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+              currentBranch +=  IRBl("_prints")
+
+            case _ => genAndPrintExpr(expr)
+          }
+          case _ => genAndPrintExpr(expr)
             None
-        }
-        val exprType = generateExpr(expr)
-        
-        if (exprType == BaseType.IntType) {
-          helpers.getOrElseUpdate(IRLabel("_printi"), printi())
-          currentBranch +=  IRBl("_printi")
-        } else if (exprType == BaseType.CharType) {
-          helpers.getOrElseUpdate(IRLabel("_printc"), printc())
-          currentBranch +=  IRBl("_printc")
-        } else if (exprType == BaseType.StrType || exprType == ArrayType(BaseType.CharType)) {
-          helpers.getOrElseUpdate(IRLabel("_prints"), prints())
-          currentBranch +=  IRBl("_prints")
-        } else if (exprType == BaseType.BoolType) {
-          helpers.getOrElseUpdate(IRLabel("_printb"), printb())
-          currentBranch +=  IRBl("_printb")
-        } else if (exprType == ArrayType(BaseType.IntType)) {
-          helpers.getOrElseUpdate(IRLabel("_printp"), printp()) //printp
-          currentBranch +=  IRBl("_printp")
-        } else if (exprType.isInstanceOf[PairType]) {
-          helpers.getOrElseUpdate(IRLabel("_printp"), printp())
-          currentBranch +=  IRBl("_printp")
         }
 
       case PrintlnStmt(expr) => 
@@ -855,33 +883,45 @@ object CodeGen {
 
       // move the identifier into the destination register
       case Identifier(name) =>
-        lookupVariable(name) match {
-          case Some((Left(reg), t)) => 
-            if (destW != reg.asW) {
-              t match {
-                //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
-                case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
-                case PairType(_,_) => currentBranch += IRMovReg(destX, reg.asX)
-                case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
-                case _ => currentBranch += IRMovReg(destW, reg.asW)
-              }
+        constants.get(name) match {
+          case Some((BaseType.IntType, value: Int)) => 
+            currentBranch += IRMov(destW, value)
+            BaseType.IntType
+          case Some((BaseType.BoolType, value: Int)) => 
+            currentBranch += IRMov(destW, value)
+            BaseType.BoolType
+          case Some((BaseType.CharType, value: Int)) => 
+            currentBranch += IRMov(destW, value)
+            BaseType.CharType
+          case _ =>
+            lookupVariable(name) match {
+              case Some((Left(reg), t)) => 
+                if (destW != reg.asW) {
+                  t match {
+                    //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
+                    case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
+                    case PairType(_,_) => currentBranch += IRMovReg(destX, reg.asX)
+                    case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
+                    case _ => currentBranch += IRMovReg(destW, reg.asW)
+                  }
+                }
+                t
+              case Some((Right(off),t)) =>
+                val temp = getTempRegister().getOrElse(defTempReg)
+                currentBranch += IRLdr(temp, FP, Some(off))
+                if (destW != temp.asW) {
+                  t match {
+                    //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
+                    case ArrayType(_) => currentBranch += IRMovReg(destX, temp.asX)
+                    case PairType(_,_) => currentBranch += IRMovReg(destX, temp.asX)
+                    case BaseType.StrType => currentBranch += IRMovReg(destX, temp.asX)
+                    case _ => currentBranch += IRMovReg(destW, temp.asW)
+                  }
+                }
+                freeRegister(temp)
+                t
+              case _ => NullType
             }
-            t
-          case Some((Right(off),t)) =>
-            val temp = getTempRegister().getOrElse(defTempReg)
-            currentBranch += IRLdr(temp, FP, Some(off))
-            if (destW != temp.asW) {
-              t match {
-                //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
-                case ArrayType(_) => currentBranch += IRMovReg(destX, temp.asX)
-                case PairType(_,_) => currentBranch += IRMovReg(destX, temp.asX)
-                case BaseType.StrType => currentBranch += IRMovReg(destX, temp.asX)
-                case _ => currentBranch += IRMovReg(destW, temp.asW)
-              }
-            }
-            freeRegister(temp)
-            t
-          case _ => NullType
         }
         // compare if the dest and src are the same value or not to reduce redundancy
 
@@ -904,10 +944,21 @@ object CodeGen {
           case UnaryOperator.Length =>
             expr match {
                 case Identifier(name) =>
+                  constants.get(name) match {
+                    case Some((_, arr : List[Any])) => currentBranch += IRMov(destW, arr.length)
+                    case _ =>
+                  }
                   lookupVariable(name) match {
                     case Some((Left(reg), _)) => currentBranch += IRLdur(destW, reg, -stackOffset)
                     case _ =>
                   }
+                case ArrayElem(name, indices) => constants.get(name) match {
+                  case Some((_, arr: List[Any])) => getArrayItem(arr, indices) match {
+                    case Some(list: List[Any]) => currentBranch += IRMov(destW, list.length)
+                    case _ =>
+                  }
+                  case _ =>
+                }
                 case _ =>
             }
             BaseType.IntType
@@ -919,9 +970,13 @@ object CodeGen {
               case CharLiteral(value) =>
                 currentBranch += IRMov(destW, value.toInt) // Convert char to integer
               case Identifier(name) => 
-                lookupVariable(name) match {
-                  case Some((Left(r), _)) => currentBranch += IRMovReg(destW, r.asW)
+                constants.get(name) match {
+                  case Some((_,value: Int)) => currentBranch += IRMov(destW, value)
                   case _ =>
+                    lookupVariable(name) match {
+                      case Some((Left(r), _)) => currentBranch += IRMovReg(destW, r.asW)
+                      case _ =>
+                    }
                 }
             }
             BaseType.IntType
@@ -1049,42 +1104,84 @@ object CodeGen {
         binaryInstrs  
 
       case ArrayElem(name, indices) => 
-      
-        lookupVariable(name) match {
-          case Some((Left(baseReg), arrType)) => // Base address
-            generateExpr(indices.head, indexReg) // Get index value
-            arrType match {
-              case ArrayType(ArrayType(_)) => 
-                helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
-                helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-                currentBranch += IRMovReg(defArrTempReg, baseReg) += IRBl("_arrLoad8")
-                currentBranch += IRMovReg(defTempReg, defArrTempReg) += IRLdur(defArrPairReg.asW, defTempReg, -stackOffset)
-              case ArrayType(PairType(_,_)) =>
-                helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
-                helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-                currentBranch += IRMovReg(defArrTempReg, baseReg) 
-                currentBranch += IRBl("_arrLoad8") += IRMovReg(dest, defArrTempReg)
+        constants.get(name) match {
+          case Some(arrType, array) => getArrayItem(array, indices) match {
+            case Some(n: Int) => currentBranch += IRMov(destW, n)
+            case _ =>
+          }
+            getAccessedArrayType(arrType, indices)
+          case None => lookupVariable(name) match {
+            case Some((Left(baseReg), arrType)) => // Base address
+              generateExpr(indices.head, indexReg) // Get index value
+              arrType match {
+                case ArrayType(ArrayType(_)) => 
+                  helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
+                  helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+                  currentBranch += IRMovReg(defArrTempReg, baseReg) += IRBl("_arrLoad8")
+                  currentBranch += IRMovReg(defTempReg, defArrTempReg) += IRLdur(defArrPairReg.asW, defTempReg, -stackOffset)
+                case ArrayType(PairType(_,_)) =>
+                  helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
+                  helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+                  currentBranch += IRMovReg(defArrTempReg, baseReg) 
+                  currentBranch += IRBl("_arrLoad8") += IRMovReg(dest, defArrTempReg)
 
-              case _ =>
+                case _ =>
+                  helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
+                  helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+                  currentBranch += IRMovReg(defArrTempReg, baseReg) 
+                  currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
+              }
+              if (indices.size > 1) {
                 helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
                 helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-                currentBranch += IRMovReg(defArrTempReg, baseReg) 
+                currentBranch.remove(currentBranch.size - 1)
+                currentBranch += pushReg(defTempReg, XZR)
+                generateExpr(indices.apply(1), indexReg)
+                currentBranch += popReg(defArrTempReg, XZR)
                 currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
-            }
-            if (indices.size > 1) {
-              helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
-              helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-              currentBranch.remove(currentBranch.size - 1)
-              currentBranch += pushReg(defTempReg, XZR)
-              generateExpr(indices.apply(1), indexReg)
-              currentBranch += popReg(defArrTempReg, XZR)
-              currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
-            }
-            getAccessedArrayType(arrType, indices)
-          case _ => BaseType.IntType
+              }
+              getAccessedArrayType(arrType, indices)
+            case _ => BaseType.IntType
+          }
         }
       case _ => BaseType.IntType
         
+    }
+  }
+
+  def checkBounds(list: List[Any], i: Int): Boolean = i >= 0 && i < list.length
+  
+  def getArrayItem(arr: Any, indices: List[Expr]): Option[Any] = indices match {
+    case Nil => Some(arr)
+    case i :: rest => i match {
+      case Identifier(name) => constants.get(name) match {
+        case Some((BaseType.IntType, index)) => (arr, index) match {
+          case (list: List[Any], n: Int) if checkBounds(list, n) => getArrayItem(list(n), rest)
+          case _ => 
+            helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+            currentBranch += IRJump("_errOutOfBounds")
+            None
+        }
+        case Some(_) => None
+        case _ => None
+      }
+      case IntLiteral(n) => arr match {
+        case list: List[Any] if checkBounds(list, n.toInt) => getArrayItem(list(n.toInt), rest)
+        case _ => 
+          helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+          currentBranch += IRJump("_errOutOfBounds")
+          None
+      }
+      case ArrayElem(name, is) => constants.get(name) match {
+        case Some((_, outerlist: List[Any])) => getArrayItem(outerlist, is) match {
+          case Some(n) => (arr, n) match {
+            case (list: List[Any], n: Int) if checkBounds(list, n) => getArrayItem(list(n), rest)
+            case _ => None
+          }
+          case _ => None
+        }
+        case _ => None
+      }
     }
   }
   

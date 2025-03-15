@@ -1,5 +1,6 @@
 package wacc
 import scala.collection.mutable
+import wacc.Constants._
 
 sealed trait SymbolEntry
 
@@ -146,10 +147,19 @@ class SymbolTable {
 
 object semanticChecker {
 
+  private val constants: mutable.Map[String, (Type, Any)] = mutable.Map()
   val symbolTable: SymbolTable = new SymbolTable
 
-  def checkSemantic(parsed: Any): Either[String, SymbolTable] = parsed match {
-    case program: Program => checkProgram(program).toLeft(symbolTable)
+  def addConstant(name: String, value: (Type, Any)): Unit = {
+    constants(name) = value
+  }
+
+  def removeConstant(name: String) = {
+    constants -= name
+  }
+
+  def checkSemantic(parsed: Any): Either[String, (SymbolTable, mutable.Map[String, (Type, Any)])] = parsed match {
+    case program: Program => checkProgram(program).toLeft(symbolTable, constants)
     case _ => Left(s"Unknown parsed structure")
   }
   
@@ -214,6 +224,100 @@ object semanticChecker {
     bodyCheckResult
   }
 
+  def evaluateExpr(value: Expr): Option[Int] = value match {
+    case IntLiteral(n) => Some(n.toInt)
+    case BoolLiteral(b) => if (b) Some(trueValue) else Some(falseValue)
+    case CharLiteral(c) => Some(c.toInt)
+    case Identifier(name) => constants.get(name) match {
+      case Some((_, n: Int)) => Some(n)
+      case _ => None
+    }
+    case UnaryOp(op, expr) => evaluateExpr(expr) match {
+      case Some(result) => op match {
+        case UnaryOperator.Negate => Some((-result))
+        case UnaryOperator.Not => Some(((result - 1).abs))
+        case UnaryOperator.Ord => Some(result)
+        case UnaryOperator.Chr => Some(result)
+        case _ => None
+      }
+      case _ => None
+    }
+    case BinaryOp(expr1, op, expr2) => (evaluateExpr(expr1), evaluateExpr(expr2)) match {
+      case (Some(result1), Some(result2)) => op match {
+          case BinaryOperator.Add          => Some(result1 + result2)
+          case BinaryOperator.Subtract     => Some(result1 - result2)
+          case BinaryOperator.Multiply     => Some(result1 * result2)
+          case BinaryOperator.Divide       => if (result2 != 0) Some(result1 / result2) else None
+          case BinaryOperator.Modulus      => if (result2 != 0) Some(result1 % result2) else None
+          case BinaryOperator.And          => if (result1 == trueValue && result2 == trueValue) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.Or           => if (result1 == trueValue || result2 == trueValue) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.Greater      => if (result1 >  result2) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.GreaterEqual => if (result1 >= result2) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.Less         => if (result1 <  result2) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.LessEqual    => if (result1 <= result2) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.Equal        => if (result1 == result2) Some(trueValue) else Some(falseValue)
+          case BinaryOperator.NotEqual     => if (result1 != result2) Some(trueValue) else Some(falseValue)
+        }
+      case _ => None
+    }
+    case _ => None
+  }
+
+  def evaluateArray(array: ArrayLiter): Option[List[Any]] = array.elements match {
+    case Some(exprList) =>
+      val evaluated = exprList.map {
+        case expr: Expr => expr match {
+          case Identifier(name) => constants.get(name) match {
+            case Some((_, arr: List[Any])) => Some(arr)
+            case _ => evaluateExpr(expr)
+          }
+          case arr: ArrayLiter => evaluateArray(arr)
+          case _ => evaluateExpr(expr)
+        }
+      }
+      if (evaluated.contains(None)) None else Some(evaluated.map(_.get))
+    case None => Some(List())
+  }
+
+  def allowedArrayType(t: Type): Boolean = t match {
+    case ArrayType(innertype) => allowedArrayType(innertype)
+    case BaseType.IntType => true
+    case BaseType.BoolType => true
+    // case BaseType.CharType => true
+    case _ => false
+  }
+
+  def extract(value: RValue): Option[Any] = value match {
+    case RValue.RExpr(expr) => Some(expr)
+    case RValue.RArrayLiter(array) => Some(array)
+    case _ => None
+  }
+
+  def checkAndAddConstant(t: Type, name: String, value: RValue) = {
+    extract(value) match {
+      case Some(expr: Expr) => evaluateExpr(expr) match {
+        case Some(n) => t match {
+          case BaseType.IntType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              addConstant(name, (BaseType.IntType, n))
+            }
+          case BaseType.BoolType =>
+            if (n == trueValue || n == falseValue) addConstant(name, (BaseType.BoolType, n))
+          case BaseType.CharType =>
+            if (n >= 0 && n <= 127) addConstant(name, (BaseType.CharType, n))
+          case _ =>
+        }
+        case _ =>
+      }
+      case Some(array: ArrayLiter) => evaluateArray(array) match {
+        case Some(list) => 
+          if (allowedArrayType(t)) addConstant(name, (t, list))
+        case None =>
+      }
+      case _ =>
+    }
+  }
+
   def checkStatement(stmt: Stmt): Option[String] = stmt match {
     case SkipStmt => None
 
@@ -225,8 +329,10 @@ object semanticChecker {
           if (isCompatibleTo(rType, t)) {
             println(s"\nadding $name to the table")
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
-            if (can_add_if_no_duplicate)
+            if (can_add_if_no_duplicate) {
+              checkAndAddConstant(t, name, value)
               None
+            }
             else Some(s"Semantic Error in Declaration: Variable $name is already declared")
            }
           else Some(s"Semantic Error in Declaration: $rType is not compatible with $t for variable $name")
@@ -242,6 +348,7 @@ object semanticChecker {
             case LValue.LName(name) => symbolTable.lookupVariable(name) match {
               case Some(VariableEntry(lType)) => 
                 if (isCompatibleTo(rType, lType)) {
+                  removeConstant(name)
                   None
                 } else {
                   Some(s"Semantic Error in Assignment of identifier $name: $rType is not compatible to $lType identifier $name")
@@ -252,6 +359,7 @@ object semanticChecker {
             case LValue.LArray(ArrayElem(name, _)) => symbolTable.lookupVariable(name) match {
               case Some(VariableEntry(ArrayType(lType))) => 
                 if (isCompatibleTo(rType, lType)) {
+                  removeConstant(name)
                   None
                 } else {
                   Some(s"Semantic Error in Assignment of array $name: $rType is not compatible to $lType")
@@ -282,8 +390,12 @@ object semanticChecker {
     // must be either type int or type char
     case ReadStmt(lvalue) => lvalue match {
       case LValue.LName(name) => symbolTable.lookup(name) match {
-        case Some(VariableEntry(BaseType.IntType)) => None
-        case Some(VariableEntry(BaseType.CharType)) => None
+        case Some(VariableEntry(BaseType.IntType)) => 
+          removeConstant(name)
+          None
+        case Some(VariableEntry(BaseType.CharType)) =>
+          removeConstant(name)
+          None
         case Some(t) => Some(s"Semantic Error in Read: Identifier $name must be of type int or char, but got $t instead")
         case None => Some(s"Semantic Error in Read: Identifier $name not declared")
       }
@@ -341,7 +453,7 @@ object semanticChecker {
 
     // 'if' <expr> 'then' <stmt> 'else' <stmt> 'fi'
     case IfStmt(cond, thenStmt, elseStmt) => 
-      checkExprType(cond, symbolTable) match {
+      checkExprType(cond, symbolTable, true) match {
         case Left(error) => Some(error)
 
         case Right(BaseType.BoolType) => 
@@ -358,7 +470,7 @@ object semanticChecker {
 
     // 'while' <expr> 'do' <stmt> 'done'
     case WhileStmt(cond, body) => 
-      checkExprType(cond, symbolTable) match {
+      checkExprType(cond, symbolTable, true) match {
         case Left(error) => Some(error)
         case Right(BaseType.BoolType) => 
           symbolTable.enterScope()
@@ -393,7 +505,9 @@ object semanticChecker {
       case None => Some(s"Error in checking left value: $name is not declared")
     }
     case LValue.LArray(ArrayElem(name, indices)) => symbolTable.lookupVariable(name) match {
-      case Some(VariableEntry(ArrayType(_))) => None
+      case Some(VariableEntry(ArrayType(_))) => 
+        removeConstant(name)
+        None
       case Some(VariableEntry(t)) => Some(s"Error in checking left value of $name: expected array, but got $t instead")
       case None => Some(s"Error in checking left value: $name is not declared")
     }
@@ -534,7 +648,38 @@ object semanticChecker {
     case _ => NullType 
   }
 
-  def checkExprType(expr: Expr, env: SymbolTable): Either[String, Type] = expr match {
+  def getArrayItem(arr: Any, indices: List[Expr]): Option[Any] = indices match {
+    case Nil => Some(arr)
+    case i :: rest => i match {
+      case Identifier(name) => constants.get(name) match {
+        case Some((BaseType.IntType, index)) => (arr, index) match {
+          case (list: List[Any], n: Int) if indexInRange(list, n) => getArrayItem(list(n), rest)
+          case _ => None
+        }
+        case Some(_) => None
+        case _ => None
+      }
+      case IntLiteral(n) => arr match {
+        case list: List[Any] if indexInRange(list, n.toInt) => getArrayItem(list(n.toInt), rest)
+        case _ => None
+      }
+      case ArrayElem(name, is) => constants.get(name) match {
+        case Some((_, outerlist: List[Any])) => getArrayItem(outerlist, is) match {
+          case Some(n) => (arr, n) match {
+            case (list: List[Any], n: Int) if indexInRange(list, n) => getArrayItem(list(n.toInt), rest)
+            case _ => None
+          }
+          case _ => None
+        }
+        case _ => None
+      }
+      case _ => None
+    }
+  }
+
+  def indexInRange(list: List[Any], n: Int): Boolean = n < list.length && n >= 0
+
+  def checkExprType(expr: Expr, env: SymbolTable, isIfOrWhile: Boolean = false): Either[String, Type] = expr match {
     
     case IntLiteral(_) => Right(BaseType.IntType)
     case BoolLiteral(_) => Right(BaseType.BoolType)
@@ -543,15 +688,22 @@ object semanticChecker {
 
     case PairLiteral => Right(PairType(NullType, NullType))
     
-    case Identifier(name) => env.lookup(name) match {
-      case Some(VariableEntry(t)) => Right(t)
-      case Some(FunctionEntry(t, _)) => Right(t)
-      case None => Left(s"Semantic Error in Expression: Identifier $name is not declared")
-    }
+    case Identifier(name) => 
+      if (isIfOrWhile) {
+        removeConstant(name)
+      }
+      env.lookup(name) match {
+        case Some(VariableEntry(t)) => Right(t)
+        case Some(FunctionEntry(t, _)) => Right(t)
+        case None => Left(s"Semantic Error in Expression: Identifier $name is not declared")
+      }
 
     // // <ident> ('[ <expr> ']')+
 // case class ArrayElem(name: String, indices: List[Expr]) extends Expr
-    case ArrayElem(name, indices) => 
+    case ArrayElem(name, indices) => constants.get(name) match {
+      case Some((_, arr)) => if (getArrayItem(arr, indices) == None || isIfOrWhile) removeConstant(name)
+      case _ =>
+    }
       // all Expr in indices must be compatible with IntExpr
       indices.foldLeft[Either[String, Type]](Right(BaseType.IntType)) {
         case (acc, index) =>
@@ -586,7 +738,7 @@ object semanticChecker {
       BinaryOperator.Divide,
       BinaryOperator.Modulus
     ).contains(op) =>
-      (checkExprType(left, env), checkExprType(right, env)) match {
+      (checkExprType(left, env, isIfOrWhile), checkExprType(right, env, isIfOrWhile)) match {
         // case (Right(BaseType.IntType), Right(BaseType.IntType)) => Right(BaseType.IntType) 
         case (Right(t1), Right(t2)) =>
           if (isCompatibleTo(BaseType.IntType, t1) && isCompatibleTo(BaseType.IntType, t2)) { 
@@ -605,7 +757,7 @@ object semanticChecker {
       BinaryOperator.Less,
       BinaryOperator.LessEqual,
     ).contains(op) =>
-      (checkExprType(left, env), checkExprType(right, env)) match {
+      (checkExprType(left, env, isIfOrWhile), checkExprType(right, env, isIfOrWhile)) match {
         case (Right(BaseType.IntType), Right(BaseType.IntType)) => Right(BaseType.BoolType) 
         case (Right(BaseType.CharType), Right(BaseType.CharType)) => Right(BaseType.BoolType) 
         case (Right(t1), Right(t2)) => Left(s"Semantic Error: Types should be int or char, but got $t1 and $t2 instead in operation $op") 
@@ -618,7 +770,7 @@ object semanticChecker {
       BinaryOperator.Equal,
       BinaryOperator.NotEqual
     ).contains(op) =>
-      (checkExprType(left, env), checkExprType(right, env)) match {
+      (checkExprType(left, env, isIfOrWhile), checkExprType(right, env, isIfOrWhile)) match {
         case (Right(t1), Right(t2)) => 
           if (isCompatibleTo(t1, t2) || isCompatibleTo(t2, t1)) 
             Right(BaseType.BoolType) 
@@ -632,7 +784,7 @@ object semanticChecker {
       BinaryOperator.And,
       BinaryOperator.Or
     ).contains(op) =>
-      (checkExprType(left, env), checkExprType(right, env)) match {
+      (checkExprType(left, env, isIfOrWhile), checkExprType(right, env, isIfOrWhile)) match {
         case (Right(BaseType.BoolType), Right(BaseType.BoolType)) => Right(BaseType.BoolType) 
         case (Right(t1), Right(t2)) => Left(s"Semantic Error: $t1 and $t2 are incompatible for logical operation of $op")
         case (Left(error1), Left(error2)) => Left(s"$error1, $error2")
@@ -642,14 +794,14 @@ object semanticChecker {
 
     // Unary Operators: !, -, len, ord, chr
     case UnaryOp(UnaryOperator.Not, expr) =>
-      checkExprType(expr, env) match {
+      checkExprType(expr, env, isIfOrWhile) match {
         case Right(BaseType.BoolType) => Right(BaseType.BoolType) 
         case Right(t) => Left(s"Semantic Error: `!` operator requires a boolean operand but found $t") 
         case Left(error) => Left(error)
       }
 
     case UnaryOp(UnaryOperator.Negate, expr) =>
-      checkExprType(expr, env) match {
+      checkExprType(expr, env, isIfOrWhile) match {
         case Right(t) => 
           if (isCompatibleTo(BaseType.IntType, t)) 
             Right(BaseType.IntType)
@@ -658,21 +810,21 @@ object semanticChecker {
       }
 
     case UnaryOp(UnaryOperator.Length, expr) =>
-      checkExprType(expr, env) match {
+      checkExprType(expr, env, isIfOrWhile) match {
         case Right(ArrayType(_)) => Right(BaseType.IntType) 
         case Right(t) => Left(s"Semantic Error: `len` operator requires an array but found $t")
         case Left(error) => Left(error)
       }
 
     case UnaryOp(UnaryOperator.Ord, expr) =>
-      checkExprType(expr, env) match {
+      checkExprType(expr, env, isIfOrWhile) match {
         case Right(BaseType.CharType) => Right(BaseType.IntType) 
         case Right(t) => Left(s"Semantic Error: `ord` operator requires a character but found $t") 
         case Left(error) => Left(error)
       }
 
     case UnaryOp(UnaryOperator.Chr, expr) =>
-      checkExprType(expr, env) match {
+      checkExprType(expr, env, isIfOrWhile) match {
         case Right(t) => 
           if (isCompatibleTo(BaseType.IntType, t)) 
             Right(BaseType.CharType)
