@@ -629,6 +629,7 @@ object semanticChecker {
         }
         case _ => None
       }
+      case _ => None
     }
   }
 
