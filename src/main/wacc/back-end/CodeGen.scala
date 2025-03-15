@@ -481,6 +481,12 @@ object CodeGen {
     helpers.values.toList.flatten
   }
 
+  def stringToHex(input: String): String = {
+    val hexString = input.map(_.toInt.toHexString).mkString
+    val trimmedHex = hexString.takeRight(8)
+    "0x" + ("0" * (8 - trimmedHex.length)) + trimmedHex
+  }
+
   def genAndPrintExpr(expr: Expr): Unit = {
     val exprType = generateExpr(expr)
     
@@ -714,7 +720,7 @@ object CodeGen {
 
           case Identifier(name) if (constants.get(name) != None) => constants.get(name) match {
             case Some((ArrayType(_), _)) =>
-              generateExpr(StrLiteral("Constant_Array_" + name))
+              generateExpr(StrLiteral(stringToHex(name)))
               helpers.getOrElseUpdate(IRLabel("_prints"), prints())
               currentBranch +=  IRBl("_prints")
 
