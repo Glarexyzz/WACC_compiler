@@ -355,7 +355,6 @@ object CodeGen {
     funcLabel: Option[String] = None, 
     paramRegs: Option[List[wacc.Param]] = None
   ): List[IRInstr] = {
-    
     branches = mutable.ListBuffer[IRInstr]() // cleanup the branches
 
     
@@ -496,7 +495,6 @@ object CodeGen {
       case AssignStmt(lvalue, rvalue) => 
         lvalue match {
           case LValue.LName(name) => 
-            
             lookupVariable(name) match {
               case Some((Left(reg), t)) =>
                 generateRValue(rvalue, reg, Some(t))
@@ -1179,8 +1177,7 @@ object CodeGen {
 
   def generateRValue(rvalue: RValue, reg: Register, exprType: Option[Type] = None): Unit = {
     rvalue match {
-      case RValue.RExpr(expr) => 
-        generateExpr(expr, reg) 
+      case RValue.RExpr(expr) => generateExpr(expr, reg) 
 
       case RValue.RArrayLiter(arrayLiter) => 
         val elementsIR = arrayLiter.elements.getOrElse(List()) // list of elements
