@@ -409,7 +409,7 @@ object semanticChecker {
 
     // 'if' <expr> 'then' <stmt> 'else' <stmt> 'fi'
     case IfStmt(cond, thenStmt, elseStmt) => 
-      checkExprType(cond, symbolTable) match {
+      checkExprType(cond, symbolTable, true) match {
         case Left(error) => Some(error)
 
         case Right(BaseType.BoolType) => 
@@ -426,7 +426,7 @@ object semanticChecker {
 
     // 'while' <expr> 'do' <stmt> 'done'
     case WhileStmt(cond, body) => 
-      checkExprType(cond, symbolTable) match {
+      checkExprType(cond, symbolTable, true) match {
         case Left(error) => Some(error)
         case Right(BaseType.BoolType) => 
           symbolTable.enterScope()
@@ -635,7 +635,7 @@ object semanticChecker {
 
   def indexInRange(list: List[Any], n: Int): Boolean = n < list.length && n >= 0
 
-  def checkExprType(expr: Expr, env: SymbolTable): Either[String, Type] = expr match {
+  def checkExprType(expr: Expr, env: SymbolTable, isIfOrWhile: Boolean = false): Either[String, Type] = expr match {
     
     case IntLiteral(_) => Right(BaseType.IntType)
     case BoolLiteral(_) => Right(BaseType.BoolType)
@@ -644,16 +644,20 @@ object semanticChecker {
 
     case PairLiteral => Right(PairType(NullType, NullType))
     
-    case Identifier(name) => env.lookup(name) match {
-      case Some(VariableEntry(t)) => Right(t)
-      case Some(FunctionEntry(t, _)) => Right(t)
-      case None => Left(s"Semantic Error in Expression: Identifier $name is not declared")
-    }
+    case Identifier(name) => 
+      if (isIfOrWhile) {
+        removeConstant(name)
+      }
+      env.lookup(name) match {
+        case Some(VariableEntry(t)) => Right(t)
+        case Some(FunctionEntry(t, _)) => Right(t)
+        case None => Left(s"Semantic Error in Expression: Identifier $name is not declared")
+      }
 
     // // <ident> ('[ <expr> ']')+
 // case class ArrayElem(name: String, indices: List[Expr]) extends Expr
     case ArrayElem(name, indices) => constants.get(name) match {
-      case Some((_, arr)) => if (getArrayItem(arr, indices) == None) removeConstant(name)
+      case Some((_, arr)) => if (getArrayItem(arr, indices) == None || isIfOrWhile) removeConstant(name)
       case _ =>
     }
       // all Expr in indices must be compatible with IntExpr
@@ -690,7 +694,7 @@ object semanticChecker {
       BinaryOperator.Divide,
       BinaryOperator.Modulus
     ).contains(op) =>
-      (checkExprType(left, env), checkExprType(right, env)) match {
+      (checkExprType(left, env, isIfOrWhile), checkExprType(right, env, isIfOrWhile)) match {
         // case (Right(BaseType.IntType), Right(BaseType.IntType)) => Right(BaseType.IntType) 
         case (Right(t1), Right(t2)) =>
           if (isCompatibleTo(BaseType.IntType, t1) && isCompatibleTo(BaseType.IntType, t2)) { 
@@ -709,7 +713,7 @@ object semanticChecker {
       BinaryOperator.Less,
       BinaryOperator.LessEqual,
     ).contains(op) =>
-      (checkExprType(left, env), checkExprType(right, env)) match {
+      (checkExprType(left, env, isIfOrWhile), checkExprType(right, env, isIfOrWhile)) match {
         case (Right(BaseType.IntType), Right(BaseType.IntType)) => Right(BaseType.BoolType) 
         case (Right(BaseType.CharType), Right(BaseType.CharType)) => Right(BaseType.BoolType) 
         case (Right(t1), Right(t2)) => Left(s"Semantic Error: Types should be int or char, but got $t1 and $t2 instead in operation $op") 
@@ -722,7 +726,7 @@ object semanticChecker {
       BinaryOperator.Equal,
       BinaryOperator.NotEqual
     ).contains(op) =>
-      (checkExprType(left, env), checkExprType(right, env)) match {
+      (checkExprType(left, env, isIfOrWhile), checkExprType(right, env, isIfOrWhile)) match {
         case (Right(t1), Right(t2)) => 
           if (isCompatibleTo(t1, t2) || isCompatibleTo(t2, t1)) 
             Right(BaseType.BoolType) 
@@ -736,7 +740,7 @@ object semanticChecker {
       BinaryOperator.And,
       BinaryOperator.Or
     ).contains(op) =>
-      (checkExprType(left, env), checkExprType(right, env)) match {
+      (checkExprType(left, env, isIfOrWhile), checkExprType(right, env, isIfOrWhile)) match {
         case (Right(BaseType.BoolType), Right(BaseType.BoolType)) => Right(BaseType.BoolType) 
         case (Right(t1), Right(t2)) => Left(s"Semantic Error: $t1 and $t2 are incompatible for logical operation of $op")
         case (Left(error1), Left(error2)) => Left(s"$error1, $error2")
@@ -746,14 +750,14 @@ object semanticChecker {
 
     // Unary Operators: !, -, len, ord, chr
     case UnaryOp(UnaryOperator.Not, expr) =>
-      checkExprType(expr, env) match {
+      checkExprType(expr, env, isIfOrWhile) match {
         case Right(BaseType.BoolType) => Right(BaseType.BoolType) 
         case Right(t) => Left(s"Semantic Error: `!` operator requires a boolean operand but found $t") 
         case Left(error) => Left(error)
       }
 
     case UnaryOp(UnaryOperator.Negate, expr) =>
-      checkExprType(expr, env) match {
+      checkExprType(expr, env, isIfOrWhile) match {
         case Right(t) => 
           if (isCompatibleTo(BaseType.IntType, t)) 
             Right(BaseType.IntType)
@@ -762,21 +766,21 @@ object semanticChecker {
       }
 
     case UnaryOp(UnaryOperator.Length, expr) =>
-      checkExprType(expr, env) match {
+      checkExprType(expr, env, isIfOrWhile) match {
         case Right(ArrayType(_)) => Right(BaseType.IntType) 
         case Right(t) => Left(s"Semantic Error: `len` operator requires an array but found $t")
         case Left(error) => Left(error)
       }
 
     case UnaryOp(UnaryOperator.Ord, expr) =>
-      checkExprType(expr, env) match {
+      checkExprType(expr, env, isIfOrWhile) match {
         case Right(BaseType.CharType) => Right(BaseType.IntType) 
         case Right(t) => Left(s"Semantic Error: `ord` operator requires a character but found $t") 
         case Left(error) => Left(error)
       }
 
     case UnaryOp(UnaryOperator.Chr, expr) =>
-      checkExprType(expr, env) match {
+      checkExprType(expr, env, isIfOrWhile) match {
         case Right(t) => 
           if (isCompatibleTo(BaseType.IntType, t)) 
             Right(BaseType.CharType)
