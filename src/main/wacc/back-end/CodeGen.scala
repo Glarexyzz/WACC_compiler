@@ -431,7 +431,7 @@ object CodeGen {
       
       // Scope variables initiation
       val maxVars = symTab.getMaxConcurrentVariables
-      println(s"ConcurrentVariableNums: $maxVars")
+      //println(s"ConcurrentVariableNums: $maxVars")
       val regsNeeded = math.min(maxVars, availableRegisters.size)
       val allocated = availableRegisters.take(regsNeeded)
       availableVariableRegisters.pushAll(allocated)
@@ -446,8 +446,8 @@ object CodeGen {
                   throw new Exception("Ran out of stack offsets for spilling variables!")
           }
       }
-      println(s"parameters: $allocatedParamsRegs\n")
-      println(s"variables: $allocated\n")
+      //println(s"parameters: $allocatedParamsRegs\n")
+      //println(s"variables: $allocated\n")
       (allocated ++= allocatedParamsRegs).toList
   }
   
