@@ -357,7 +357,7 @@ object CodeGen {
     paramsMap = mutable.Map.from(paramRegs.map(assignFuncParams).getOrElse(Map()))
     variableRegisters ++= paramsMap  // Store parameter registers in variable map
 
-    val allocatedRegs = initialiseVariables(symbolTable)
+    val allocatedRegs = initialiseVariables(symbolTable, funcLabel)
 
     // function: Save parameters onto the stack to allow modification
     val paramPushInstrs = pushFunctionParams(paramsMap.values.map(_._1).toList)
@@ -413,14 +413,28 @@ object CodeGen {
   }
 
   // Variable Registers
-  def initialiseVariables(symTab: SymbolTable): List[Register] = {
+  def initialiseVariables(symTab: SymbolTable, funcName: Option[String] = None): List[Register] = {
+      // Functions parameters initiation
+      val allocatedParamsRegs = mutable.Stack[Register]()
+      var maxParams = 0
+      var paramsRegsNeeded = 0
+      funcName match {
+        case Some(name) =>
+          maxParams = symTab.getCurrentFunctionParamsNum(name)
+          paramsRegsNeeded = math.min(maxParams, argumentRegisters.size)
+          allocatedParamsRegs ++= argumentRegisters.take(paramsRegsNeeded)
+        case None => 
+      }
+      
+      // Scope variables initiation
       val maxVars = symTab.getMaxConcurrentVariables
+      println(s"ConcurrentVariableNums: $maxVars")
       val regsNeeded = math.min(maxVars, availableRegisters.size)
       val allocated = availableRegisters.take(regsNeeded)
       availableVariableRegisters.pushAll(allocated)
       availableRegisters --= allocated
       // Pre-allocate stack space for the rest
-      val spillVars = maxVars - regsNeeded
+      val spillVars = (maxVars - regsNeeded) + (maxParams - paramsRegsNeeded)
       for (_ <- 0 until spillVars) {
           getStackVarOffset(BaseType.IntType) match {
               case Some(off) => 
@@ -429,7 +443,9 @@ object CodeGen {
                   throw new Exception("Ran out of stack offsets for spilling variables!")
           }
       }
-      allocated.toList
+      println(s"parameters: $allocatedParamsRegs\n")
+      println(s"variables: $allocated\n")
+      (allocated ++= allocatedParamsRegs).toList
   }
   
 
