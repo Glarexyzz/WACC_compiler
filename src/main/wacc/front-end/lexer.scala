@@ -4,7 +4,6 @@ import parsley.quick.*
 import parsley.Parsley
 import parsley.token.{Lexer, Basic}
 import parsley.token.descriptions.*
-import parsley.character.{char, satisfy}
 import parsley.errors.combinator.ErrorMethods
 
 object lexer {
