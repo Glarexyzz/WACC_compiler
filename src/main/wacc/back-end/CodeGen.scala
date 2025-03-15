@@ -923,6 +923,13 @@ object CodeGen {
                     case Some((Left(reg), _)) => currentBranch += IRLdur(destW, reg, -stackOffset)
                     case _ =>
                   }
+                case ArrayElem(name, indices) => constants.get(name) match {
+                  case Some((_, arr: List[Any])) => getArrayItem(arr, indices) match {
+                    case Some(list: List[Any]) => currentBranch += IRMov(destW, list.length)
+                    case _ =>
+                  }
+                  case _ =>
+                }
                 case _ =>
             }
             BaseType.IntType
