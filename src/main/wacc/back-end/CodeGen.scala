@@ -481,6 +481,30 @@ object CodeGen {
     helpers.values.toList.flatten
   }
 
+  def genAndPrintExpr(expr: Expr): Unit = {
+    val exprType = generateExpr(expr)
+    
+    if (exprType == BaseType.IntType) {
+    helpers.getOrElseUpdate(IRLabel("_printi"), printi())
+      currentBranch +=  IRBl("_printi")
+    } else if (exprType == BaseType.CharType) {
+      helpers.getOrElseUpdate(IRLabel("_printc"), printc())
+      currentBranch +=  IRBl("_printc")
+    } else if (exprType == BaseType.StrType || exprType == ArrayType(BaseType.CharType)) {
+      helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+      currentBranch +=  IRBl("_prints")
+    } else if (exprType == BaseType.BoolType) {
+      helpers.getOrElseUpdate(IRLabel("_printb"), printb())
+      currentBranch +=  IRBl("_printb")
+    } else if (exprType == ArrayType(BaseType.IntType)) {
+      helpers.getOrElseUpdate(IRLabel("_printp"), printp()) //printp
+      currentBranch +=  IRBl("_printp")
+    } else if (exprType.isInstanceOf[PairType]) {
+      helpers.getOrElseUpdate(IRLabel("_printp"), printp())
+      currentBranch +=  IRBl("_printp")
+    }
+  }
+
   def generateStmt(stmt: Stmt): Unit = stmt match {
       case SkipStmt =>
 
@@ -686,29 +710,18 @@ object CodeGen {
               IRLdur(reg, SP, defOffset),
               IRMovReg(paramsReg, SP)
             )
-          case _ =>
+            genAndPrintExpr(expr)
+
+          case Identifier(name) if (constants.get(name) != None) => constants.get(name) match {
+            case Some((ArrayType(_), _)) =>
+              generateExpr(StrLiteral("Constant_Array_" + name))
+              helpers.getOrElseUpdate(IRLabel("_prints"), prints())
+              currentBranch +=  IRBl("_prints")
+
+            case _ => genAndPrintExpr(expr)
+          }
+          case _ => genAndPrintExpr(expr)
             None
-        }
-        val exprType = generateExpr(expr)
-        
-        if (exprType == BaseType.IntType) {
-          helpers.getOrElseUpdate(IRLabel("_printi"), printi())
-          currentBranch +=  IRBl("_printi")
-        } else if (exprType == BaseType.CharType) {
-          helpers.getOrElseUpdate(IRLabel("_printc"), printc())
-          currentBranch +=  IRBl("_printc")
-        } else if (exprType == BaseType.StrType || exprType == ArrayType(BaseType.CharType)) {
-          helpers.getOrElseUpdate(IRLabel("_prints"), prints())
-          currentBranch +=  IRBl("_prints")
-        } else if (exprType == BaseType.BoolType) {
-          helpers.getOrElseUpdate(IRLabel("_printb"), printb())
-          currentBranch +=  IRBl("_printb")
-        } else if (exprType == ArrayType(BaseType.IntType)) {
-          helpers.getOrElseUpdate(IRLabel("_printp"), printp()) //printp
-          currentBranch +=  IRBl("_printp")
-        } else if (exprType.isInstanceOf[PairType]) {
-          helpers.getOrElseUpdate(IRLabel("_printp"), printp())
-          currentBranch +=  IRBl("_printp")
         }
 
       case PrintlnStmt(expr) => 
