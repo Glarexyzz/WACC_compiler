@@ -20,6 +20,8 @@ def main(args: Array[String]): Unit = {
                             println(s"Semantic errors found:\n$errors\n")
                             exitCode = exitInvalidSemantics
                         case Right(symbolTable) => 
+                            println(s"Functions: \n${symbolTable.getFunctionTable}\n")
+                            println(s"Variables: \n${symbolTable.getVariableScopes}\n")
                             parsed match {
                                 case program: Program =>
                                     compile(program, input, symbolTable)
