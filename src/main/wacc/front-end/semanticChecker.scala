@@ -80,8 +80,8 @@ class SymbolTable {
       nVariablesInScope += 1
 
       val totalNowAlive = nVariableRegs + nVariablesInScope
-      //println(s"nVarRegs: $nVariableRegs")
-      //println(s"nVarScope: $nVariablesInScope")
+      // println(s"nVarRegs: $nVariableRegs")
+      // println(s"nVarScope: $nVariablesInScope")
       maxConcurrentVariables = Math.max(maxConcurrentVariables, totalNowAlive)
       //println(s"maxVarNum: $maxConcurrentVariables")
       

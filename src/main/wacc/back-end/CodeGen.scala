@@ -130,7 +130,7 @@ object CodeGen {
 
   // Main function
   def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable, constantVars: mutable.Map[String, (Type, Any)]): Unit = {
-    println(constantVars)
+    //println(constantVars)
     println("Compiling...")
     // initialise symbol table
     symbolTable = newSymbolTable
@@ -417,25 +417,29 @@ object CodeGen {
 
   // Variable Registers
   def initialiseVariables(symTab: SymbolTable, funcName: Option[String] = None): List[Register] = {
-      // Functions parameters initiation
+      
       val allocatedParamsRegs = mutable.Stack[Register]()
       var maxParams = 0
       var paramsRegsNeeded = 0
+      val allocated = mutable.Stack[Register]()
+      var maxVars = 0
+      var regsNeeded = 0
       funcName match {
         case Some(name) =>
+          // Functions parameters initiation
           maxParams = symTab.getCurrentFunctionParamsNum(name)
           paramsRegsNeeded = math.min(maxParams, argumentRegisters.size)
           allocatedParamsRegs ++= argumentRegisters.take(paramsRegsNeeded)
         case None => 
+          // Scopes variables initiation
+          //println(s"ConcurrentVariableNums: $maxVars")
+          maxVars = symTab.getMaxConcurrentVariables
+          regsNeeded = math.min(maxVars, availableRegisters.size)
+          allocated ++= availableRegisters.take(regsNeeded)
+          availableVariableRegisters.pushAll(allocated)
+          availableRegisters --= allocated
       }
-      
-      // Scope variables initiation
-      val maxVars = symTab.getMaxConcurrentVariables
-      //println(s"ConcurrentVariableNums: $maxVars")
-      val regsNeeded = math.min(maxVars, availableRegisters.size)
-      val allocated = availableRegisters.take(regsNeeded)
-      availableVariableRegisters.pushAll(allocated)
-      availableRegisters --= allocated
+
       // Pre-allocate stack space for the rest
       val spillVars = (maxVars - regsNeeded) + (maxParams - paramsRegsNeeded)
       for (_ <- 0 until spillVars) {
@@ -446,8 +450,8 @@ object CodeGen {
                   throw new Exception("Ran out of stack offsets for spilling variables!")
           }
       }
-      //println(s"parameters: $allocatedParamsRegs\n")
-      //println(s"variables: $allocated\n")
+      // println(s"parameters: $allocatedParamsRegs\n")
+      // println(s"variables: $allocated\n")
       (allocated ++= allocatedParamsRegs).toList
   }
   
