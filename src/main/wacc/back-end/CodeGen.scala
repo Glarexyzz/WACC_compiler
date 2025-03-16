@@ -777,19 +777,30 @@ object CodeGen {
 
 
       case IfStmt(cond, thenStmt, elseStmt) =>
-        val temp = getTempRegister().getOrElse(defTempReg)
-        generateExpr(cond, temp) // load result in temp register
-        currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
-        freeRegister(temp)
-        enterScope()
-        generateStmt(elseStmt) // else, continue
-        exitScope()
-        currentBranch += IRJump(branchLabel(2)) 
-        addBranch()
-        enterScope()
-        generateStmt(thenStmt)
-        exitScope()
-        addBranch()
+        evalConstants(cond) match {
+          case Some(true) => 
+            enterScope()
+            generateStmt(thenStmt)
+            exitScope()
+          case Some(false) =>
+            enterScope()
+            generateStmt(elseStmt)
+            exitScope()
+          case _ => 
+            val temp = getTempRegister().getOrElse(defTempReg)
+            generateExpr(cond, temp) // load result in temp register
+            currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
+            freeRegister(temp)
+            enterScope()
+            generateStmt(elseStmt) // else, continue
+            exitScope()
+            currentBranch += IRJump(branchLabel(2)) 
+            addBranch()
+            enterScope()
+            generateStmt(thenStmt)
+            exitScope()
+            addBranch()
+        }
 
       case WhileStmt(cond, body) =>
         val initialBranch = branchLabel(0)
@@ -1170,6 +1181,99 @@ object CodeGen {
           }
           case _ => None
         }
+        case _ => None
+      }
+    }
+  }
+
+  def evalConstants(expr: Expr): Option[Any] = expr match {
+    case BoolLiteral(value) => Some(value)
+    case IntLiteral(value) => Some(value)
+    case CharLiteral(value) => Some(value)
+    case Identifier(name) => constants.get(name) match {
+      case Some((BaseType.BoolType, value: Int)) => Some(value == trueValue)
+      case Some((BaseType.CharType, value: Int)) => Some(value.toChar)
+      case Some((BaseType.IntType, value: Int)) => Some(value)
+      case _ => None
+    }
+    case UnaryOp(op, innerExpr) => op match {
+      case UnaryOperator.Negate => evalConstants(innerExpr) match {
+        case Some(value: Int) => Some(-value)
+        case _ => None
+      }
+      case UnaryOperator.Not => evalConstants(innerExpr) match {
+        case Some(value: Boolean) => Some(!value)
+        case _ => None
+      }
+      case UnaryOperator.Ord => evalConstants(innerExpr) match {
+        case Some(value: Char) => Some(value.toInt)
+        case _ => None
+      }
+      case UnaryOperator.Chr => evalConstants(innerExpr) match {
+        case Some(value: Int) => Some(value.toChar)
+        case _ => None
+      }
+      case _ => None
+    }
+    case BinaryOp(expr1, op, expr2) => op match {
+      case BinaryOperator.Add => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 + i2)
+        case _ => None
+      }
+      case BinaryOperator.Subtract => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 - i2)
+        case _ => None
+      }
+      case BinaryOperator.Multiply => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 * i2)
+        case _ => None
+      }
+      case BinaryOperator.Divide => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => if (i2 != 0) Some(i1 / i2) else None
+        case _ => None
+      }
+      case BinaryOperator.Modulus => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => if (i2 != 0) Some(i1 % i2) else None
+        case _ => None
+      }
+      case BinaryOperator.Greater => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 > i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 > c2)
+        case _ => None
+      }
+      case BinaryOperator.GreaterEqual => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 >= i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 >= c2)
+        case _ => None
+      }
+      case BinaryOperator.Less => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 < i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 < c2)
+        case _ => None
+      }
+      case BinaryOperator.LessEqual => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 <= i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 <= c2)
+        case _ => None
+      }
+      case BinaryOperator.Equal => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 == i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 == c2)
+        case (Some(b1: Boolean), Some(b2: Boolean)) => Some(b1 == b2)
+        case _ => None
+      }
+      case BinaryOperator.NotEqual => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 != i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 != c2)
+        case (Some(b1: Boolean), Some(b2: Boolean)) => Some(b1 != b2)
+        case _ => None
+      }
+      case BinaryOperator.And => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(b1: Boolean), Some(b2: Boolean)) => Some(b1 && b2)
+        case _ => None
+      }
+      case BinaryOperator.Or => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(b1: Boolean), Some(b2: Boolean)) => Some(b1 || b2)
         case _ => None
       }
     }
