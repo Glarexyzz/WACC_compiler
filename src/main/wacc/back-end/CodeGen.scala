@@ -553,74 +553,70 @@ object CodeGen {
       case AssignStmt(lvalue, rvalue) => 
         lvalue match {
           case LValue.LName(name) => 
-            if (!unusedVars.contains(name)) {
-              lookupVariable(name) match {
-                case Some((Left(reg), t)) =>
-                  generateRValue(rvalue, reg, Some(t))
-                  // function parameter update push to stack
-                  if (paramsMap.contains(name)) {
-                    currentBranch ++= List(
-                      IRCmt(s"push {$reg}"),
-                      pushReg(reg, XZR),
-                      IRMovReg(paramsReg, SP)
-                    )
-                  }
-                case Some((Right(off), t)) =>
-                  val temp = getTempRegister().getOrElse(defTempReg)
-                  generateRValue(rvalue, temp, Some(t))
-                  push(temp, off)
-                  if (paramsMap.contains(name)) {
-                    currentBranch ++= List(
-                      IRCmt(s"push {$temp}"),
-                      pushReg(temp, XZR),
-                      IRMovReg(paramsReg, SP)
-                    )
-                  }
-                  freeRegister(temp)
-                case None =>
-                  variableOffsets.get(name) match {
-                    case Some((off, t)) =>
-                      val temp = getTempRegister().getOrElse(defTempReg)
-                      generateRValue(rvalue, temp, Some(t))
-                      push(temp, off)
-                      if (paramsMap.contains(name)) {
-                        currentBranch ++= List(
-                          IRCmt(s"push {$temp}"),
-                          pushReg(temp, XZR),
-                          IRMovReg(paramsReg, SP)
-                        )
-                      }
-                      freeRegister(temp)
-                    case None => 
-                      // This should not be reached
-                      throw new Exception(s"Variable $name used before declaration")
-                  }
-              }
+            lookupVariable(name) match {
+              case Some((Left(reg), t)) =>
+                generateRValue(rvalue, reg, Some(t))
+                // function parameter update push to stack
+                if (paramsMap.contains(name)) {
+                  currentBranch ++= List(
+                    IRCmt(s"push {$reg}"),
+                    pushReg(reg, XZR),
+                    IRMovReg(paramsReg, SP)
+                  )
+                }
+              case Some((Right(off), t)) =>
+                val temp = getTempRegister().getOrElse(defTempReg)
+                generateRValue(rvalue, temp, Some(t))
+                push(temp, off)
+                if (paramsMap.contains(name)) {
+                  currentBranch ++= List(
+                    IRCmt(s"push {$temp}"),
+                    pushReg(temp, XZR),
+                    IRMovReg(paramsReg, SP)
+                  )
+                }
+                freeRegister(temp)
+              case None =>
+                variableOffsets.get(name) match {
+                  case Some((off, t)) =>
+                    val temp = getTempRegister().getOrElse(defTempReg)
+                    generateRValue(rvalue, temp, Some(t))
+                    push(temp, off)
+                    if (paramsMap.contains(name)) {
+                      currentBranch ++= List(
+                        IRCmt(s"push {$temp}"),
+                        pushReg(temp, XZR),
+                        IRMovReg(paramsReg, SP)
+                      )
+                    }
+                    freeRegister(temp)
+                  case None => 
+                    // This should not be reached
+                    throw new Exception(s"Variable $name used before declaration")
+                }
             }
           case LValue.LArray(ArrayElem(name, indices)) =>
-            if (!unusedVars.contains(name)) {
-              lookupVariable(name) match {
-                case (Some(Left(baseReg), arrType)) =>
-                  generateExpr(indices.head, indexReg) // Get index value
-                  val varReg = getTempRegister().getOrElse(defArrPairReg)
-                  val elemType = arrType
-                  generateRValue(rvalue, varReg, Some(elemType))
-                  currentBranch += IRMovReg(X7, baseReg)
-                  if (elemType == ArrayType(BaseType.CharType)) {
-                    currentBranch += IRBl("_arrStore1")
-                    helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-                    helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore1(varReg.asW))
-                  } else if (elemType == ArrayType(ArrayType(BaseType.IntType))) {
-                    currentBranch += IRBl("_arrStore8")
-                    helpers.getOrElseUpdate(IRLabel("_arrStore8"), arrStore8(varReg.asX))
-                  }
-                  else {
-                    currentBranch += IRBl("_arrStore4")
-                    helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore4(varReg.asW))
-                    
-                  }
-                case _ =>
-              }
+            lookupVariable(name) match {
+              case (Some(Left(baseReg), arrType)) =>
+                generateExpr(indices.head, indexReg) // Get index value
+                val varReg = getTempRegister().getOrElse(defArrPairReg)
+                val elemType = arrType
+                generateRValue(rvalue, varReg, Some(elemType))
+                currentBranch += IRMovReg(X7, baseReg)
+                if (elemType == ArrayType(BaseType.CharType)) {
+                  currentBranch += IRBl("_arrStore1")
+                  helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+                  helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore1(varReg.asW))
+                } else if (elemType == ArrayType(ArrayType(BaseType.IntType))) {
+                  currentBranch += IRBl("_arrStore8")
+                  helpers.getOrElseUpdate(IRLabel("_arrStore8"), arrStore8(varReg.asX))
+                }
+                else {
+                  currentBranch += IRBl("_arrStore4")
+                  helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore4(varReg.asW))
+                  
+                }
+              case _ =>
             }
 
           case LValue.LPair(pairElem) =>
@@ -633,35 +629,33 @@ object CodeGen {
       case ReadStmt(lvalue) => 
         lvalue match {
           case LValue.LName(name) => 
-            if(!unusedVars.contains(name)) {
-              lookupVariable(name).get match {
-                case (Left(regX), t) =>
-                  val reg = regX.asW
-                  t match {
-                    case BaseType.IntType => 
-                      helpers.getOrElseUpdate(IRLabel("_readi"), readi())
-                      currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readi"), IRMovReg(reg, tempIOReg))
-                    case BaseType.CharType => 
-                      helpers.getOrElseUpdate(IRLabel("_readc"), readc())
-                      currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readc"), IRMovReg(reg, tempIOReg))
-                    case _ => List()
-                  }
-                case (Right(off), t) =>
-                  val reg = getTempRegister().getOrElse(defTempReg)
-                  t match {
-                    case BaseType.IntType => 
-                      helpers.getOrElseUpdate(IRLabel("_readi"), readi())
-                      currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readi"), IRMovReg(reg, tempIOReg))
-                    case BaseType.CharType => 
-                      helpers.getOrElseUpdate(IRLabel("_readc"), readc())
-                      currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readc"), IRMovReg(reg, tempIOReg))
-                    case _ => List()
-                  
-                  }
-                  push(reg, off)
-                  freeRegister(reg)
-                case _ =>
-              }
+            lookupVariable(name).get match {
+              case (Left(regX), t) =>
+                val reg = regX.asW
+                t match {
+                  case BaseType.IntType => 
+                    helpers.getOrElseUpdate(IRLabel("_readi"), readi())
+                    currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readi"), IRMovReg(reg, tempIOReg))
+                  case BaseType.CharType => 
+                    helpers.getOrElseUpdate(IRLabel("_readc"), readc())
+                    currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readc"), IRMovReg(reg, tempIOReg))
+                  case _ => List()
+                }
+              case (Right(off), t) =>
+                val reg = getTempRegister().getOrElse(defTempReg)
+                t match {
+                  case BaseType.IntType => 
+                    helpers.getOrElseUpdate(IRLabel("_readi"), readi())
+                    currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readi"), IRMovReg(reg, tempIOReg))
+                  case BaseType.CharType => 
+                    helpers.getOrElseUpdate(IRLabel("_readc"), readc())
+                    currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readc"), IRMovReg(reg, tempIOReg))
+                  case _ => List()
+                
+                }
+                push(reg, off)
+                freeRegister(reg)
+              case _ =>
             }
 
           case LValue.LPair(PairElem.FstElem(LValue.LName(name))) =>

@@ -351,6 +351,7 @@ object semanticChecker {
               case Some(VariableEntry(lType)) => 
                 if (isCompatibleTo(rType, lType)) {
                   removeConstant(name)
+                  unusedVars.remove(name)
                   None
                 } else {
                   Some(s"Semantic Error in Assignment of identifier $name: $rType is not compatible to $lType identifier $name")
@@ -362,6 +363,7 @@ object semanticChecker {
               case Some(VariableEntry(ArrayType(lType))) => 
                 if (isCompatibleTo(rType, lType)) {
                   removeConstant(name)
+                  unusedVars.remove(name)
                   None
                 } else {
                   Some(s"Semantic Error in Assignment of array $name: $rType is not compatible to $lType")
@@ -393,9 +395,11 @@ object semanticChecker {
     case ReadStmt(lvalue) => lvalue match {
       case LValue.LName(name) => symbolTable.lookup(name) match {
         case Some(VariableEntry(BaseType.IntType)) => 
+          unusedVars.remove(name)
           removeConstant(name)
           None
         case Some(VariableEntry(BaseType.CharType)) =>
+          unusedVars.remove(name)
           removeConstant(name)
           None
         case Some(t) => Some(s"Semantic Error in Read: Identifier $name must be of type int or char, but got $t instead")
@@ -508,6 +512,7 @@ object semanticChecker {
     }
     case LValue.LArray(ArrayElem(name, indices)) => symbolTable.lookupVariable(name) match {
       case Some(VariableEntry(ArrayType(_))) => 
+        unusedVars.remove(name)
         removeConstant(name)
         None
       case Some(VariableEntry(t)) => Some(s"Error in checking left value of $name: expected array, but got $t instead")
