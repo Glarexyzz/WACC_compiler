@@ -5,7 +5,7 @@ import wacc.Constants._
 sealed trait SymbolEntry
 
 case class VariableEntry(varType: Type) extends SymbolEntry
-case class FunctionEntry(returnType: Type, params: Option[List[Param]]) extends SymbolEntry
+case class FunctionEntry(returnType: Type, params: List[Param]) extends SymbolEntry
 
 
 class SymbolTable {
@@ -13,16 +13,17 @@ class SymbolTable {
   // Variables are stored in a mutable Stack (to handle scopes), while functions are stored directly.
   private val functionTable: mutable.Map[String, FunctionEntry] = mutable.Map()
   private val variableScopes: mutable.Stack[mutable.Map[String, VariableEntry]] = mutable.Stack()
-  var scopeLevel: Int = 0 // Tracks current scope depth
-  private var functionStatus: Option[Type] = None // Tracks the return type of the current function
+  private var functionStatus: Option[(String, Type)] = None // Tracks the return type of the current function
 
-  private var nVariablesInScope = 0        // Number of variables in the **current scope**.
-  private var maxConcurrentVariables = 0   // Global "high-water mark" for variable count.
+  var scopeLevel: Int = 0 // Tracks current scope depth
+  var nVariablesInScope = 0        // Number of variables in the **current scope**.
+  var maxConcurrentVariables = 0   // Global "high-water mark" for variable count.
   private var nVariableRegs = 0            // Total number of variables across all scopes (for function params etc.)
 
   def getFunctionTable: Map[String, FunctionEntry] = functionTable.toMap
   def getVariableScopes: List[Map[String, VariableEntry]] = variableScopes.toList.map(_.toMap)
-  def getMaxConcurrentVariables: Int = maxConcurrentVariables + functionTable.size
+  def getMaxConcurrentVariables: Int = maxConcurrentVariables
+  def getCurrentFunctionParamsNum(funcName: String): Int = functionTable(funcName).params.length
   
   def enterScope(): Unit = {
     nVariableRegs += nVariablesInScope  // Carry over total variables seen so far.
@@ -40,27 +41,50 @@ class SymbolTable {
   def exitScope(): Unit = {
     if (scopeLevel > 0) {
       val exitingScope = variableScopes.pop()
-      nVariablesInScope = 0  // The parent scope has 0 new variables at first
+      val parentScope = variableScopes.top
+      var nExitVars = exitingScope.size - parentScope.size
+      //println(s"exiting scope: $exitingScope")
+      //println(s"exiting scope size: ${exitingScope.size}")
+      nVariableRegs += nVariablesInScope  // Carry over total variables seen so far.
+      //println(s"nVarRegs before exiting: $nVariableRegs")
+      nVariablesInScope = 0  // The parent scope remove child scope variables
+      if (functionStatus.isDefined) {
+        functionStatus match {
+          case Some(name, t) =>
+            val nParams = getCurrentFunctionParamsNum(name)
+            nVariableRegs += nParams
+            //println(s"nVarRegs going through parameters: $nVariableRegs")
+            if (parentScope.size != 0) {
+              nExitVars += nParams
+            }
+          case None => 
+        }
+      } 
 
       // When we pop a scope, all its variables "die"
-      nVariableRegs -= exitingScope.size
+      nVariableRegs -= nExitVars
+      //println(s"nVarRegs after exiting: $nVariableRegs")
+      maxConcurrentVariables = Math.max(maxConcurrentVariables, nVariableRegs) // Update max
       scopeLevel -= 1
     }
   }
   
   def addVariable(name: String, varType: Type): Boolean = {
     if (variableScopes.nonEmpty) {
+      //println(s"variableName: $name, varType: $varType")
       val currentScope = variableScopes.top // Get current scope
       if (currentScope.contains(name) && !functionStatus.isDefined) {
         return false // Variable already declared in this scope
       }
-      
       currentScope(name) = VariableEntry(varType)
       nVariablesInScope += 1
 
       val totalNowAlive = nVariableRegs + nVariablesInScope
+      // println(s"nVarRegs: $nVariableRegs")
+      // println(s"nVarScope: $nVariablesInScope")
       maxConcurrentVariables = Math.max(maxConcurrentVariables, totalNowAlive)
-
+      //println(s"maxVarNum: $maxConcurrentVariables")
+      
       return true
     }
     false // No active scope
@@ -71,7 +95,11 @@ class SymbolTable {
     // Check if the function already exists in the table
     if (functionTable.contains(name)) return false
     // Add the function entry
-    val functionEntry = FunctionEntry(returnType, params)
+    val paramsList: List[Param] = params match {
+      case Some(parameters) => parameters
+      case None => List()
+    }
+    val functionEntry = FunctionEntry(returnType, paramsList)
     functionTable(name) = functionEntry
     true
   }
@@ -98,11 +126,22 @@ class SymbolTable {
     lookupVariable(name).orElse(lookupFunction(name))
   }
 
-  def setFunctionStatus(t: Option[Type]): Unit = {
-    functionStatus = t
+  def setFunctionStatus(name: Option[String] = None, returnType: Option[Type]): Unit = {
+    returnType match {
+      case Some(t) => 
+        val funcName = name match {
+          case Some(n) => n
+          case None => ""
+        }
+        functionStatus = Some(funcName, t)
+      case None => functionStatus = None
+    }
   }
 
-  def checkFunctionStatus(): Option[Type] = functionStatus
+  def checkFunctionStatus(): Option[Type] = functionStatus match {
+    case Some(n, t) => Some (t)
+    case None => None
+  }
   
 }
 
@@ -162,22 +201,26 @@ object semanticChecker {
 
   def checkFunc(func: Func): Option[String] = {
     symbolTable.enterScope()
+
+    symbolTable.setFunctionStatus(Some(func.name), Some(func.t))
     
     // Add function parameters to the symbol table
     func.paramList.foreach { params =>
       params.foreach { param =>
         symbolTable.addVariable(param.name, param.t)
+        //println("is function's parameter\n")
+        symbolTable.nVariablesInScope -= 1
+        symbolTable.maxConcurrentVariables -= 1
       }
     }
     
     // Checks the function's body
-    symbolTable.setFunctionStatus(Some(func.t))
     val bodyCheckResult = checkStatement(func.stmt) match {
       case None => None
       case Some(error) => Some(s"In function ${func.name},\n$error")
     }
-    symbolTable.setFunctionStatus(None)
     symbolTable.exitScope()
+    symbolTable.setFunctionStatus(returnType = None)
     bodyCheckResult
   }
 
@@ -284,6 +327,7 @@ object semanticChecker {
         case Right(rType) => 
 
           if (isCompatibleTo(rType, t)) {
+            //println(s"\nadding $name to the table")
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate) {
               checkAndAddConstant(t, name, value)
@@ -520,12 +564,12 @@ object semanticChecker {
       symbolTable.lookupFunction(name) match {
         case Some(FunctionEntry(returnType, params)) => 
           params match {
-            case None =>
+            case List() =>
               argList match {
                 case None => Right(returnType)
                 case Some(_) => Left(s"Semantic Error: Too many arguments in function call of $name")
               }
-            case Some(paramList) =>
+            case paramList =>
               argList match {
                 case None => Left(s"Semantic Error: Too few arguments in function call of $name")
                 case Some(args) =>
