@@ -319,6 +319,26 @@ object semanticChecker {
     }
   }
 
+  def checkAndAddUnusedVariable(t: Type, name: String, value: RValue) = {
+    extract(value) match {
+      case Some(expr: Expr) => evaluateExpr(expr) match {
+        case Some(n) => t match {
+          case BaseType.IntType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              unusedVars.add(name)
+            }
+          case BaseType.BoolType =>
+            if (n == trueValue || n == falseValue) addConstant(name, (BaseType.BoolType, n))
+          case BaseType.CharType =>
+            if (n >= 0 && n <= 127) unusedVars.add(name)
+          case _ =>
+        }
+        case _ =>
+      }
+      case _ =>
+    }
+  }
+
   def checkStatement(stmt: Stmt): Option[String] = stmt match {
     case SkipStmt => None
 
@@ -331,7 +351,7 @@ object semanticChecker {
             //println(s"\nadding $name to the table")
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate) {
-              unusedVars.add(name)
+              checkAndAddUnusedVariable(t, name, value)
               checkAndAddConstant(t, name, value)
               None
             }
