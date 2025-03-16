@@ -19,12 +19,12 @@ def main(args: Array[String]): Unit = {
                         case Left(errors) => 
                             println(s"Semantic errors found:\n$errors\n")
                             exitCode = exitInvalidSemantics
-                        case Right(symbolTable, constants) => 
+                        case Right(symbolTable, constants, unusedVariables) => 
                             //println(s"func table: ${symbolTable.getFunctionTable}")
                             //println(s"vars table: ${symbolTable.getVariableScopes}")
                             parsed match {
                                 case program: Program =>
-                                    compile(program, input, symbolTable, constants)
+                                    compile(program, input, symbolTable, constants, unusedVariables)
                                     println(s"Successfully parsed & compiled:\n$parsed\n")
                                     exitCode = exitValid
 

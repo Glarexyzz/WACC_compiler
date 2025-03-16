@@ -34,6 +34,7 @@ object CodeGen {
   private val variableOffsets = mutable.Map[String, (Int, Type)]()
   private var stackVarPointer = initStackVarsOffset
   private var constants = mutable.Map[String, (Type, Any)]()
+  private var unusedVars = mutable.Set.empty[String]
   // for variables
   private val availableVariableRegisters = mutable.Stack[Register]()
   private val availableVariableOffsets = mutable.Stack[Int]()
@@ -129,12 +130,14 @@ object CodeGen {
   private val helpers = mutable.Map[IRLabel, List[IRInstr]]()
 
   // Main function
-  def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable, constantVars: mutable.Map[String, (Type, Any)]): Unit = {
+  def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable, 
+  constantVars: mutable.Map[String, (Type, Any)], unusedVariables: mutable.Set[String]): Unit = {
     //println(constantVars)
     println("Compiling...")
     // initialise symbol table
     symbolTable = newSymbolTable
     constants = constantVars
+    unusedVars = unusedVariables
     val ir = generateIR(prog)
 
     // AArch64 assembly conversion
@@ -534,7 +537,8 @@ object CodeGen {
         constants.get(name) match {
           case Some(_) =>
           case None =>
-            addVariable(name, t) match {
+            if (!unusedVars.contains(name)) {
+              addVariable(name, t) match {
               case Some(Left(reg)) => generateRValue(value, reg, Some(t))
               case Some(Right(off)) => 
                 val temp = getTempRegister().getOrElse(defTempReg)
@@ -542,6 +546,7 @@ object CodeGen {
                 push(temp, off)
                 freeRegister(temp)
               case _ =>
+              }
             }
         }
             

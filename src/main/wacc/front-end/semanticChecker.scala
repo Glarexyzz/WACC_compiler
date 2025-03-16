@@ -148,6 +148,7 @@ class SymbolTable {
 object semanticChecker {
 
   private val constants: mutable.Map[String, (Type, Any)] = mutable.Map()
+  private val unusedVars: mutable.Set[String] = mutable.Set.empty[String]
   val symbolTable: SymbolTable = new SymbolTable
 
   def addConstant(name: String, value: (Type, Any)): Unit = {
@@ -158,8 +159,8 @@ object semanticChecker {
     constants -= name
   }
 
-  def checkSemantic(parsed: Any): Either[String, (SymbolTable, mutable.Map[String, (Type, Any)])] = parsed match {
-    case program: Program => checkProgram(program).toLeft(symbolTable, constants)
+  def checkSemantic(parsed: Any): Either[String, (SymbolTable, mutable.Map[String, (Type, Any)], mutable.Set[String])] = parsed match {
+    case program: Program => checkProgram(program).toLeft(symbolTable, constants, unusedVars)
     case _ => Left(s"Unknown parsed structure")
   }
   
@@ -330,6 +331,7 @@ object semanticChecker {
             //println(s"\nadding $name to the table")
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate) {
+              unusedVars.add(name)
               checkAndAddConstant(t, name, value)
               None
             }
@@ -689,6 +691,7 @@ object semanticChecker {
     case PairLiteral => Right(PairType(NullType, NullType))
     
     case Identifier(name) => 
+      unusedVars.remove(name)
       if (isIfOrWhile) {
         removeConstant(name)
       }
