@@ -790,49 +790,51 @@ object CodeGen {
         currentBranch += IRBl("exit")
 
 
-      case IfStmt(cond, thenStmt, elseStmt) =>
-        evalConstants(cond) match {
-          case Some(true) => 
-            enterScope()
-            generateStmt(thenStmt)
-            exitScope()
-          case Some(false) =>
-            enterScope()
-            generateStmt(elseStmt)
-            exitScope()
-          case _ => 
-            val temp = getTempRegister().getOrElse(defTempReg)
-            generateExpr(cond, temp) // load result in temp register
-            currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
-            freeRegister(temp)
-            enterScope()
-            generateStmt(elseStmt) // else, continue
-            exitScope()
-            currentBranch += IRJump(branchLabel(2)) 
-            addBranch()
-            enterScope()
-            generateStmt(thenStmt)
-            exitScope()
-            addBranch()
+      case IfStmt(cond, thenStmt, elseStmt) => evalConstants(cond) match {
+        case Some(true) => 
+          enterScope()
+          generateStmt(thenStmt)
+          exitScope()
+        case Some(false) =>
+          enterScope()
+          generateStmt(elseStmt)
+          exitScope()
+        case _ => 
+          val temp = getTempRegister().getOrElse(defTempReg)
+          generateExpr(cond, temp) // load result in temp register
+          currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
+          freeRegister(temp)
+          enterScope()
+          generateStmt(elseStmt) // else, continue
+          exitScope()
+          currentBranch += IRJump(branchLabel(2)) 
+          addBranch()
+          enterScope()
+          generateStmt(thenStmt)
+          exitScope()
+          addBranch()
         }
 
-      case WhileStmt(cond, body) =>
-        val initialBranch = branchLabel(0)
-        val bodyBranch = branchLabel(1)
-        val condBranch = branchLabel(2)
-        currentBranch += IRJump(condBranch) // jump to condition check
-        addBranch()
-        enterScope()
-        generateStmt(body)
-        exitScope()
-        addBranch()
-        val temp = getTempRegister().getOrElse(defTempReg)
-        generateExpr(cond, temp) // if condition true, jump to body
-        currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, bodyBranch)
-        if (condBranch != branchLabel(0)) then {
-          overwriteJump(initialBranch, branchLabel(0))
-        }
-        freeRegister(temp)
+      case WhileStmt(cond, body) => evalConstants(cond) match {
+        case Some(false) => 
+        case _ => 
+          val initialBranch = branchLabel(0)
+          val bodyBranch = branchLabel(1)
+          val condBranch = branchLabel(2)
+          currentBranch += IRJump(condBranch) // jump to condition check
+          addBranch()
+          enterScope()
+          generateStmt(body)
+          exitScope()
+          addBranch()
+          val temp = getTempRegister().getOrElse(defTempReg)
+          generateExpr(cond, temp) // if condition true, jump to body
+          currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, bodyBranch)
+          if (condBranch != branchLabel(0)) then {
+            overwriteJump(initialBranch, branchLabel(0))
+          }
+          freeRegister(temp)
+      }
 
       case BodyStmt(body) => 
         enterScope()
