@@ -585,7 +585,7 @@ object CodeGen {
                 freeRegister(temp)
               case _ =>
               }
-            }
+            //}
         // }
             
       case AssignStmt(lvalue, rvalue) => 
@@ -844,7 +844,7 @@ object CodeGen {
         generateExpr(expr)
         currentBranch += IRBl("exit")
 
-
+      /*
       case IfStmt(cond, thenStmt, elseStmt) => evalConstants(cond) match {
         case Some(true) => 
           enterScope()
@@ -868,7 +868,23 @@ object CodeGen {
           generateStmt(thenStmt)
           exitScope()
           addBranch()
-        }
+        }*/
+      
+      case IfStmt(cond, thenStmt, elseStmt) =>
+        val temp = getTempRegister().getOrElse(defTempReg)
+        generateExpr(cond, temp) // load result in temp register
+        //currentBranch += IRCmpImm(temp.asW, trueValue) 
+        currentBranch += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
+        freeRegister(temp)
+        enterScope()
+        generateStmt(elseStmt) // else, continue
+        exitScope()
+        currentBranch += IRJump(branchLabel(2)) 
+        addBranch()
+        enterScope()
+        generateStmt(thenStmt)
+        exitScope()
+        addBranch()
 
       case WhileStmt(cond, body) => evalConstants(cond) match {
         case Some(false) => 
