@@ -857,7 +857,13 @@ object CodeGen {
         case _ => 
           val temp = getTempRegister().getOrElse(defTempReg)
           generateExpr(cond, temp) // load result in temp register
-          currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
+          cond match {
+              case BinaryOp(lhs, op, rhs) =>
+                currentBranch += IRJumpCond(condToIR(op), bodyBranch)
+              case _ =>
+                currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1))
+            }
+          //currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
           freeRegister(temp)
           enterScope()
           generateStmt(elseStmt) // else, continue
