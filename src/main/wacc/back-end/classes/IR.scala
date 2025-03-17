@@ -82,9 +82,12 @@ case class IRStur(reg: Register, base: Register, offset: Int) extends IRInstr {
   override def toString: String = s"stur $reg, [$base, #$offset]"
 }
 // Load a pair of registers from the stack
-case class IRLdp(reg1: Register, reg2: Register, offset: Int = 0, postIncrement: Boolean = false) extends IRInstr {
+case class IRLdp(reg1: Register, reg2: Register, offset: Int = 0, 
+    postIncrement: Boolean = false, funcParams: Boolean = false
+) extends IRInstr {
   override def toString: String =
-    if (postIncrement) s"ldp $reg1, $reg2, [sp], #$offset" 
+    if (funcParams) s"ldp $reg1, $reg2, [sp, #$offset]"
+    else if (postIncrement) s"ldp $reg1, $reg2, [sp], #$offset" 
     else s"ldp $reg1, $reg2, [sp]" 
 }
 
