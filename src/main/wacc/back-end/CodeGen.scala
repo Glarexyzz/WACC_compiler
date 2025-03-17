@@ -868,23 +868,6 @@ object CodeGen {
           exitScope()
           addBranch()
         }
-      
-      /*
-      case IfStmt(cond, thenStmt, elseStmt) =>
-        val temp = getTempRegister().getOrElse(defTempReg)
-        generateExpr(cond, temp) // load result in temp register
-        //currentBranch += IRCmpImm(temp.asW, trueValue) 
-        currentBranch += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
-        freeRegister(temp)
-        enterScope()
-        generateStmt(elseStmt) // else, continue
-        exitScope()
-        currentBranch += IRJump(branchLabel(2)) 
-        addBranch()
-        enterScope()
-        generateStmt(thenStmt)
-        exitScope()
-        addBranch()*/
 
       case WhileStmt(cond, body) => evalConstants(cond) match {
         case Some(false) => 
@@ -971,7 +954,7 @@ object CodeGen {
 
       // move the identifier into the destination register
       case Identifier(name) =>
-        /* constants.get(name) match {
+        constants.get(name) match {
           case Some((BaseType.IntType, value: Int)) => 
             currentBranch += IRMov(destW, value)
             BaseType.IntType
@@ -1010,7 +993,7 @@ object CodeGen {
                 t
               case _ => NullType
             }
-        //}
+        }
         // compare if the dest and src are the same value or not to reduce redundancy
 
       case PairLiteral =>
