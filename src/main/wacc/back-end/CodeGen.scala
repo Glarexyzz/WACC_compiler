@@ -976,304 +976,323 @@ object CodeGen {
   def generateExpr(expr: Expr, dest: Register = defReturnReg): Type = {
     val destX = dest.asX
     val destW = dest.asW
-    expr match {
-      case IntLiteral(value) =>
-        if (value.abs <= max16BitUnsigned || value <= min32BitSigned) {
-          currentBranch += IRMov(destW, value.toInt)
-          BaseType.IntType
+    evalConstants(expr) match {
+      case Some(i: Int) => 
+        if (i.abs <= max16BitUnsigned || i <= min32BitSigned) {
+          currentBranch += IRMov(destW, i.toInt)
         } else {
-          val lower16 = (value & lower16Mask).toInt          // Extract lower 16 bits
-          val upper16 = ((value >> upper16Shift) & lower16Mask).toInt  
+          val lower16 = (i & lower16Mask).toInt          // Extract lower 16 bits
+          val upper16 = ((i >> upper16Shift) & lower16Mask).toInt  
 
           currentBranch +=
             IRMov(destW, lower16) +=        
             IRMovk(destW, upper16, upper16Shift)   
-
-          BaseType.IntType
         }
-        
-
-
-      case BoolLiteral(value) =>
-        currentBranch += IRMov(destW, if (value) trueValue else falseValue)
+        BaseType.IntType
+      case Some(b: Boolean) => 
+        currentBranch += IRMov(destW, if (b) trueValue else falseValue)
         BaseType.BoolType
-
-      case CharLiteral(value) =>
-        currentBranch += IRMov(destW, value.toInt)
+      case Some(c: Char) => 
+        currentBranch += IRMov(destW, c.toInt)
         BaseType.CharType
+      case _ =>
+        expr match {
+          case IntLiteral(value) =>
+            if (value.abs <= max16BitUnsigned || value <= min32BitSigned) {
+              currentBranch += IRMov(destW, value.toInt)
+              BaseType.IntType
+            } else {
+              val lower16 = (value & lower16Mask).toInt          // Extract lower 16 bits
+              val upper16 = ((value >> upper16Shift) & lower16Mask).toInt  
 
-      case StrLiteral(value) =>
-        val label = nextLabel()
-        val formatVal = escapeInnerQuotes(value)
-        stringLiterals.getOrElseUpdate(label, formatVal) // Store string in .data
-        currentBranch += IRAdrp(destX, label) += IRAddImm(destX, destX, s":lo12:$label")
-        BaseType.StrType
+              currentBranch +=
+                IRMov(destW, lower16) +=        
+                IRMovk(destW, upper16, upper16Shift)   
 
-      // move the identifier into the destination register
-      case Identifier(name) =>
-        /*constants.get(name) match {
-          case Some((BaseType.IntType, value: Int)) => 
-            currentBranch += IRMov(destW, value)
-            BaseType.IntType
-          case Some((BaseType.BoolType, value: Int)) => 
-            currentBranch += IRMov(destW, value)
-            BaseType.BoolType
-          case Some((BaseType.CharType, value: Int)) => 
-            currentBranch += IRMov(destW, value)
-            BaseType.CharType
-          case _ => */
-            lookupVariable(name) match {
-              case Some((Left(reg), t)) => 
-                if (destW != reg.asW) {
-                  t match {
-                    //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
-                    case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
-                    case PairType(_,_) => currentBranch += IRMovReg(destX, reg.asX)
-                    case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
-                    case _ => currentBranch += IRMovReg(destW, reg.asW)
-                  }
-                }
-                t
-              case Some((Right(off),t)) =>
-                val temp = getTempRegister().getOrElse(defTempReg)
-                currentBranch += IRLdr(temp, FP, Some(off))
-                if (destW != temp.asW) {
-                  t match {
-                    //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
-                    case ArrayType(_) => currentBranch += IRMovReg(destX, temp.asX)
-                    case PairType(_,_) => currentBranch += IRMovReg(destX, temp.asX)
-                    case BaseType.StrType => currentBranch += IRMovReg(destX, temp.asX)
-                    case _ => currentBranch += IRMovReg(destW, temp.asW)
-                  }
-                }
-                freeRegister(temp)
-                t
-              case _ => NullType
+              BaseType.IntType
             }
-        //}
-        // compare if the dest and src are the same value or not to reduce redundancy
-
-      case PairLiteral =>
-        currentBranch += IRMov(destX, defPairNullValue) // 0 is the null value
-        PairType(NullType, NullType)
-      
-      case UnaryOp(op, expr) => 
-        val srcRegX = getTempRegister().getOrElse(defTempReg)
-        val srcRegW = srcRegX.asW
-        generateExpr(expr, srcRegX)
-        val unaryType = op match {
-          case UnaryOperator.Negate =>
-            currentBranch += IRNeg(destW, srcRegW) += IRJumpCond(VS, "_errOverflow")
-            genOverflow()
-            BaseType.IntType 
-          case UnaryOperator.Not =>
-            currentBranch += IRCmpImm(srcRegW, trueValue) += IRCset(destW, NE)
-            BaseType.BoolType
-          case UnaryOperator.Length =>
-            expr match {
-                case Identifier(name) =>
-                  constants.get(name) match {
-                    case Some((_, arr : List[Any])) => currentBranch += IRMov(destW, arr.length)
-                    case _ =>
-                  }
-                  lookupVariable(name) match {
-                    case Some((Left(reg), _)) => currentBranch += IRLdur(destW, reg, -stackOffset)
-                    case _ =>
-                  }
-                case ArrayElem(name, indices) => constants.get(name) match {
-                  case Some((_, arr: List[Any])) => getArrayItem(arr, indices) match {
-                    case Some(list: List[Any]) => currentBranch += IRMov(destW, list.length)
-                    case _ =>
-                  }
-                  case _ =>
-                }
-                case _ =>
-            }
-            BaseType.IntType
-
             
+          case BoolLiteral(value) =>
+            currentBranch += IRMov(destW, if (value) trueValue else falseValue)
+            BaseType.BoolType
 
-          case UnaryOperator.Ord => 
-            expr match {
-              case CharLiteral(value) =>
-                currentBranch += IRMov(destW, value.toInt) // Convert char to integer
-              case Identifier(name) => 
-                constants.get(name) match {
-                  case Some((_,value: Int)) => currentBranch += IRMov(destW, value)
-                  case _ =>
-                    lookupVariable(name) match {
-                      case Some((Left(r), _)) => currentBranch += IRMovReg(destW, r.asW)
+          case CharLiteral(value) =>
+            currentBranch += IRMov(destW, value.toInt)
+            BaseType.CharType
+
+          case StrLiteral(value) =>
+            val label = nextLabel()
+            val formatVal = escapeInnerQuotes(value)
+            stringLiterals.getOrElseUpdate(label, formatVal) // Store string in .data
+            currentBranch += IRAdrp(destX, label) += IRAddImm(destX, destX, s":lo12:$label")
+            BaseType.StrType
+
+          // move the identifier into the destination register
+          case Identifier(name) =>
+            /*constants.get(name) match {
+              case Some((BaseType.IntType, value: Int)) => 
+                currentBranch += IRMov(destW, value)
+                BaseType.IntType
+              case Some((BaseType.BoolType, value: Int)) => 
+                currentBranch += IRMov(destW, value)
+                BaseType.BoolType
+              case Some((BaseType.CharType, value: Int)) => 
+                currentBranch += IRMov(destW, value)
+                BaseType.CharType
+              case _ => */
+                lookupVariable(name) match {
+                  case Some((Left(reg), t)) => 
+                    if (destW != reg.asW) {
+                      t match {
+                        //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
+                        case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
+                        case PairType(_,_) => currentBranch += IRMovReg(destX, reg.asX)
+                        case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
+                        case _ => currentBranch += IRMovReg(destW, reg.asW)
+                      }
+                    }
+                    t
+                  case Some((Right(off),t)) =>
+                    val temp = getTempRegister().getOrElse(defTempReg)
+                    currentBranch += IRLdr(temp, FP, Some(off))
+                    if (destW != temp.asW) {
+                      t match {
+                        //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
+                        case ArrayType(_) => currentBranch += IRMovReg(destX, temp.asX)
+                        case PairType(_,_) => currentBranch += IRMovReg(destX, temp.asX)
+                        case BaseType.StrType => currentBranch += IRMovReg(destX, temp.asX)
+                        case _ => currentBranch += IRMovReg(destW, temp.asW)
+                      }
+                    }
+                    freeRegister(temp)
+                    t
+                  case _ => NullType
+                }
+            //}
+            // compare if the dest and src are the same value or not to reduce redundancy
+
+          case PairLiteral =>
+            currentBranch += IRMov(destX, defPairNullValue) // 0 is the null value
+            PairType(NullType, NullType)
+          
+          case UnaryOp(op, expr) => 
+            val srcRegX = getTempRegister().getOrElse(defTempReg)
+            val srcRegW = srcRegX.asW
+            generateExpr(expr, srcRegX)
+            val unaryType = op match {
+              case UnaryOperator.Negate =>
+                currentBranch += IRNeg(destW, srcRegW) += IRJumpCond(VS, "_errOverflow")
+                genOverflow()
+                BaseType.IntType 
+              case UnaryOperator.Not =>
+                currentBranch += IRCmpImm(srcRegW, trueValue) += IRCset(destW, NE)
+                BaseType.BoolType
+              case UnaryOperator.Length =>
+                expr match {
+                    case Identifier(name) =>
+                      constants.get(name) match {
+                        case Some((_, arr : List[Any])) => currentBranch += IRMov(destW, arr.length)
+                        case _ =>
+                      }
+                      lookupVariable(name) match {
+                        case Some((Left(reg), _)) => currentBranch += IRLdur(destW, reg, -stackOffset)
+                        case _ =>
+                      }
+                    case ArrayElem(name, indices) => constants.get(name) match {
+                      case Some((_, arr: List[Any])) => getArrayItem(arr, indices) match {
+                        case Some(list: List[Any]) => currentBranch += IRMov(destW, list.length)
+                        case _ =>
+                      }
                       case _ =>
                     }
+                    case _ =>
                 }
-            }
-            BaseType.IntType
+                BaseType.IntType
 
-          case UnaryOperator.Chr =>
-            helpers.getOrElseUpdate(IRLabel("_errBadChar"), errBadChar())
-            currentBranch += IRTst(srcRegW, min8BitSigned)     // Test if value is within ASCII range (0-127)
-                    += IRCsel(chrRangeCheckReg, defChrReg, chrRangeCheckReg, NE) // Conditional move if out of range
-                    += IRJumpCond(NE , "_errBadChar") // Branch if invalid
-                    += IRMovReg(destW, srcRegW)          // Move the value into W0 (truncate to char)
-            BaseType.CharType
+                
+
+              case UnaryOperator.Ord => 
+                expr match {
+                  case CharLiteral(value) =>
+                    currentBranch += IRMov(destW, value.toInt) // Convert char to integer
+                  case Identifier(name) => 
+                    constants.get(name) match {
+                      case Some((_,value: Int)) => currentBranch += IRMov(destW, value)
+                      case _ =>
+                        lookupVariable(name) match {
+                          case Some((Left(r), _)) => currentBranch += IRMovReg(destW, r.asW)
+                          case _ =>
+                        }
+                    }
+                }
+                BaseType.IntType
+
+              case UnaryOperator.Chr =>
+                helpers.getOrElseUpdate(IRLabel("_errBadChar"), errBadChar())
+                currentBranch += IRTst(srcRegW, min8BitSigned)     // Test if value is within ASCII range (0-127)
+                        += IRCsel(chrRangeCheckReg, defChrReg, chrRangeCheckReg, NE) // Conditional move if out of range
+                        += IRJumpCond(NE , "_errBadChar") // Branch if invalid
+                        += IRMovReg(destW, srcRegW)          // Move the value into W0 (truncate to char)
+                BaseType.CharType
+                  
+            }
+            freeRegister(srcRegX)
+            unaryType
+
+          // DO REGISTERS AS PARAMETER  
+          
+          case BinaryOp(expr1, op, expr2) =>
+            if (op == BinaryOperator.Add || op == BinaryOperator.Subtract || op == BinaryOperator.Multiply) then {
+              genOverflow()
+            } else {
+              genDivZero()
+            }
+            // 📌 Helpers for comparisons:
+            def compareFunc(cond:Condition): Type = {
+              val (wreg1, wreg2) = genExprs(expr1, expr2, false)
+              val temp = getTempRegister().getOrElse(defTempReg)
+              currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp.asW, cond) += IRMovReg(destW, temp.asW)
+              freeRegister(temp)
+              freeRegister(wreg1.asX)
+              freeRegister(wreg2.asX)
+              BaseType.BoolType
+            }
+            // Helper to generate both sides of a binary operator
+            def genExprs(expr1: Expr, expr2: Expr, useTemp: Boolean): (Register, Register) = {
+              val xreg1 = if (useTemp) then getTempRegister().getOrElse(defTempReg) else getRegister().getOrElse(defNormReg)
+              val wreg1 = xreg1.asW        
+              generateExpr(expr1, xreg1)
+              val xreg2 = if (useTemp) then getTempRegister().getOrElse(defTempReg) else getRegister().getOrElse(defNormReg)
+              val wreg2 = xreg2.asW 
+              generateExpr(expr2, xreg2)
+              (wreg1, wreg2)
+            }
+            val binaryInstrs = op match {
+              case BinaryOperator.Add => 
+                extractInt(expr1, expr2, true) match {
+                  case Some((expr, value)) =>
+                    generateExpr(expr, dest)
+                    currentBranch += IRAddsImm(destW, destW, value) += IRJumpCond(VS, "_errOverflow")
+                  case _ =>
+                    val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+                    currentBranch += IRAdds(destW, wreg1, wreg2) += IRJumpCond(VS, "_errOverflow")
+                    freeRegister(wreg1.asX)
+                    freeRegister(wreg2.asX)
+                }
+                BaseType.IntType
               
-        }
-        freeRegister(srcRegX)
-        unaryType
+              case BinaryOperator.Subtract =>
+                extractInt(expr1, expr2, false) match {
+                  case Some((expr, value)) => 
+                    generateExpr(expr, dest)
+                    currentBranch += IRSubImm(destW, destW, value) += IRJumpCond(VS, "_errOverflow")
+                  case _ =>
+                    val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+                    currentBranch += IRSub(destW, wreg1, wreg2) += IRJumpCond(VS, "_errOverflow")
+                    freeRegister(wreg1.asX)
+                    freeRegister(wreg2.asX)
+                }
+                BaseType.IntType
 
-      // DO REGISTERS AS PARAMETER  
-      
-      case BinaryOp(expr1, op, expr2) =>
-        if (op == BinaryOperator.Add || op == BinaryOperator.Subtract || op == BinaryOperator.Multiply) then {
-          genOverflow()
-        } else {
-          genDivZero()
-        }
-        // 📌 Helpers for comparisons:
-        def compareFunc(cond:Condition): Type = {
-          val (wreg1, wreg2) = genExprs(expr1, expr2, false)
-          val temp = getTempRegister().getOrElse(defTempReg)
-          currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp.asW, cond) += IRMovReg(destW, temp.asW)
-          freeRegister(temp)
-          freeRegister(wreg1.asX)
-          freeRegister(wreg2.asX)
-          BaseType.BoolType
-        }
-        // Helper to generate both sides of a binary operator
-        def genExprs(expr1: Expr, expr2: Expr, useTemp: Boolean): (Register, Register) = {
-          val xreg1 = if (useTemp) then getTempRegister().getOrElse(defTempReg) else getRegister().getOrElse(defNormReg)
-          val wreg1 = xreg1.asW        
-          generateExpr(expr1, xreg1)
-          val xreg2 = if (useTemp) then getTempRegister().getOrElse(defTempReg) else getRegister().getOrElse(defNormReg)
-          val wreg2 = xreg2.asW 
-          generateExpr(expr2, xreg2)
-          (wreg1, wreg2)
-        }
-        val binaryInstrs = op match {
-          case BinaryOperator.Add => 
-            extractInt(expr1, expr2, true) match {
-              case Some((expr, value)) =>
-                generateExpr(expr, dest)
-                currentBranch += IRAddsImm(destW, destW, value) += IRJumpCond(VS, "_errOverflow")
-              case _ =>
+              case BinaryOperator.Multiply =>
                 val (wreg1, wreg2) = genExprs(expr1, expr2, true)
-                currentBranch += IRAdds(destW, wreg1, wreg2) += IRJumpCond(VS, "_errOverflow")
+                currentBranch += IRSMull(destX, wreg1, wreg2) += IRCmpExt(destX, destW) += IRJumpCond(NE, "_errOverflow")
                 freeRegister(wreg1.asX)
                 freeRegister(wreg2.asX)
-            }
-            BaseType.IntType
-          
-          case BinaryOperator.Subtract =>
-            extractInt(expr1, expr2, false) match {
-              case Some((expr, value)) => 
-                generateExpr(expr, dest)
-                currentBranch += IRSubImm(destW, destW, value) += IRJumpCond(VS, "_errOverflow")
-              case _ =>
+                BaseType.IntType
+
+
+              case BinaryOperator.Divide => 
                 val (wreg1, wreg2) = genExprs(expr1, expr2, true)
-                currentBranch += IRSub(destW, wreg1, wreg2) += IRJumpCond(VS, "_errOverflow")
+                currentBranch += IRCmpImm(wreg2, falseValue) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(destW, wreg1, wreg2)
                 freeRegister(wreg1.asX)
                 freeRegister(wreg2.asX)
+                BaseType.IntType
+
+              case BinaryOperator.Modulus => 
+                val (wreg1, wreg2) = genExprs(expr1, expr2, true)
+                currentBranch += IRCmpImm(wreg2, falseValue) += IRJumpCond(EQ, "_errDivZero")
+                currentBranch += IRSDiv(modTempReg, wreg1, wreg2) += IRMSub(destW, modTempReg, wreg2, wreg1)
+                freeRegister(wreg1.asX)
+                freeRegister(wreg2.asX)
+                BaseType.IntType
+
+              case BinaryOperator.Greater =>
+                compareFunc(GT)
+              case BinaryOperator.GreaterEqual =>
+                compareFunc(GE)
+              case BinaryOperator.Less =>
+                compareFunc(LT)
+              case BinaryOperator.LessEqual =>
+                compareFunc(LE)
+              case BinaryOperator.Equal =>
+                compareFunc(EQ)
+              case BinaryOperator.NotEqual =>
+                compareFunc(NE)
+
+              case BinaryOperator.Or =>
+                val (wreg1, wreg2) = genExprs(expr1, expr2, false)
+                currentBranch += IRCmpImm(wreg1, trueValue) += IRCset(wreg1, EQ)
+                currentBranch += IRCmpImm(wreg2, trueValue)  += IRCset(wreg2, EQ) += IROr(destW, wreg1, wreg2)
+                freeRegister(wreg1.asX)
+                freeRegister(wreg2.asX)
+                BaseType.BoolType
+              
+              case BinaryOperator.And =>
+                val (wreg1, wreg2) = genExprs(expr1, expr2, false)
+                currentBranch += IRCmpImm(wreg1, trueValue) += IRJumpCond(NE, branchLabel(1)) += IRCmpImm(wreg2, trueValue)
+                addBranch()
+                currentBranch += IRCset(destW, EQ)
+                freeRegister(wreg1.asX)
+                freeRegister(wreg2.asX)
+                BaseType.BoolType
             }
-            BaseType.IntType
+            binaryInstrs  
 
-          case BinaryOperator.Multiply =>
-            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
-            currentBranch += IRSMull(destX, wreg1, wreg2) += IRCmpExt(destX, destW) += IRJumpCond(NE, "_errOverflow")
-            freeRegister(wreg1.asX)
-            freeRegister(wreg2.asX)
-            BaseType.IntType
-
-
-          case BinaryOperator.Divide => 
-            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
-            currentBranch += IRCmpImm(wreg2, falseValue) += IRJumpCond(EQ, "_errDivZero") += IRSDiv(destW, wreg1, wreg2)
-            freeRegister(wreg1.asX)
-            freeRegister(wreg2.asX)
-            BaseType.IntType
-
-          case BinaryOperator.Modulus => 
-            val (wreg1, wreg2) = genExprs(expr1, expr2, true)
-            currentBranch += IRCmpImm(wreg2, falseValue) += IRJumpCond(EQ, "_errDivZero")
-            currentBranch += IRSDiv(modTempReg, wreg1, wreg2) += IRMSub(destW, modTempReg, wreg2, wreg1)
-            freeRegister(wreg1.asX)
-            freeRegister(wreg2.asX)
-            BaseType.IntType
-
-          case BinaryOperator.Greater =>
-            compareFunc(GT)
-          case BinaryOperator.GreaterEqual =>
-            compareFunc(GE)
-          case BinaryOperator.Less =>
-            compareFunc(LT)
-          case BinaryOperator.LessEqual =>
-            compareFunc(LE)
-          case BinaryOperator.Equal =>
-            compareFunc(EQ)
-          case BinaryOperator.NotEqual =>
-            compareFunc(NE)
-
-          case BinaryOperator.Or =>
-            val (wreg1, wreg2) = genExprs(expr1, expr2, false)
-            currentBranch += IRCmpImm(wreg1, trueValue) += IRCset(wreg1, EQ)
-            currentBranch += IRCmpImm(wreg2, trueValue)  += IRCset(wreg2, EQ) += IROr(destW, wreg1, wreg2)
-            freeRegister(wreg1.asX)
-            freeRegister(wreg2.asX)
-            BaseType.BoolType
-          
-          case BinaryOperator.And =>
-            val (wreg1, wreg2) = genExprs(expr1, expr2, false)
-            currentBranch += IRCmpImm(wreg1, trueValue) += IRJumpCond(NE, branchLabel(1)) += IRCmpImm(wreg2, trueValue)
-            addBranch()
-            currentBranch += IRCset(destW, EQ)
-            freeRegister(wreg1.asX)
-            freeRegister(wreg2.asX)
-            BaseType.BoolType
-        }
-        binaryInstrs  
-
-      case ArrayElem(name, indices) => 
-        constants.get(name) match {
-          case Some(arrType, array) => getArrayItem(array, indices) match {
-            case Some(n: Int) => currentBranch += IRMov(destW, n)
-            case _ =>
-          }
-            getAccessedArrayType(arrType, indices)
-          case None => lookupVariable(name) match {
-            case Some((Left(baseReg), arrType)) => // Base address
-              generateExpr(indices.head, indexReg) // Get index value
-              arrType match {
-                case ArrayType(ArrayType(_)) => 
-                  helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
-                  helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-                  currentBranch += IRMovReg(defArrTempReg, baseReg) += IRBl("_arrLoad8")
-                  currentBranch += IRMovReg(defTempReg, defArrTempReg) += IRLdur(defArrPairReg.asW, defTempReg, -stackOffset)
-                case ArrayType(PairType(_,_)) =>
-                  helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
-                  helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-                  currentBranch += IRMovReg(defArrTempReg, baseReg) 
-                  currentBranch += IRBl("_arrLoad8") += IRMovReg(dest, defArrTempReg)
-
+          case ArrayElem(name, indices) => 
+            constants.get(name) match {
+              case Some(arrType, array) => getArrayItem(array, indices) match {
+                case Some(n: Int) => currentBranch += IRMov(destW, n)
                 case _ =>
-                  helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
-                  helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-                  currentBranch += IRMovReg(defArrTempReg, baseReg) 
-                  currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
               }
-              if (indices.size > 1) {
-                helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
-                helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
-                currentBranch.remove(currentBranch.size - 1)
-                currentBranch += pushReg(defTempReg, XZR)
-                generateExpr(indices.apply(1), indexReg)
-                currentBranch += popReg(defArrTempReg, XZR)
-                currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
+                getAccessedArrayType(arrType, indices)
+              case None => lookupVariable(name) match {
+                case Some((Left(baseReg), arrType)) => // Base address
+                  generateExpr(indices.head, indexReg) // Get index value
+                  arrType match {
+                    case ArrayType(ArrayType(_)) => 
+                      helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
+                      helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+                      currentBranch += IRMovReg(defArrTempReg, baseReg) += IRBl("_arrLoad8")
+                      currentBranch += IRMovReg(defTempReg, defArrTempReg) += IRLdur(defArrPairReg.asW, defTempReg, -stackOffset)
+                    case ArrayType(PairType(_,_)) =>
+                      helpers.getOrElseUpdate(IRLabel("_arrLoad8"), arrLoad8())
+                      helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+                      currentBranch += IRMovReg(defArrTempReg, baseReg) 
+                      currentBranch += IRBl("_arrLoad8") += IRMovReg(dest, defArrTempReg)
+
+                    case _ =>
+                      helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
+                      helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+                      currentBranch += IRMovReg(defArrTempReg, baseReg) 
+                      currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
+                  }
+                  if (indices.size > 1) {
+                    helpers.getOrElseUpdate(IRLabel("_arrLoad4"), arrLoad4())
+                    helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+                    currentBranch.remove(currentBranch.size - 1)
+                    currentBranch += pushReg(defTempReg, XZR)
+                    generateExpr(indices.apply(1), indexReg)
+                    currentBranch += popReg(defArrTempReg, XZR)
+                    currentBranch += IRBl("_arrLoad4") += IRMovReg(destW, defArrTempReg.asW)
+                  }
+                  getAccessedArrayType(arrType, indices)
+                case _ => BaseType.IntType
               }
-              getAccessedArrayType(arrType, indices)
-            case _ => BaseType.IntType
-          }
+            }
+          case _ => BaseType.IntType
+            
         }
-      case _ => BaseType.IntType
-        
     }
   }
 
