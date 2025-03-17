@@ -240,8 +240,10 @@ object CodeGen {
       }
     }
 
-    firstPush ++ remainingPushes ++ List(IRMovReg(X16, SP))
+    firstPush ++ remainingPushes ++ List(IRMovReg(paramsReg, SP))
   }
+
+  private var numParamPopped: Int = 0
 
   def popFunctionParams(params: List[Register]): List[IRInstr] = {
     if (params.isEmpty) return List()
@@ -250,39 +252,77 @@ object CodeGen {
       return List() // No need to pop if only one parameter (it remains in x0)
     }
 
+    numParamPopped += 1
+
     val sortedParams = params.sorted(Ordering.by(argumentRegisters.indexOf)) // Ensure correct order
     val groupedParams: List[List[Register]] = sortedParams.grouped(2).toList // Group into pairs
 
-    val firstPop = groupedParams.head match {
-      case List(reg1, reg2) =>
-        List(
-          IRCmt(s"pop {$reg1, $reg2}"),
-          IRLdp(reg1, reg2) // First pair at SP
-        )
-      case List(reg1) =>
-        List(
-          IRCmt(s"pop {$reg1}"),
-          IRLdur(reg1, SP, 0) // Load single register with LDUR
-        )
-      case _ => List()
+    if (numParamPopped < (numParams * 2)) {
+      val firstPop = groupedParams.head match {
+        case List(reg1, reg2) =>
+          List(
+            IRCmt(s"pop {$reg1, $reg2}"),
+            IRLdp(reg1, reg2) // First pair at SP
+          )
+        case List(reg1) =>
+          List(
+            IRCmt(s"pop {$reg1}"),
+            IRLdur(reg1, SP, 0) // Load single register with LDUR
+          )
+        case _ => List()
+      }
+
+      val remainingPops = groupedParams.tail.zipWithIndex.flatMap {
+        case (List(reg1, reg2), index) =>
+          val offset = (index + 1) * 16
+          List(
+            IRCmt(s"pop {$reg1, $reg2}"),
+            IRLdp(reg1, reg2, offset, true) // Pop at offset
+          )
+        case (List(reg1), index) =>
+          val offset = (index + 1) * 16
+          List(
+            IRCmt(s"pop {$reg1}"),
+            IRLdur(reg1, SP, offset) // Load single register with LDUR
+          )
+        case _ => List()
+      }
+      firstPop ++ remainingPops ++ List(IRMovReg(paramsReg, SP))
+    } else {
+      val remainingPops = groupedParams.tail.zipWithIndex.flatMap {
+        case (List(reg1, reg2), index) =>
+          val offset = (index + 1) * 16
+          List(
+            IRCmt(s"pop {$reg1, $reg2}"),
+            IRLdp(reg1, reg2, offset, true) // Pop at offset
+          )
+        case (List(reg1), index) =>
+          val offset = (index + 1) * 16
+          List(
+            IRCmt(s"pop {$reg1}"),
+            IRLdur(reg1, SP, offset) // Load single register with LDUR
+          )
+        case _ => List()
+      }
+      val firstPop = groupedParams.head match {
+        case List(reg1, reg2) =>
+          val offset = (groupedParams.length) * 16
+          List(
+            IRCmt(s"pop {$reg1, $reg2}"),
+            IRLdp(reg1, reg2, offset, true) // First pair at SP
+          )
+        case List(reg1) =>
+          val offset = (groupedParams.length) * 16
+          List(
+            IRCmt(s"pop {$reg1}"),
+            IRLdur(reg1, SP, offset) // Load single register with LDUR
+          )
+        case _ => List()
+      }
+      remainingPops ++ firstPop
     }
 
-    val remainingPops = groupedParams.tail.zipWithIndex.flatMap {
-      case (List(reg1, reg2), index) =>
-        val offset = (index + 1) * 16
-        List(
-          IRCmt(s"pop {$reg1, $reg2}"),
-          IRLdp(reg1, reg2, offset, true) // Pop at offset
-        )
-      case (List(reg1), index) =>
-        val offset = (index + 1) * 16
-        List(
-          IRCmt(s"pop {$reg1}"),
-          IRLdur(reg1, SP, offset) // Load single register with LDUR
-        )
-      case _ => List()
-    }
-    firstPop ++ remainingPops ++ List(IRMovReg(X16, SP))
+
   }
   
   // Branches for main function
@@ -802,7 +842,7 @@ object CodeGen {
                   currentBranch ++= List(
                     IRCmt(s"pop/peek from stack offset $off"),
                     IRLdur(temp, FP, off),   
-                    IRMovReg(W0, temp.asW)
+                    IRMovReg(defReturnReg, temp.asW)
                   )
                 } else {
                   currentBranch ++= popFunctionParams(params)
