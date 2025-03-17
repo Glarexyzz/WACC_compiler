@@ -280,20 +280,22 @@ object semanticChecker {
     case None => Some(List())
   }
 
+  // Returns true if the array type can be added to the constants map
   def allowedArrayType(t: Type): Boolean = t match {
     case ArrayType(innertype) => allowedArrayType(innertype)
     case BaseType.IntType => true
     case BaseType.BoolType => true
-    // case BaseType.CharType => true
     case _ => false
   }
 
+  // Extracts the needed RValue if it is a valid value to be evaluated
   def extract(value: RValue): Option[Any] = value match {
     case RValue.RExpr(expr) => Some(expr)
     case RValue.RArrayLiter(array) => Some(array)
     case _ => None
   }
 
+  // Checks constant validity, and adds it if it is valid
   def checkAndAddConstant(t: Type, name: String, value: RValue) = {
     extract(value) match {
       case Some(expr: Expr) => evaluateExpr(expr) match {
@@ -319,6 +321,7 @@ object semanticChecker {
     }
   }
 
+  // Checks unused variable validity, and adds it if it is valid
   def checkAndAddUnusedVariable(t: Type, name: String, value: RValue) = {
     extract(value) match {
       case Some(expr: Expr) => evaluateExpr(expr) match {
@@ -675,6 +678,7 @@ object semanticChecker {
     case _ => NullType 
   }
 
+  // This function gets an item from an array, if the indices are valid and any variables are constants
   def getArrayItem(arr: Any, indices: List[Expr]): Option[Any] = indices match {
     case Nil => Some(arr)
     case i :: rest => i match {
@@ -704,6 +708,7 @@ object semanticChecker {
     }
   }
 
+  // Checks range of an index in a list
   def indexInRange(list: List[Any], n: Int): Boolean = n < list.length && n >= 0
 
   def checkExprType(expr: Expr, env: SymbolTable, isIfOrWhile: Boolean = false): Either[String, Type] = expr match {
