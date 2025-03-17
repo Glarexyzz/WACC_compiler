@@ -502,6 +502,7 @@ object CodeGen {
         case _ => // Don't free function parameters
       }
 
+      /*
       // Restore only shadowed variables, not all from parent scope
       if (variableRegistersStack.nonEmpty) {
         val parentScopeVars = variableRegistersStack.top
@@ -521,7 +522,7 @@ object CodeGen {
             }
           }
         }
-      }
+      }*/
     }
   }
     
