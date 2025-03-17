@@ -859,7 +859,7 @@ object CodeGen {
           generateExpr(cond, temp) // load result in temp register
           cond match {
               case BinaryOp(lhs, op, rhs) =>
-                currentBranch += IRJumpCond(condToIR(op), bodyBranch)
+                currentBranch += IRJumpCond(condToIR(op), branchLabel(1))
               case _ =>
                 currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1))
             }
