@@ -844,7 +844,6 @@ object CodeGen {
         generateExpr(expr)
         currentBranch += IRBl("exit")
 
-      /*
       case IfStmt(cond, thenStmt, elseStmt) => evalConstants(cond) match {
         case Some(true) => 
           enterScope()
@@ -868,8 +867,9 @@ object CodeGen {
           generateStmt(thenStmt)
           exitScope()
           addBranch()
-        }*/
+        }
       
+      /*
       case IfStmt(cond, thenStmt, elseStmt) =>
         val temp = getTempRegister().getOrElse(defTempReg)
         generateExpr(cond, temp) // load result in temp register
@@ -884,7 +884,7 @@ object CodeGen {
         enterScope()
         generateStmt(thenStmt)
         exitScope()
-        addBranch()
+        addBranch()*/
 
       case WhileStmt(cond, body) => evalConstants(cond) match {
         case Some(false) => 
@@ -1092,9 +1092,9 @@ object CodeGen {
         // 📌 Helpers for comparisons:
         def compareFunc(cond:Condition): Type = {
           val (wreg1, wreg2) = genExprs(expr1, expr2, false)
-          //val temp = getTempRegister().getOrElse(defTempReg)
-          currentBranch += IRCmp(wreg1, wreg2)// += IRCset(temp.asW, cond) += IRMovReg(destW, temp.asW)
-          //freeRegister(temp)
+          val temp = getTempRegister().getOrElse(defTempReg)
+          currentBranch += IRCmp(wreg1, wreg2) += IRCset(temp.asW, cond) += IRMovReg(destW, temp.asW)
+          freeRegister(temp)
           freeRegister(wreg1.asX)
           freeRegister(wreg2.asX)
           BaseType.BoolType
