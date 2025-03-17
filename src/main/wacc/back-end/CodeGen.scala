@@ -1426,7 +1426,6 @@ object CodeGen {
         case (Some(b1: Boolean), Some(b2: Boolean)) => Some(b1 || b2)
         case _ => None
       }
-      case _ => None
     }
     case _ => None
   }
