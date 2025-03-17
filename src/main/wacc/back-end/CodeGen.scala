@@ -884,7 +884,13 @@ object CodeGen {
           addBranch()
           val temp = getTempRegister().getOrElse(defTempReg)
           generateExpr(cond, temp) // if condition true, jump to body
-          currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, bodyBranch)
+          cond match {
+            case BinaryOp(lhs, op, rhs) =>
+              currentBranch += IRJumpCond(condToIR(op), bodyBranch)
+            case _ =>
+              currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, bodyBranch)
+          }
+          
           if (condBranch != branchLabel(0)) then {
             overwriteJump(initialBranch, branchLabel(0))
           }
@@ -898,6 +904,18 @@ object CodeGen {
 
       case SeqStmt(left, right) => generateStmt(left)
                                    generateStmt(right)
+  }
+
+  def condToIR(op: BinaryOperator): Condition = {
+    op match {
+      case BinaryOperator.Equal => EQ
+      case BinaryOperator.NotEqual => NE
+      case BinaryOperator.Greater => GT
+      case BinaryOperator.Less => LT
+      case BinaryOperator.GreaterEqual => GE
+      case BinaryOperator.LessEqual => LE
+      case _ => throw new Exception(s"Not a valid condition type.")
+    }
   }
 
   def genOverflow() = 
