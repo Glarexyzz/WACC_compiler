@@ -964,7 +964,7 @@ object CodeGen {
           case Some((BaseType.CharType, value: Int)) => 
             currentBranch += IRMov(destW, value)
             BaseType.CharType
-          case _ => */
+          case _ => 
             lookupVariable(name) match {
               case Some((Left(reg), t)) => 
                 if (destW != reg.asW) {
