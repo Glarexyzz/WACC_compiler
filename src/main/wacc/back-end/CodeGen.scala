@@ -282,10 +282,8 @@ object CodeGen {
         )
       case _ => List()
     }
-    firstPop ++ remainingPops
+    firstPop ++ remainingPops ++ List(IRMovReg(X16, SP))
   }
-
-  private val poppedParams = mutable.Set[String]()
   
   // Branches for main function
   private var nBranch = 0 // Track number of branching sections
@@ -794,7 +792,7 @@ object CodeGen {
                     IRMovReg(paramsReg, SP)
                   )
                 } else {
-                  currentBranch ++= popFunctionParams(params) ++ List(IRMovReg(X16, SP))
+                  currentBranch ++= popFunctionParams(params)
                 }
                 genAndPrintExpr(expr)
 
@@ -807,7 +805,7 @@ object CodeGen {
                     IRMovReg(W0, temp.asW)
                   )
                 } else {
-                  currentBranch ++= popFunctionParams(params) ++ List(IRMovReg(X16, SP))
+                  currentBranch ++= popFunctionParams(params)
                 }
 
                 freeRegister(temp)
@@ -832,31 +830,43 @@ object CodeGen {
         generateStmt(PrintStmt(expr))
         currentBranch += IRBl("_println")
 
+        println(s"availableVariableRegisters: ${availableVariableRegisters.size}")
+
         expr match {
           case Identifier(name) if paramsMap.contains(name) =>
-            val (reg, t) = paramsMap(name)
-
-            // function parameter pop
-            poppedParams += name
-            currentBranch ++= List(
-              IRCmt(s"pop {$reg}"),
-              popReg(reg, XZR)
+            val paramPopInstrs = popFunctionParams(
+              paramsMap.view.values.map(_._1).toList
             )
+            currentBranch ++= paramPopInstrs
+          case Identifier(name) if (availableVariableRegisters.size == 1) => 
+            lookupVariable(name) match {
+              case Some((Left(reg), t)) =>
+                currentBranch ++= List(
+                  IRCmt(s"pop {$reg}"),
+                  popReg(reg, XZR)
+                )
+              case Some((Right(off), t)) =>
+                val temp = getTempRegister().getOrElse(defTempReg)
+                currentBranch ++= List(
+                  IRCmt(s"pop {$temp}"),
+                  popReg(temp, XZR)
+                )
+                freeRegister(temp)
+              case _ =>
+            }
           case _ =>
-            None
         }
 
-
       case ReturnStmt(expr) => 
-        val paramPopInstrs = popFunctionParams(
-          paramsMap.view.filterKeys(!poppedParams.contains(_)).values.map(_._1).toList
-        )
+        /*val paramPopInstrs = popFunctionParams(
+          paramsMap.view.values.map(_._1).toList
+        )*/
         generateExpr(expr, W0)
         currentBranch ++= (
           List(
             IRCmt("Function epilogue: reset stack pointer"),
-            IRMovReg(SP, FP)  // Reset stack pointer before returning
-          ) ++ paramPopInstrs ++ List(
+            IRMovReg(SP, FP),  // Reset stack pointer before returning
+          //) ++ paramPopInstrs ++ List(
             popReg(FP, LR),
             IRRet()
           )
