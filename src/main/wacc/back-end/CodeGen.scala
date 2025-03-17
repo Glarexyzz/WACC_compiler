@@ -80,12 +80,11 @@ object CodeGen {
         Some((Left(reg), t)) // Parameters are stored in registers
       case None =>
         // If not in params, check local variables in scopes
-        variableRegistersStack.iterator.flatMap(_.get(name)).find(_ => true)
+        variableRegistersStack.iterator.flatMap(_.get(name)).nextOption
     }
   }
 
   private def addVariable(name: String, t: Type): Option[Either[Register, Int]] = {
-    println(s"trying to add variable $name type: $t")
     if (variableRegistersStack.isEmpty) {
       throw new RuntimeException("Trying to add variable when no active scope exists!")
     }
@@ -105,12 +104,12 @@ object CodeGen {
 
     if (availableVariableRegisters.nonEmpty) {
       val reg = availableVariableRegisters.pop()
-      println(s"Allocated register $reg for variable $name in scope ${variableRegistersStack.size}")
+      // println(s"Allocated register $reg for variable $name in scope ${variableRegistersStack.size}")
       currentScope(name) = (Left(reg), t)
       Some(Left(reg))
     } else if (availableVariableOffsets.nonEmpty) {
       val off = availableVariableOffsets.pop()
-      println(s"Allocated stack offset $off for variable $name in scope ${variableRegistersStack.size}")
+      // println(s"Allocated stack offset $off for variable $name in scope ${variableRegistersStack.size}")
       currentScope(name) = (Right(off), t)
       Some(Right(off))
     } else {
@@ -449,12 +448,12 @@ object CodeGen {
         case None => 
           // Scopes variables initiation
           maxVars = symTab.getMaxConcurrentVariables
-          println(s"MaxVariableNums: $maxVars")
+          // println(s"MaxVariableNums: $maxVars")
           regsNeeded = math.min(maxVars, availableRegisters.size)
           allocated ++= availableRegisters.take(regsNeeded)
           availableVariableRegisters.pushAll(allocated.reverse)
           availableRegisters --= allocated
-          println(s"Allocated registers: $allocated")
+          // println(s"Allocated registers: $allocated")
       }
 
       // Pre-allocate stack space for the rest
@@ -467,8 +466,8 @@ object CodeGen {
                   throw new Exception("Ran out of stack offsets for spilling variables!")
           }
       }
-      println(s"parameters: $allocatedParamsRegs\n")
-      println(s"variables: $allocated\n")
+      // println(s"parameters: $allocatedParamsRegs\n")
+      // println(s"variables: $allocated\n")
       (allocated ++= allocatedParamsRegs).toList
   }
   
@@ -483,22 +482,22 @@ object CodeGen {
 
   // Scopes
   def enterScope() = {
-    println(s"Entering Scope: ${variableRegistersStack.map(_.keys)}")
+    // println(s"Entering Scope: ${variableRegistersStack.map(_.keys)}")
     variableRegistersStack.push(mutable.Map.empty)
   }
 
   def exitScope() = {
     if (variableRegistersStack.nonEmpty) {
       val currentScopeVars = variableRegistersStack.pop()
-      println(s"Exiting Scope: ${currentScopeVars.keys}")
+      // println(s"Exiting Scope: ${currentScopeVars.keys}")
 
       // Only free **local** variables, not function parameters
       currentScopeVars.foreach {
         case (name, (Left(reg), _)) if !paramsMap.contains(name) => 
-          println(s"Freeing variable $name from register $reg")
+          // println(s"Freeing variable $name from register $reg")
           freeVariableRegister(reg)
         case (name, (Right(off), _)) if !paramsMap.contains(name) => 
-          println(s"Freeing variable $name from stack offset $off")
+          // println(s"Freeing variable $name from stack offset $off")
           availableVariableOffsets.push(off)
         case _ => // Don't free function parameters
       }
@@ -510,10 +509,10 @@ object CodeGen {
           if (currentScopeVars.contains(name)) { // Only restore if it was shadowed
             regOrOffset match {
               case Left(reg) =>
-                println(s"Restoring $name into register $reg")
+                // println(s"Restoring $name into register $reg")
                 currentBranch += IRMovReg(reg, reg)
               case Right(off) =>
-                println(s"Restoring $name from stack offset $off")
+                // println(s"Restoring $name from stack offset $off")
                 val temp = getTempRegister().getOrElse(defTempReg)
                 currentBranch += IRLdur(temp, FP, off) // Load back from stack
                 push(temp, off)
@@ -774,7 +773,7 @@ object CodeGen {
               IRMovReg(paramsReg, SP)
             )
             genAndPrintExpr(expr)
-          
+          /*
           case Identifier(name) if (lookupVariable(name).isDefined) => 
              lookupVariable(name) match {
               case Some((Left(reg), _)) =>
@@ -785,7 +784,7 @@ object CodeGen {
                 currentBranch += IRMovReg(W0, temp.asW)
                 freeRegister(temp)
               case _ =>
-            }
+            }*/
 
           case Identifier(name) if (constants.get(name) != None) => constants.get(name) match {
             case Some((ArrayType(_), _)) =>
