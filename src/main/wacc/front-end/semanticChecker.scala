@@ -43,10 +43,10 @@ class SymbolTable {
     if (scopeLevel > 0) {
       //println(s"Exiting scope: ${getVariableScopes}")
       val exitingScope = variableScopes.pop()
+      //println(s"exitingScope: $exitingScope")
       val parentScope = variableScopes.top
+      //println(s"parentScope: $parentScope")
       var nExitVars = exitingScope.size - parentScope.size
-      //println(s"exiting scope: $exitingScope")
-      //println(s"exiting scope size: ${exitingScope.size}")
       nVariableRegs += nVariablesInScope  // Carry over total variables seen so far.
       //println(s"nVarRegs before exiting: $nVariableRegs")
       nVariablesInScope = 0  // The parent scope remove child scope variables
@@ -61,7 +61,9 @@ class SymbolTable {
             }
           case None => 
         }
-      } 
+      } else {
+        nExitVars = exitingScope.size
+      }
 
       // When we pop a scope, all its variables "die"
       nVariableRegs -= nExitVars
