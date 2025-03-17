@@ -399,6 +399,7 @@ object CodeGen {
 
     currentBranch ++= prologue
 
+    println(s"Function $funcLabel Parameters: ${paramsMap.map { case (k, v) => s"$k -> ${v._1}" }.mkString(", ")}")
     enterScope()
     generateStmt(stmt) // Generate IR for main function body
     exitScope()
@@ -780,11 +781,13 @@ object CodeGen {
         expr match {
           case Identifier(name) if paramsMap.contains(name) =>
             val (reg, t) = paramsMap(name)
+            println(s"PRINT PARAM: $name -> $reg ($t)")
             // function parameter push
             currentBranch ++= List(
               IRCmt(s"pop/peek {$reg}"),
               IRLdur(reg, SP, defOffset),
-              IRMovReg(paramsReg, SP)
+              IRMovReg(paramsReg, SP),
+              IRMovReg(X16, reg) // DEBUG: Print pointer before calling _prints
             )
             genAndPrintExpr(expr)
           /*
@@ -833,6 +836,7 @@ object CodeGen {
 
 
       case ReturnStmt(expr) => 
+        println(s"RETURNING FROM FUNCTION: ${expr}")
         val paramPopInstrs = popFunctionParams(
           paramsMap.view.filterKeys(!poppedParams.contains(_)).values.map(_._1).toList
         )
@@ -1512,6 +1516,7 @@ object CodeGen {
         currentBranch += IRMov(defArrPairReg.asW, arrayMemory) += IRBl("_malloc")
         += IRMovReg(arrPairStrReg, defArrPairReg) += IRAddImmInt(arrPairStrReg, arrPairStrReg, stackOffset)
         += IRMov(temp, size) += IRStur(temp, arrPairStrReg, -stackOffset)
+        += IRMovReg(X16, arrPairStrReg) // DEBUG: Print allocated array pointer
         
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
           val elType = generateExpr(element, temp)
@@ -1613,7 +1618,12 @@ object CodeGen {
         args.zip(paramRegs).foreach { case (arg, reg) =>
           generateExpr(arg, reg) // Move argument values into x8-x15
         }
-        currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, defReturnReg))
+        currentBranch ++= List(
+          IRMovReg(X16, SP), // DEBUG: Check SP before call
+          IRBl(s"wacc_$name"), 
+          IRMovReg(X17, SP),  // DEBUG: Check SP after call
+          IRMovReg(reg.asW, defReturnReg)
+        )
 
       case RValue.RCall(name, None) =>
         currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, defReturnReg))    }
