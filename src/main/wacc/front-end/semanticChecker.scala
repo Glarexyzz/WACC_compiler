@@ -26,6 +26,7 @@ class SymbolTable {
   def getCurrentFunctionParamsNum(funcName: String): Int = functionTable(funcName).params.length
   
   def enterScope(): Unit = {
+    println(s"Entering scope: ${getVariableScopes}")
     nVariableRegs += nVariablesInScope  // Carry over total variables seen so far.
     scopeLevel += 1
     val newScope = if (functionStatus.isDefined && variableScopes.nonEmpty) {
@@ -40,6 +41,7 @@ class SymbolTable {
 
   def exitScope(): Unit = {
     if (scopeLevel > 0) {
+      println(s"Exiting scope: ${getVariableScopes}")
       val exitingScope = variableScopes.pop()
       val parentScope = variableScopes.top
       var nExitVars = exitingScope.size - parentScope.size
@@ -71,7 +73,7 @@ class SymbolTable {
   
   def addVariable(name: String, varType: Type): Boolean = {
     if (variableScopes.nonEmpty) {
-      //println(s"variableName: $name, varType: $varType")
+      println(s"variableName: $name, varType: $varType")
       val currentScope = variableScopes.top // Get current scope
       if (currentScope.contains(name) && !functionStatus.isDefined) {
         return false // Variable already declared in this scope
@@ -80,8 +82,8 @@ class SymbolTable {
       nVariablesInScope += 1
 
       val totalNowAlive = nVariableRegs + nVariablesInScope
-      // println(s"nVarRegs: $nVariableRegs")
-      // println(s"nVarScope: $nVariablesInScope")
+      //println(s"nVarRegs: $nVariableRegs")
+      //println(s"nVarScope: $nVariablesInScope")
       maxConcurrentVariables = Math.max(maxConcurrentVariables, totalNowAlive)
       //println(s"maxVarNum: $maxConcurrentVariables")
       
