@@ -268,6 +268,7 @@ object semanticChecker {
     case _ => None
   }
 
+  // Evaluates whether or not the array is valid
   def evaluateArray(array: ArrayLiter): Option[List[Any]] = array.elements match {
     case Some(exprList) =>
       val evaluated = exprList.map {
