@@ -93,7 +93,6 @@ object CodeGen {
 
     // Prevent duplicate variables in the same scope
     if (currentScope.contains(name)) {
-      //println(s"Variable $name is already declared in the current scope")
       return None
     }
 
@@ -253,18 +252,21 @@ object CodeGen {
     val sortedParams = params.sorted(Ordering.by(argumentRegisters.indexOf)) // Ensure correct order
     val groupedParams: List[List[Register]] = sortedParams.grouped(2).toList // Group into pairs
 
-    groupedParams.flatMap {
-      case List(reg1: Register, reg2: Register) =>
-        List(
-          IRCmt(s"# pop {$reg1, $reg2}"),
-          IRLdp(reg1, reg2) // Restore from stack
-        )
-      case List(reg1: Register) =>
-        List(
-          IRCmt(s"# pop {$reg1}"),
-          IRLdur(reg1, SP, 0) // Peek single value
-        )
-      case _ => List()
+    groupedParams.zipWithIndex.flatMap { case (regs, index) =>
+      val offset = index * 16
+      regs match {
+        case List(reg1: Register, reg2: Register) =>
+          List(
+            IRCmt(s"# pop {$reg1, $reg2}"),
+            IRLdp(reg1, reg2, offset, true) // Restore from stack
+          )
+        case List(reg1: Register) =>
+          List(
+            IRCmt(s"# pop {$reg1}"),
+            IRLdur(reg1, SP, offset) // Peek single value
+          )
+        case _ => List()
+      }
     }
   }
 
@@ -399,7 +401,7 @@ object CodeGen {
 
     currentBranch ++= prologue
 
-    println(s"Function $funcLabel Parameters: ${paramsMap.map { case (k, v) => s"$k -> ${v._1}" }.mkString(", ")}")
+    //println(s"Function $funcLabel Parameters: ${paramsMap.map { case (k, v) => s"$k -> ${v._1}" }.mkString(", ")}")
     enterScope()
     generateStmt(stmt) // Generate IR for main function body
     exitScope()
@@ -484,14 +486,12 @@ object CodeGen {
 
   // Scopes
   def enterScope() = {
-    // println(s"Entering Scope: ${variableRegistersStack.map(_.keys)}")
     variableRegistersStack.push(mutable.Map.empty)
   }
 
   def exitScope() = {
     if (variableRegistersStack.nonEmpty) {
       val currentScopeVars = variableRegistersStack.pop()
-      // println(s"Exiting Scope: ${currentScopeVars.keys}")
 
       // Only free **local** variables, not function parameters
       currentScopeVars.foreach {
@@ -768,28 +768,36 @@ object CodeGen {
 
       case PrintStmt(expr) =>
         expr match {
-          case Identifier(name) if paramsMap.contains(name) =>
-            val (reg, t) = paramsMap(name)
-            println(s"PRINT PARAM: $name -> $reg ($t)")
-            // function parameter push
-            currentBranch ++= List(
-              IRCmt(s"pop/peek {$reg}"),
-              IRLdur(reg, SP, defOffset),
-              IRMovReg(paramsReg, SP),
-            )
-            genAndPrintExpr(expr)
-          /*
           case Identifier(name) if (lookupVariable(name).isDefined) => 
-             lookupVariable(name) match {
+            val params = paramsMap.values.map(_._1).toList
+            lookupVariable(name) match {
               case Some((Left(reg), _)) =>
-                currentBranch += IRMovReg(W0, reg.asW)
+                if (params.length == 1) {
+                  currentBranch ++= List(
+                    IRCmt(s"pop/peek {$reg}"),
+                    IRLdur(reg, SP, 0),
+                    IRMovReg(paramsReg, SP),
+                  )
+                } else {
+                  currentBranch ++= popFunctionParams(params) ++ List(IRMovReg(X16, SP))
+                }
+                genAndPrintExpr(expr)
               case Some((Right(off), _)) =>
                 val temp = getTempRegister().getOrElse(defTempReg)
-                currentBranch += IRLdr(temp, FP, Some(off))
-                currentBranch += IRMovReg(W0, temp.asW)
+                if (params.length == 1) {
+                  currentBranch ++= List(
+                    IRCmt(s"pop/peek from stack offset $off"),
+                    IRLdur(temp, FP, off),   
+                    IRMovReg(W0, temp.asW)
+                  )
+                } else {
+                  currentBranch ++= popFunctionParams(params) ++ List(IRMovReg(X16, SP))
+                }
+
                 freeRegister(temp)
+                genAndPrintExpr(expr)
               case _ =>
-            }*/
+            }
 
           case Identifier(name) if (constants.get(name) != None) => constants.get(name) match {
             case Some((ArrayType(_), _)) =>
@@ -824,22 +832,10 @@ object CodeGen {
 
 
       case ReturnStmt(expr) => 
-        println(s"RETURNING FROM FUNCTION: ${expr}")
         val paramPopInstrs = popFunctionParams(
           paramsMap.view.filterKeys(!poppedParams.contains(_)).values.map(_._1).toList
         )
-        /*val paramPopInstrs = paramsMap
-          .view.filterKeys(!poppedParams.contains(_)).toMap // Only pop parameters that weren't already popped
-          .values
-          .map { case (reg, _) =>
-            List(
-              IRCmt(s"pop {$reg}"),
-              popReg(reg, XZR)
-            )
-          }.toList.flatten*/
-
         generateExpr(expr, W0)
-
         currentBranch ++= (
           List(
             IRCmt("Function epilogue: reset stack pointer")
