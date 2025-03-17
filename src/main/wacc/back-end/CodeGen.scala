@@ -79,7 +79,7 @@ object CodeGen {
         Some((Left(reg), t)) // Parameters are stored in registers
       case None =>
         // If not in params, check local variables in scopes
-        variableRegistersStack.reverseIterator.flatMap(_.get(name)).find(_ => true)
+        variableRegistersStack.iterator.flatMap(_.get(name)).find(_ => true)
     }
   }
 
