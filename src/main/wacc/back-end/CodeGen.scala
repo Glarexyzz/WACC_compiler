@@ -838,6 +838,7 @@ object CodeGen {
               paramsMap.view.values.map(_._1).toList
             )
             currentBranch ++= paramPopInstrs
+          /*
           case Identifier(name) if (availableVariableRegisters.size == 1) => 
             lookupVariable(name) match {
               case Some((Left(reg), t)) =>
@@ -853,7 +854,7 @@ object CodeGen {
                 )
                 freeRegister(temp)
               case _ =>
-            }
+            }*/
           case _ =>
         }
 
