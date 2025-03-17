@@ -206,17 +206,23 @@ object CodeGen {
     val groupedParams: List[List[Register]] = 
       params.sorted(Ordering.by(argumentRegisters.indexOf)).grouped(2).toList // Group into pairs
     
+    // ✅ Debugging: Print grouped parameters before pushing
+    currentBranch ++= List(IRCmt(s"DEBUG: Grouped Params for push: ${groupedParams.map(_.mkString(","))}"))
+
     // First pair should decrement SP and store
     val firstPush = groupedParams.head match {
       case List(reg1, reg2) =>
         List(
           IRCmt(s"push {$reg1, $reg2}"),
-          IRStp(reg1, reg2, -stackSize, true) // First pair decrements SP!
+          IRStp(reg1, reg2, -stackSize, true), // First pair decrements SP!
+          IRMovReg(W0, reg1.asW), IRBl("_printi"),  // debug Print value before push
+          IRMovReg(W0, reg2.asW), IRBl("_printi")  // debug
         )
       case List(reg1) =>
         List(
           IRCmt(s"push {$reg1}"),
-          IRStp(reg1, XZR, -stackSize, true) // Store single register
+          IRStp(reg1, XZR, -stackSize, true), // Store single register
+          IRMovReg(W0, reg1.asW), IRBl("_printi") //debug
         )
       case _ => List()
     }   
@@ -228,12 +234,15 @@ object CodeGen {
         case List(reg1, reg2) =>
           List(
             IRCmt(s"push {$reg1, $reg2}"),
-            IRStp(reg1, reg2, offset) // Use positive offsets
+            IRStp(reg1, reg2, offset), // Use positive offsets
+            IRMovReg(W0, reg1.asW), IRBl("_printi"), //debug
+            IRMovReg(W0, reg2.asW), IRBl("_printi") //debug
           )
         case List(reg1) =>
           List(
             IRCmt(s"push {$reg1}"),
-            IRStp(reg1, XZR, offset) // Store single register
+            IRStp(reg1, XZR, offset), // Store single register
+            IRMovReg(W0, reg1.asW), IRBl("_printi")  // debug
           )
         case _ => List()
       }
@@ -258,12 +267,15 @@ object CodeGen {
         case List(reg1: Register, reg2: Register) =>
           List(
             IRCmt(s"# pop {$reg1, $reg2}"),
-            IRLdp(reg1, reg2, offset, true) // Restore from stack
+            IRLdp(reg1, reg2, offset, true), // Restore from stack
+            IRMovReg(W0, reg1.asW), IRBl("_printi"), // debug
+            IRMovReg(W0, reg2.asW), IRBl("_printi")  // debug
           )
         case List(reg1: Register) =>
           List(
             IRCmt(s"# pop {$reg1}"),
-            IRLdur(reg1, SP, offset) // Peek single value
+            IRLdur(reg1, SP, offset), // Peek single value
+            IRMovReg(W0, reg1.asW), IRBl("_printi")  // debug
           )
         case _ => List()
       }
@@ -376,6 +388,14 @@ object CodeGen {
     
     paramsMap = mutable.Map.from(paramRegs.map(assignFuncParams).getOrElse(Map()))
     variableRegisters ++= paramsMap  // Store parameter registers in variable map
+
+    // Add debug print for function parameters
+    paramsMap.foreach { case (name, (reg, _)) =>
+      currentBranch ++= List(
+        IRCmt(s"DEBUG: Function Parameter $name is stored in $reg"),
+        IRMovReg(W0, reg.asW), IRBl("_printi") // <-- Add this line to print register contents
+      )
+    }
 
     val allocatedRegs = initialiseVariables(symbolTable, funcLabel)
 
@@ -777,17 +797,20 @@ object CodeGen {
                     IRCmt(s"pop/peek {$reg}"),
                     IRLdur(reg, SP, 0),
                     IRMovReg(paramsReg, SP),
+                    IRMovReg(W0, reg.asW), IRBl("_printi")  //debug
                   )
                 } else {
                   currentBranch ++= popFunctionParams(params) ++ List(IRMovReg(X16, SP))
                 }
                 genAndPrintExpr(expr)
+
               case Some((Right(off), _)) =>
                 val temp = getTempRegister().getOrElse(defTempReg)
                 if (params.length == 1) {
                   currentBranch ++= List(
                     IRCmt(s"pop/peek from stack offset $off"),
                     IRLdur(temp, FP, off),   
+                    IRMov(W0, off), IRBl("_printi"), //debug
                     IRMovReg(W0, temp.asW)
                   )
                 } else {
@@ -836,11 +859,17 @@ object CodeGen {
           paramsMap.view.filterKeys(!poppedParams.contains(_)).values.map(_._1).toList
         )
         generateExpr(expr, W0)
+
+        // Debug print before returning
+        currentBranch ++= List(
+          IRCmt("DEBUG: Value in W0 before returning"),
+          IRMovReg(W0, W0), IRBl("_printi")
+        )
         currentBranch ++= (
           List(
-            IRCmt("Function epilogue: reset stack pointer")
+            IRCmt("Function epilogue: reset stack pointer"),
+            IRMovReg(SP, FP)  // Reset stack pointer before returning
           ) ++ paramPopInstrs ++ List(
-            IRMovReg(SP, FP), // Reset stack pointer before returning
             popReg(FP, LR),
             IRRet()
           )
