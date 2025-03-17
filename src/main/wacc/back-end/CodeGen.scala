@@ -461,6 +461,7 @@ object CodeGen {
       for (_ <- 0 until spillVars) {
           getStackVarOffset(BaseType.IntType) match {
               case Some(off) => 
+                //println(s"📌offset: $off")
                 availableVariableOffsets.push(off)
               case None => 
                   throw new Exception("Ran out of stack offsets for spilling variables!")
