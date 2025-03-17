@@ -206,26 +206,16 @@ object CodeGen {
     val groupedParams: List[List[Register]] = 
       params.sorted(Ordering.by(argumentRegisters.indexOf)).grouped(2).toList // Group into pairs
     
-    // ✅ Debugging: Print grouped parameters before pushing
-    helpers.getOrElseUpdate(IRLabel("_printi"), printi())
-    currentBranch ++= List(
-        IRCmt(s"DEBUG: SP before push"),
-        IRMovReg(W0, SP.asW),
-        IRBl("_printi")
-    )
     // First pair should decrement SP and store
     val firstPush = groupedParams.head match {
       case List(reg1, reg2) =>
         List(
           IRCmt(s"push {$reg1, $reg2}"),
-          IRMovReg(W0, reg1.asW), IRBl("_printi"),  // debug Print value before push
-          IRMovReg(W0, reg2.asW), IRBl("_printi"), // debug
           IRStp(reg1, reg2, -stackSize, true) // First pair decrements SP!
         )
       case List(reg1) =>
         List(
           IRCmt(s"push {$reg1}"),
-          IRMovReg(W0, reg1.asW), IRBl("_printi"), //debug
           IRStp(reg1, XZR, -stackSize, true) // Store single register
         )
       case _ => List()
@@ -238,14 +228,11 @@ object CodeGen {
         case List(reg1, reg2) =>
           List(
             IRCmt(s"push {$reg1, $reg2}"),
-            IRMovReg(W0, reg1.asW), IRBl("_printi"), //debug
-            IRMovReg(W0, reg2.asW), IRBl("_printi"), //debug
             IRStp(reg1, reg2, offset) // Use positive offsets
           )
         case List(reg1) =>
           List(
             IRCmt(s"push {$reg1}"),
-            IRMovReg(W0, reg1.asW), IRBl("_printi"),  // debug
             IRStp(reg1, XZR, offset) // Store single register
 
           )
@@ -254,17 +241,11 @@ object CodeGen {
     }
 
     firstPush ++ remainingPushes ++ List(IRMovReg(X16, SP))
-    ++ List( // debug
-        IRCmt("DEBUG: SP after push"),
-        IRMovReg(W0, SP.asW),
-        IRBl("_printi")
-    )
   }
 
   def popFunctionParams(params: List[Register]): List[IRInstr] = {
     if (params.isEmpty) return List()
     val numParams = params.length
-    val stackSize = (numParams + 1) / 2 * 16 // Ensure stack stays 16-byte aligned
     if (numParams <= 1) {
       return List() // No need to pop if only one parameter (it remains in x0)
     }
@@ -272,37 +253,36 @@ object CodeGen {
     val sortedParams = params.sorted(Ordering.by(argumentRegisters.indexOf)) // Ensure correct order
     val groupedParams: List[List[Register]] = sortedParams.grouped(2).toList // Group into pairs
 
-    // debug
-    helpers.getOrElseUpdate(IRLabel("_printi"), printi())
-    currentBranch ++= List( 
-        IRCmt(s"DEBUG: SP before pop"),
-        IRMovReg(W0, SP.asW),
-        IRBl("_printi")
-    )
-    groupedParams.zipWithIndex.flatMap { case (regs, index) =>
-      val offset = index * 16
-      regs match {
-        case List(reg1: Register, reg2: Register) =>
-          List(
-            IRCmt(s"# pop {$reg1, $reg2}"),
-            IRLdp(reg1, reg2, offset, true), // Restore from stack
-            IRMovReg(W0, reg1.asW), IRBl("_printi"), // debug
-            IRMovReg(W0, reg2.asW), IRBl("_printi"),  // debug
-            IRCmt("Adjusting SP after popping params"),
-            IRAddImmInt(SP, SP, stackSize) // Restore SP position
-          )
-        case List(reg1: Register) =>
-          List(
-            IRCmt(s"# pop {$reg1}"),
-            IRLdur(reg1, SP, offset), // Peek single value
-            IRMovReg(W0, reg1.asW), IRBl("_printi"),  // debug
-            IRCmt("Adjusting SP after popping params"),
-            IRAddImmInt(SP, SP, stackSize) // Restore SP position
-          )
-        case _ => List()
-      }
-
+    val firstPop = groupedParams.head match {
+      case List(reg1, reg2) =>
+        List(
+          IRCmt(s"pop {$reg1, $reg2}"),
+          IRLdp(reg1, reg2) // First pair at SP
+        )
+      case List(reg1) =>
+        List(
+          IRCmt(s"pop {$reg1}"),
+          IRLdur(reg1, SP, 0) // Load single register with LDUR
+        )
+      case _ => List()
     }
+
+    val remainingPops = groupedParams.tail.zipWithIndex.flatMap {
+      case (List(reg1, reg2), index) =>
+        val offset = (index + 1) * 16
+        List(
+          IRCmt(s"pop {$reg1, $reg2}"),
+          IRLdp(reg1, reg2, offset, true) // Pop at offset
+        )
+      case (List(reg1), index) =>
+        val offset = (index + 1) * 16
+        List(
+          IRCmt(s"pop {$reg1}"),
+          IRLdur(reg1, SP, offset) // Load single register with LDUR
+        )
+      case _ => List()
+    }
+    firstPop ++ remainingPops
   }
 
   private val poppedParams = mutable.Set[String]()
@@ -411,15 +391,6 @@ object CodeGen {
     
     paramsMap = mutable.Map.from(paramRegs.map(assignFuncParams).getOrElse(Map()))
     variableRegisters ++= paramsMap  // Store parameter registers in variable map
-
-    // Add debug print for function parameters
-    helpers.getOrElseUpdate(IRLabel("_printi"), printi())
-    paramsMap.foreach { case (name, (reg, _)) =>
-      currentBranch ++= List(
-        IRCmt(s"DEBUG: Function Parameter $name is stored in $reg"),
-        IRMovReg(W0, reg.asW), IRBl("_printi") // <-- Add this line to print register contents
-      )
-    }
 
     val allocatedRegs = initialiseVariables(symbolTable, funcLabel)
 
@@ -813,8 +784,6 @@ object CodeGen {
       case PrintStmt(expr) =>
         expr match {
           case Identifier(name) if (lookupVariable(name).isDefined) => 
-            // debug
-            helpers.getOrElseUpdate(IRLabel("_printi"), printi())
             val params = paramsMap.values.map(_._1).toList
             lookupVariable(name) match {
               case Some((Left(reg), _)) =>
@@ -822,8 +791,7 @@ object CodeGen {
                   currentBranch ++= List(
                     IRCmt(s"pop/peek {$reg}"),
                     IRLdur(reg, SP, 0),
-                    IRMovReg(paramsReg, SP),
-                    IRMovReg(W0, reg.asW), IRBl("_printi")  //debug
+                    IRMovReg(paramsReg, SP)
                   )
                 } else {
                   currentBranch ++= popFunctionParams(params) ++ List(IRMovReg(X16, SP))
@@ -836,7 +804,6 @@ object CodeGen {
                   currentBranch ++= List(
                     IRCmt(s"pop/peek from stack offset $off"),
                     IRLdur(temp, FP, off),   
-                    IRMov(W0, off), IRBl("_printi"), //debug
                     IRMovReg(W0, temp.asW)
                   )
                 } else {
@@ -885,13 +852,6 @@ object CodeGen {
           paramsMap.view.filterKeys(!poppedParams.contains(_)).values.map(_._1).toList
         )
         generateExpr(expr, W0)
-
-        // Debug print before returning
-        helpers.getOrElseUpdate(IRLabel("_printi"), printi())
-        currentBranch ++= List(
-          IRCmt("DEBUG: Value in W0 before returning"),
-          IRMovReg(W0, W0), IRBl("_printi")
-        )
         currentBranch ++= (
           List(
             IRCmt("Function epilogue: reset stack pointer"),
