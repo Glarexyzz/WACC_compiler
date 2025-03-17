@@ -954,7 +954,7 @@ object CodeGen {
 
       // move the identifier into the destination register
       case Identifier(name) =>
-        constants.get(name) match {
+        /*constants.get(name) match {
           case Some((BaseType.IntType, value: Int)) => 
             currentBranch += IRMov(destW, value)
             BaseType.IntType
@@ -964,7 +964,7 @@ object CodeGen {
           case Some((BaseType.CharType, value: Int)) => 
             currentBranch += IRMov(destW, value)
             BaseType.CharType
-          case _ => 
+          case _ => */
             lookupVariable(name) match {
               case Some((Left(reg), t)) => 
                 if (destW != reg.asW) {
@@ -993,7 +993,7 @@ object CodeGen {
                 t
               case _ => NullType
             }
-        }
+        //}
         // compare if the dest and src are the same value or not to reduce redundancy
 
       case PairLiteral =>
