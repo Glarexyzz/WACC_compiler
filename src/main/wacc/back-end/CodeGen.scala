@@ -857,13 +857,13 @@ object CodeGen {
         case _ => 
           val temp = getTempRegister().getOrElse(defTempReg)
           generateExpr(cond, temp) // load result in temp register
-          cond match {
+          /*cond match {
               case BinaryOp(lhs, op, rhs) =>
                 currentBranch += IRJumpCond(condToIR(op), branchLabel(1))
               case _ =>
                 currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1))
-            }
-          //currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
+            }*/
+          currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
           freeRegister(temp)
           enterScope()
           generateStmt(elseStmt) // else, continue
@@ -890,13 +890,13 @@ object CodeGen {
           addBranch()
           val temp = getTempRegister().getOrElse(defTempReg)
           generateExpr(cond, temp) // if condition true, jump to body
-          cond match {
+          /*cond match {
             case BinaryOp(lhs, op, rhs) =>
               currentBranch += IRJumpCond(condToIR(op), bodyBranch)
             case _ =>
               currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, bodyBranch)
-          }
-          
+          }*/
+          currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, bodyBranch)
           if (condBranch != branchLabel(0)) then {
             overwriteJump(initialBranch, branchLabel(0))
           }
