@@ -84,7 +84,18 @@ object CodeGen {
   }
 
   private def addVariable(name: String, t: Type): Option[Either[Register, Int]] = {
+    println(s"trying to add variable $name type: $t")
+    if (variableRegistersStack.isEmpty) {
+      throw new RuntimeException("Trying to add variable when no active scope exists!")
+    }
+
     val currentScope = variableRegistersStack.top
+
+    // Prevent duplicate variables in the same scope
+    if (currentScope.contains(name)) {
+      //println(s"Variable $name is already declared in the current scope")
+      return None
+    }
 
     // Don't allocate if it's already in the paramsMap
     if (paramsMap.contains(name)) {
@@ -93,10 +104,12 @@ object CodeGen {
 
     if (availableVariableRegisters.nonEmpty) {
       val reg = availableVariableRegisters.pop()
+      println(s"Allocated register $reg for variable $name in scope ${variableRegistersStack.size}")
       currentScope(name) = (Left(reg), t)
       Some(Left(reg))
     } else if (availableVariableOffsets.nonEmpty) {
       val off = availableVariableOffsets.pop()
+      println(s"Allocated stack offset $off for variable $name in scope ${variableRegistersStack.size}")
       currentScope(name) = (Right(off), t)
       Some(Right(off))
     } else {
@@ -432,12 +445,13 @@ object CodeGen {
           allocatedParamsRegs ++= argumentRegisters.take(paramsRegsNeeded)
         case None => 
           // Scopes variables initiation
-          //println(s"ConcurrentVariableNums: $maxVars")
           maxVars = symTab.getMaxConcurrentVariables
+          println(s"MaxVariableNums: $maxVars")
           regsNeeded = math.min(maxVars, availableRegisters.size)
           allocated ++= availableRegisters.take(regsNeeded)
-          availableVariableRegisters.pushAll(allocated)
+          availableVariableRegisters.pushAll(allocated.reverse)
           availableRegisters --= allocated
+          println(s"Allocated registers: $allocated")
       }
 
       // Pre-allocate stack space for the rest
@@ -450,8 +464,8 @@ object CodeGen {
                   throw new Exception("Ran out of stack offsets for spilling variables!")
           }
       }
-      // println(s"parameters: $allocatedParamsRegs\n")
-      // println(s"variables: $allocated\n")
+      println(s"parameters: $allocatedParamsRegs\n")
+      println(s"variables: $allocated\n")
       (allocated ++= allocatedParamsRegs).toList
   }
   
@@ -466,20 +480,45 @@ object CodeGen {
 
   // Scopes
   def enterScope() = {
+    println(s"Entering Scope: ${variableRegistersStack.map(_.keys)}")
     variableRegistersStack.push(mutable.Map.empty)
   }
 
   def exitScope() = {
     if (variableRegistersStack.nonEmpty) {
       val currentScopeVars = variableRegistersStack.pop()
+      println(s"Exiting Scope: ${currentScopeVars.keys}")
 
       // Only free **local** variables, not function parameters
       currentScopeVars.foreach {
         case (name, (Left(reg), _)) if !paramsMap.contains(name) => 
+          println(s"Freeing variable $name from register $reg")
           freeVariableRegister(reg)
         case (name, (Right(off), _)) if !paramsMap.contains(name) => 
+          println(s"Freeing variable $name from stack offset $off")
           availableVariableOffsets.push(off)
         case _ => // Don't free function parameters
+      }
+
+      // Restore only shadowed variables, not all from parent scope
+      if (variableRegistersStack.nonEmpty) {
+        val parentScopeVars = variableRegistersStack.top
+        for ((name, (regOrOffset, t)) <- parentScopeVars) {
+          if (currentScopeVars.contains(name)) { // Only restore if it was shadowed
+            regOrOffset match {
+              case Left(reg) =>
+                println(s"Restoring $name into register $reg")
+                currentBranch += IRMovReg(reg, reg)
+              case Right(off) =>
+                println(s"Restoring $name from stack offset $off")
+                val temp = getTempRegister().getOrElse(defTempReg)
+                currentBranch += IRLdur(temp, FP, off) // Load back from stack
+                push(temp, off)
+                //currentBranch += IRStr(temp, FP, Some(off)) // Store it back at correct offset
+                freeRegister(temp)
+            }
+          }
+        }
       }
     }
   }
@@ -531,9 +570,9 @@ object CodeGen {
 
       // All declared variables are initialised at the start from the symbol table
       case DeclAssignStmt(t, name, value) =>
-        constants.get(name) match {
-          case Some(_) =>
-          case None =>
+        // constants.get(name) match {
+        //   case Some(_) =>
+        //   case None =>
             addVariable(name, t) match {
               case Some(Left(reg)) => generateRValue(value, reg, Some(t))
               case Some(Right(off)) => 
@@ -543,7 +582,7 @@ object CodeGen {
                 freeRegister(temp)
               case _ =>
             }
-        }
+        // }
             
       case AssignStmt(lvalue, rvalue) => 
         lvalue match {
@@ -731,6 +770,18 @@ object CodeGen {
               IRMovReg(paramsReg, SP)
             )
             genAndPrintExpr(expr)
+          
+          case Identifier(name) if (lookupVariable(name).isDefined) => 
+             lookupVariable(name) match {
+              case Some((Left(reg), _)) =>
+                currentBranch += IRMovReg(W0, reg.asW)
+              case Some((Right(off), _)) =>
+                val temp = getTempRegister().getOrElse(defTempReg)
+                currentBranch += IRLdr(temp, FP, Some(off))
+                currentBranch += IRMovReg(W0, temp.asW)
+                freeRegister(temp)
+              case _ =>
+            }
 
           case Identifier(name) if (constants.get(name) != None) => constants.get(name) match {
             case Some((ArrayType(_), _)) =>
