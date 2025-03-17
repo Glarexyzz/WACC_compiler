@@ -207,6 +207,7 @@ object CodeGen {
       params.sorted(Ordering.by(argumentRegisters.indexOf)).grouped(2).toList // Group into pairs
     
     // ✅ Debugging: Print grouped parameters before pushing
+    helpers.getOrElseUpdate(IRLabel("_printi"), printi())
     currentBranch ++= List(
         IRCmt(s"DEBUG: SP before push"),
         IRMovReg(W0, SP.asW),
@@ -272,6 +273,7 @@ object CodeGen {
     val groupedParams: List[List[Register]] = sortedParams.grouped(2).toList // Group into pairs
 
     // debug
+    helpers.getOrElseUpdate(IRLabel("_printi"), printi())
     currentBranch ++= List( 
         IRCmt(s"DEBUG: SP before pop"),
         IRMovReg(W0, SP.asW),
@@ -411,6 +413,7 @@ object CodeGen {
     variableRegisters ++= paramsMap  // Store parameter registers in variable map
 
     // Add debug print for function parameters
+    helpers.getOrElseUpdate(IRLabel("_printi"), printi())
     paramsMap.foreach { case (name, (reg, _)) =>
       currentBranch ++= List(
         IRCmt(s"DEBUG: Function Parameter $name is stored in $reg"),
@@ -810,6 +813,8 @@ object CodeGen {
       case PrintStmt(expr) =>
         expr match {
           case Identifier(name) if (lookupVariable(name).isDefined) => 
+            // debug
+            helpers.getOrElseUpdate(IRLabel("_printi"), printi())
             val params = paramsMap.values.map(_._1).toList
             lookupVariable(name) match {
               case Some((Left(reg), _)) =>
@@ -882,6 +887,7 @@ object CodeGen {
         generateExpr(expr, W0)
 
         // Debug print before returning
+        helpers.getOrElseUpdate(IRLabel("_printi"), printi())
         currentBranch ++= List(
           IRCmt("DEBUG: Value in W0 before returning"),
           IRMovReg(W0, W0), IRBl("_printi")
