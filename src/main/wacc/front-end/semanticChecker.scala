@@ -150,6 +150,7 @@ class SymbolTable {
 object semanticChecker {
 
   private val constants: mutable.Map[String, (Type, Any)] = mutable.Map()
+  private val unusedVars: mutable.Set[String] = mutable.Set.empty[String]
   val symbolTable: SymbolTable = new SymbolTable
 
   def addConstant(name: String, value: (Type, Any)): Unit = {
@@ -160,8 +161,8 @@ object semanticChecker {
     constants -= name
   }
 
-  def checkSemantic(parsed: Any): Either[String, (SymbolTable, mutable.Map[String, (Type, Any)])] = parsed match {
-    case program: Program => checkProgram(program).toLeft(symbolTable, constants)
+  def checkSemantic(parsed: Any): Either[String, (SymbolTable, mutable.Map[String, (Type, Any)], mutable.Set[String])] = parsed match {
+    case program: Program => checkProgram(program).toLeft(symbolTable, constants, unusedVars)
     case _ => Left(s"Unknown parsed structure")
   }
   
@@ -320,6 +321,26 @@ object semanticChecker {
     }
   }
 
+  def checkAndAddUnusedVariable(t: Type, name: String, value: RValue) = {
+    extract(value) match {
+      case Some(expr: Expr) => evaluateExpr(expr) match {
+        case Some(n) => t match {
+          case BaseType.IntType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              unusedVars.add(name)
+            }
+          case BaseType.BoolType =>
+            if (n == trueValue || n == falseValue) addConstant(name, (BaseType.BoolType, n))
+          case BaseType.CharType =>
+            if (n >= 0 && n <= 127) unusedVars.add(name)
+          case _ =>
+        }
+        case _ =>
+      }
+      case _ =>
+    }
+  }
+
   def checkStatement(stmt: Stmt): Option[String] = stmt match {
     case SkipStmt => None
 
@@ -332,6 +353,7 @@ object semanticChecker {
             //println(s"\nadding $name to the table")
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate) {
+              checkAndAddUnusedVariable(t, name, value)
               checkAndAddConstant(t, name, value)
               None
             }
@@ -351,6 +373,7 @@ object semanticChecker {
               case Some(VariableEntry(lType)) => 
                 if (isCompatibleTo(rType, lType)) {
                   removeConstant(name)
+                  unusedVars.remove(name)
                   None
                 } else {
                   Some(s"Semantic Error in Assignment of identifier $name: $rType is not compatible to $lType identifier $name")
@@ -362,6 +385,7 @@ object semanticChecker {
               case Some(VariableEntry(ArrayType(lType))) => 
                 if (isCompatibleTo(rType, lType)) {
                   removeConstant(name)
+                  unusedVars.remove(name)
                   None
                 } else {
                   Some(s"Semantic Error in Assignment of array $name: $rType is not compatible to $lType")
@@ -393,9 +417,11 @@ object semanticChecker {
     case ReadStmt(lvalue) => lvalue match {
       case LValue.LName(name) => symbolTable.lookup(name) match {
         case Some(VariableEntry(BaseType.IntType)) => 
+          unusedVars.remove(name)
           removeConstant(name)
           None
         case Some(VariableEntry(BaseType.CharType)) =>
+          unusedVars.remove(name)
           removeConstant(name)
           None
         case Some(t) => Some(s"Semantic Error in Read: Identifier $name must be of type int or char, but got $t instead")
@@ -508,6 +534,7 @@ object semanticChecker {
     }
     case LValue.LArray(ArrayElem(name, indices)) => symbolTable.lookupVariable(name) match {
       case Some(VariableEntry(ArrayType(_))) => 
+        unusedVars.remove(name)
         removeConstant(name)
         None
       case Some(VariableEntry(t)) => Some(s"Error in checking left value of $name: expected array, but got $t instead")
@@ -691,6 +718,7 @@ object semanticChecker {
     case PairLiteral => Right(PairType(NullType, NullType))
     
     case Identifier(name) => 
+      unusedVars.remove(name)
       if (isIfOrWhile) {
         removeConstant(name)
       }

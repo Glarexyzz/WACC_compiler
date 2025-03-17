@@ -34,6 +34,7 @@ object CodeGen {
   private val variableOffsets = mutable.Map[String, (Int, Type)]()
   private var stackVarPointer = initStackVarsOffset
   private var constants = mutable.Map[String, (Type, Any)]()
+  private var unusedVars = mutable.Set.empty[String]
   // for variables
   private val availableVariableRegisters = mutable.Stack[Register]()
   private val availableVariableOffsets = mutable.Stack[Int]()
@@ -142,12 +143,14 @@ object CodeGen {
   private val helpers = mutable.Map[IRLabel, List[IRInstr]]()
 
   // Main function
-  def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable, constantVars: mutable.Map[String, (Type, Any)]): Unit = {
+  def compile(prog: Program, filepath: String, newSymbolTable: SymbolTable, 
+  constantVars: mutable.Map[String, (Type, Any)], unusedVariables: mutable.Set[String]): Unit = {
     //println(constantVars)
     println("Compiling...")
     // initialise symbol table
     symbolTable = newSymbolTable
     constants = constantVars
+    unusedVars = unusedVariables
     val ir = generateIR(prog)
 
     // AArch64 assembly conversion
@@ -581,6 +584,7 @@ object CodeGen {
                 push(temp, off)
                 freeRegister(temp)
               case _ =>
+              }
             }
         // }
             
@@ -841,39 +845,51 @@ object CodeGen {
         currentBranch += IRBl("exit")
 
 
-      case IfStmt(cond, thenStmt, elseStmt) =>
-        val temp = getTempRegister().getOrElse(defTempReg)
-        generateExpr(cond, temp) // load result in temp register
-        //currentBranch += IRCmpImm(temp.asW, trueValue) 
-        currentBranch += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
-        freeRegister(temp)
-        enterScope()
-        generateStmt(elseStmt) // else, continue
-        exitScope()
-        currentBranch += IRJump(branchLabel(2)) 
-        addBranch()
-        enterScope()
-        generateStmt(thenStmt)
-        exitScope()
-        addBranch()
-
-      case WhileStmt(cond, body) =>
-        val initialBranch = branchLabel(0)
-        val bodyBranch = branchLabel(1)
-        val condBranch = branchLabel(2)
-        currentBranch += IRJump(condBranch) // jump to condition check
-        addBranch()
-        enterScope()
-        generateStmt(body)
-        exitScope()
-        addBranch()
-        val temp = getTempRegister().getOrElse(defTempReg)
-        generateExpr(cond, temp) // if condition true, jump to body
-        currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, bodyBranch)
-        if (condBranch != branchLabel(0)) then {
-          overwriteJump(initialBranch, branchLabel(0))
+      case IfStmt(cond, thenStmt, elseStmt) => evalConstants(cond) match {
+        case Some(true) => 
+          enterScope()
+          generateStmt(thenStmt)
+          exitScope()
+        case Some(false) =>
+          enterScope()
+          generateStmt(elseStmt)
+          exitScope()
+        case _ => 
+          val temp = getTempRegister().getOrElse(defTempReg)
+          generateExpr(cond, temp) // load result in temp register
+          currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
+          freeRegister(temp)
+          enterScope()
+          generateStmt(elseStmt) // else, continue
+          exitScope()
+          currentBranch += IRJump(branchLabel(2)) 
+          addBranch()
+          enterScope()
+          generateStmt(thenStmt)
+          exitScope()
+          addBranch()
         }
-        freeRegister(temp)
+
+      case WhileStmt(cond, body) => evalConstants(cond) match {
+        case Some(false) => 
+        case _ => 
+          val initialBranch = branchLabel(0)
+          val bodyBranch = branchLabel(1)
+          val condBranch = branchLabel(2)
+          currentBranch += IRJump(condBranch) // jump to condition check
+          addBranch()
+          enterScope()
+          generateStmt(body)
+          exitScope()
+          addBranch()
+          val temp = getTempRegister().getOrElse(defTempReg)
+          generateExpr(cond, temp) // if condition true, jump to body
+          currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, bodyBranch)
+          if (condBranch != branchLabel(0)) then {
+            overwriteJump(initialBranch, branchLabel(0))
+          }
+          freeRegister(temp)
+      }
 
       case BodyStmt(body) => 
         enterScope()
@@ -1236,6 +1252,99 @@ object CodeGen {
           }
           case _ => None
         }
+        case _ => None
+      }
+    }
+  }
+
+  def evalConstants(expr: Expr): Option[Any] = expr match {
+    case BoolLiteral(value) => Some(value)
+    case IntLiteral(value) => Some(value)
+    case CharLiteral(value) => Some(value)
+    case Identifier(name) => constants.get(name) match {
+      case Some((BaseType.BoolType, value: Int)) => Some(value == trueValue)
+      case Some((BaseType.CharType, value: Int)) => Some(value.toChar)
+      case Some((BaseType.IntType, value: Int)) => Some(value)
+      case _ => None
+    }
+    case UnaryOp(op, innerExpr) => op match {
+      case UnaryOperator.Negate => evalConstants(innerExpr) match {
+        case Some(value: Int) => Some(-value)
+        case _ => None
+      }
+      case UnaryOperator.Not => evalConstants(innerExpr) match {
+        case Some(value: Boolean) => Some(!value)
+        case _ => None
+      }
+      case UnaryOperator.Ord => evalConstants(innerExpr) match {
+        case Some(value: Char) => Some(value.toInt)
+        case _ => None
+      }
+      case UnaryOperator.Chr => evalConstants(innerExpr) match {
+        case Some(value: Int) => Some(value.toChar)
+        case _ => None
+      }
+      case _ => None
+    }
+    case BinaryOp(expr1, op, expr2) => op match {
+      case BinaryOperator.Add => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 + i2)
+        case _ => None
+      }
+      case BinaryOperator.Subtract => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 - i2)
+        case _ => None
+      }
+      case BinaryOperator.Multiply => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 * i2)
+        case _ => None
+      }
+      case BinaryOperator.Divide => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => if (i2 != 0) Some(i1 / i2) else None
+        case _ => None
+      }
+      case BinaryOperator.Modulus => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => if (i2 != 0) Some(i1 % i2) else None
+        case _ => None
+      }
+      case BinaryOperator.Greater => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 > i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 > c2)
+        case _ => None
+      }
+      case BinaryOperator.GreaterEqual => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 >= i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 >= c2)
+        case _ => None
+      }
+      case BinaryOperator.Less => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 < i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 < c2)
+        case _ => None
+      }
+      case BinaryOperator.LessEqual => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 <= i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 <= c2)
+        case _ => None
+      }
+      case BinaryOperator.Equal => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 == i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 == c2)
+        case (Some(b1: Boolean), Some(b2: Boolean)) => Some(b1 == b2)
+        case _ => None
+      }
+      case BinaryOperator.NotEqual => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(i1: Int), Some(i2: Int)) => Some(i1 != i2)
+        case (Some(c1: Char), Some(c2: Char)) => Some(c1 != c2)
+        case (Some(b1: Boolean), Some(b2: Boolean)) => Some(b1 != b2)
+        case _ => None
+      }
+      case BinaryOperator.And => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(b1: Boolean), Some(b2: Boolean)) => Some(b1 && b2)
+        case _ => None
+      }
+      case BinaryOperator.Or => (evalConstants(expr1), evalConstants(expr2)) match {
+        case (Some(b1: Boolean), Some(b2: Boolean)) => Some(b1 || b2)
         case _ => None
       }
     }
