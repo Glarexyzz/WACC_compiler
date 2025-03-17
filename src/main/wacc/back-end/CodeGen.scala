@@ -80,12 +80,21 @@ object CodeGen {
         Some((Left(reg), t)) // Parameters are stored in registers
       case None =>
         // If not in params, check local variables in scopes
-        variableRegistersStack.reverseIterator.flatMap(_.get(name)).find(_ => true)
+        variableRegistersStack.iterator.flatMap(_.get(name)).nextOption
     }
   }
 
   private def addVariable(name: String, t: Type): Option[Either[Register, Int]] = {
+    if (variableRegistersStack.isEmpty) {
+      throw new RuntimeException("Trying to add variable when no active scope exists!")
+    }
+
     val currentScope = variableRegistersStack.top
+
+    // Prevent duplicate variables in the same scope
+    if (currentScope.contains(name)) {
+      return None
+    }
 
     // Don't allocate if it's already in the paramsMap
     if (paramsMap.contains(name)) {
@@ -94,10 +103,12 @@ object CodeGen {
 
     if (availableVariableRegisters.nonEmpty) {
       val reg = availableVariableRegisters.pop()
+      // println(s"Allocated register $reg for variable $name in scope ${variableRegistersStack.size}")
       currentScope(name) = (Left(reg), t)
       Some(Left(reg))
     } else if (availableVariableOffsets.nonEmpty) {
       val off = availableVariableOffsets.pop()
+      // println(s"Allocated stack offset $off for variable $name in scope ${variableRegistersStack.size}")
       currentScope(name) = (Right(off), t)
       Some(Right(off))
     } else {
@@ -223,6 +234,7 @@ object CodeGen {
           List(
             IRCmt(s"push {$reg1}"),
             IRStp(reg1, XZR, offset) // Store single register
+
           )
         case _ => List()
       }
@@ -241,22 +253,37 @@ object CodeGen {
     val sortedParams = params.sorted(Ordering.by(argumentRegisters.indexOf)) // Ensure correct order
     val groupedParams: List[List[Register]] = sortedParams.grouped(2).toList // Group into pairs
 
-    groupedParams.flatMap {
-      case List(reg1: Register, reg2: Register) =>
+    val firstPop = groupedParams.head match {
+      case List(reg1, reg2) =>
         List(
-          IRCmt(s"# pop {$reg1, $reg2}"),
-          IRLdp(reg1, reg2) // Restore from stack
+          IRCmt(s"pop {$reg1, $reg2}"),
+          IRLdp(reg1, reg2) // First pair at SP
         )
-      case List(reg1: Register) =>
+      case List(reg1) =>
         List(
-          IRCmt(s"# pop {$reg1}"),
-          IRLdur(reg1, SP, 0) // Peek single value
+          IRCmt(s"pop {$reg1}"),
+          IRLdur(reg1, SP, 0) // Load single register with LDUR
         )
       case _ => List()
     }
-  }
 
-  private val poppedParams = mutable.Set[String]()
+    val remainingPops = groupedParams.tail.zipWithIndex.flatMap {
+      case (List(reg1, reg2), index) =>
+        val offset = (index + 1) * 16
+        List(
+          IRCmt(s"pop {$reg1, $reg2}"),
+          IRLdp(reg1, reg2, offset, true) // Pop at offset
+        )
+      case (List(reg1), index) =>
+        val offset = (index + 1) * 16
+        List(
+          IRCmt(s"pop {$reg1}"),
+          IRLdur(reg1, SP, offset) // Load single register with LDUR
+        )
+      case _ => List()
+    }
+    firstPop ++ remainingPops ++ List(IRMovReg(X16, SP))
+  }
   
   // Branches for main function
   private var nBranch = 0 // Track number of branching sections
@@ -387,6 +414,7 @@ object CodeGen {
 
     currentBranch ++= prologue
 
+    //println(s"Function $funcLabel Parameters: ${paramsMap.map { case (k, v) => s"$k -> ${v._1}" }.mkString(", ")}")
     enterScope()
     generateStmt(stmt) // Generate IR for main function body
     exitScope()
@@ -435,12 +463,13 @@ object CodeGen {
           allocatedParamsRegs ++= argumentRegisters.take(paramsRegsNeeded)
         case None => 
           // Scopes variables initiation
-          //println(s"ConcurrentVariableNums: $maxVars")
           maxVars = symTab.getMaxConcurrentVariables
+          // println(s"MaxVariableNums: $maxVars")
           regsNeeded = math.min(maxVars, availableRegisters.size)
           allocated ++= availableRegisters.take(regsNeeded)
-          availableVariableRegisters.pushAll(allocated)
+          availableVariableRegisters.pushAll(allocated.reverse)
           availableRegisters --= allocated
+          // println(s"Allocated registers: $allocated")
       }
 
       // Pre-allocate stack space for the rest
@@ -448,6 +477,7 @@ object CodeGen {
       for (_ <- 0 until spillVars) {
           getStackVarOffset(BaseType.IntType) match {
               case Some(off) => 
+                //println(s"📌offset: $off")
                 availableVariableOffsets.push(off)
               case None => 
                   throw new Exception("Ran out of stack offsets for spilling variables!")
@@ -479,10 +509,34 @@ object CodeGen {
       // Only free **local** variables, not function parameters
       currentScopeVars.foreach {
         case (name, (Left(reg), _)) if !paramsMap.contains(name) => 
+          // println(s"Freeing variable $name from register $reg")
           freeVariableRegister(reg)
         case (name, (Right(off), _)) if !paramsMap.contains(name) => 
+          // println(s"Freeing variable $name from stack offset $off")
           availableVariableOffsets.push(off)
         case _ => // Don't free function parameters
+      }
+
+      
+      // Restore only shadowed variables, not all from parent scope
+      if (variableRegistersStack.nonEmpty) {
+        val parentScopeVars = variableRegistersStack.top
+        for ((name, (regOrOffset, t)) <- parentScopeVars) {
+          if (currentScopeVars.contains(name)) { // Only restore if it was shadowed
+            regOrOffset match {
+              case Left(reg) =>
+                // println(s"Restoring $name into register $reg")
+                currentBranch += IRMovReg(reg, reg)
+              case Right(off) =>
+                // println(s"Restoring $name from stack offset $off")
+                val temp = getTempRegister().getOrElse(defTempReg)
+                currentBranch += IRLdur(temp, FP, off) // Load back from stack
+                push(temp, off)
+                //currentBranch += IRStr(temp, FP, Some(off)) // Store it back at correct offset
+                freeRegister(temp)
+            }
+          }
+        }
       }
     }
   }
@@ -534,12 +588,12 @@ object CodeGen {
 
       // All declared variables are initialised at the start from the symbol table
       case DeclAssignStmt(t, name, value) =>
-        constants.get(name) match {
-          case Some(_) =>
-          case None =>
-            if (!unusedVars.contains(name)) {
-              addVariable(name, t) match {
-              case Some(Left(reg)) => generateRValue(value, reg, Some(t))
+        // constants.get(name) match {
+        //   case Some(_) =>
+        //   case None =>
+            addVariable(name, t) match {
+              case Some(Left(reg)) => 
+                generateRValue(value, reg, Some(t))
               case Some(Right(off)) => 
                 val temp = getTempRegister().getOrElse(defTempReg)
                 generateRValue(value, temp, Some(t))
@@ -547,8 +601,8 @@ object CodeGen {
                 freeRegister(temp)
               case _ =>
               }
-            }
-        }
+            //}
+        // }
             
       case AssignStmt(lvalue, rvalue) => 
         lvalue match {
@@ -727,15 +781,37 @@ object CodeGen {
 
       case PrintStmt(expr) =>
         expr match {
-          case Identifier(name) if paramsMap.contains(name) =>
-            val (reg, t) = paramsMap(name)
-            // function parameter push
-            currentBranch ++= List(
-              IRCmt(s"pop/peek {$reg}"),
-              IRLdur(reg, SP, defOffset),
-              IRMovReg(paramsReg, SP)
-            )
-            genAndPrintExpr(expr)
+          case Identifier(name) if (lookupVariable(name).isDefined) => 
+            val params = paramsMap.values.map(_._1).toList
+            lookupVariable(name) match {
+              case Some((Left(reg), _)) =>
+                if (params.length == 1) {
+                  currentBranch ++= List(
+                    IRCmt(s"pop/peek {$reg}"),
+                    IRLdur(reg, SP, 0),
+                    IRMovReg(paramsReg, SP)
+                  )
+                } else {
+                  currentBranch ++= popFunctionParams(params)
+                }
+                genAndPrintExpr(expr)
+
+              case Some((Right(off), _)) =>
+                val temp = getTempRegister().getOrElse(defTempReg)
+                if (params.length == 1) {
+                  currentBranch ++= List(
+                    IRCmt(s"pop/peek from stack offset $off"),
+                    IRLdur(temp, FP, off),   
+                    IRMovReg(W0, temp.asW)
+                  )
+                } else {
+                  currentBranch ++= popFunctionParams(params)
+                }
+
+                freeRegister(temp)
+                genAndPrintExpr(expr)
+              case _ =>
+            }
 
           case Identifier(name) if (constants.get(name) != None) => constants.get(name) match {
             case Some((ArrayType(_), _)) =>
@@ -754,37 +830,43 @@ object CodeGen {
         generateStmt(PrintStmt(expr))
         currentBranch += IRBl("_println")
 
+        println(s"availableVariableRegisters: ${availableVariableRegisters.size}")
+
         expr match {
           case Identifier(name) if paramsMap.contains(name) =>
-            val (reg, t) = paramsMap(name)
-
-            // function parameter pop
-            poppedParams += name
-            currentBranch ++= List(
-              IRCmt(s"pop {$reg}"),
-              popReg(reg, XZR)
+            val paramPopInstrs = popFunctionParams(
+              paramsMap.view.values.map(_._1).toList
             )
+            currentBranch ++= paramPopInstrs
+          case Identifier(name) if (availableVariableRegisters.size == 1) => 
+            lookupVariable(name) match {
+              case Some((Left(reg), t)) =>
+                currentBranch ++= List(
+                  IRCmt(s"pop {$reg}"),
+                  popReg(reg, XZR)
+                )
+              case Some((Right(off), t)) =>
+                val temp = getTempRegister().getOrElse(defTempReg)
+                currentBranch ++= List(
+                  IRCmt(s"pop {$temp}"),
+                  popReg(temp, XZR)
+                )
+                freeRegister(temp)
+              case _ =>
+            }
           case _ =>
-            None
         }
 
-
       case ReturnStmt(expr) => 
-        val paramPopInstrs = paramsMap
-          .view.filterKeys(!poppedParams.contains(_)).toMap // Only pop parameters that weren't already popped
-          .values
-          .map { case (reg, _) =>
-            List(
-              IRCmt(s"pop {$reg}"),
-              popReg(reg, XZR)
-            )
-          }.toList.flatten
+        /*val paramPopInstrs = popFunctionParams(
+          paramsMap.view.values.map(_._1).toList
+        )*/
         generateExpr(expr, W0)
         currentBranch ++= (
           List(
-            IRCmt("Function epilogue: reset stack pointer")
-          ) ++ paramPopInstrs ++ List(
-            IRMovReg(SP, FP), // Reset stack pointer before returning
+            IRCmt("Function epilogue: reset stack pointer"),
+            IRMovReg(SP, FP),  // Reset stack pointer before returning
+          //) ++ paramPopInstrs ++ List(
             popReg(FP, LR),
             IRRet()
           )
@@ -793,7 +875,6 @@ object CodeGen {
       case ExitStmt(expr) =>
         generateExpr(expr)
         currentBranch += IRBl("exit")
-
 
       case IfStmt(cond, thenStmt, elseStmt) => evalConstants(cond) match {
         case Some(true) => 
@@ -807,6 +888,12 @@ object CodeGen {
         case _ => 
           val temp = getTempRegister().getOrElse(defTempReg)
           generateExpr(cond, temp) // load result in temp register
+          /*cond match {
+              case BinaryOp(lhs, op, rhs) =>
+                currentBranch += IRJumpCond(condToIR(op), branchLabel(1))
+              case _ =>
+                currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1))
+            }*/
           currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, branchLabel(1)) // if true, jump to next branch
           freeRegister(temp)
           enterScope()
@@ -830,10 +917,17 @@ object CodeGen {
           addBranch()
           enterScope()
           generateStmt(body)
+          //freeRegister(iReg)
           exitScope()
           addBranch()
           val temp = getTempRegister().getOrElse(defTempReg)
           generateExpr(cond, temp) // if condition true, jump to body
+          /*cond match {
+            case BinaryOp(lhs, op, rhs) =>
+              currentBranch += IRJumpCond(condToIR(op), bodyBranch)
+            case _ =>
+              currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, bodyBranch)
+          }*/
           currentBranch += IRCmpImm(temp.asW, trueValue) += IRJumpCond(EQ, bodyBranch)
           if (condBranch != branchLabel(0)) then {
             overwriteJump(initialBranch, branchLabel(0))
@@ -848,6 +942,18 @@ object CodeGen {
 
       case SeqStmt(left, right) => generateStmt(left)
                                    generateStmt(right)
+  }
+
+  def condToIR(op: BinaryOperator): Condition = {
+    op match {
+      case BinaryOperator.Equal => EQ
+      case BinaryOperator.NotEqual => NE
+      case BinaryOperator.Greater => GT
+      case BinaryOperator.Less => LT
+      case BinaryOperator.GreaterEqual => GE
+      case BinaryOperator.LessEqual => LE
+      case _ => throw new Exception(s"Not a valid condition type.")
+    }
   }
 
   def genOverflow() = 
@@ -892,7 +998,58 @@ object CodeGen {
               BaseType.IntType
             } else {
               val lower16 = (value & lower16Mask).toInt          // Extract lower 16 bits
-              val upper16 = ((value >> upper16Shift) & lower16Mask).toInt  
+              val upper16 = ((value >> upper16Shift) & lower16Mask).toInt  }
+
+          case StrLiteral(value) =>
+            val label = nextLabel()
+            val formatVal = escapeInnerQuotes(value)
+            stringLiterals.getOrElseUpdate(label, formatVal) // Store string in .data
+            currentBranch += IRAdrp(destX, label) += IRAddImm(destX, destX, s":lo12:$label")
+            BaseType.StrType
+
+          // move the identifier into the destination register
+          case Identifier(name) =>
+            /*constants.get(name) match {
+              case Some((BaseType.IntType, value: Int)) => 
+                currentBranch += IRMov(destW, value)
+                BaseType.IntType
+              case Some((BaseType.BoolType, value: Int)) => 
+                currentBranch += IRMov(destW, value)
+                BaseType.BoolType
+              case Some((BaseType.CharType, value: Int)) => 
+                currentBranch += IRMov(destW, value)
+                BaseType.CharType
+              case _ => */
+            lookupVariable(name) match {
+              case Some((Left(reg), t)) => 
+                if (destW != reg.asW) {
+                  t match {
+                    //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
+                    case ArrayType(_) => currentBranch += IRMovReg(destX, reg.asX)
+                    case PairType(_,_) => currentBranch += IRMovReg(destX, reg.asX)
+                    case BaseType.StrType => currentBranch += IRMovReg(destX, reg.asX)
+                    case _ => currentBranch += IRMovReg(destW, reg.asW)
+                  }
+                }
+                t
+              case Some((Right(off),t)) =>
+                val temp = getTempRegister().getOrElse(defTempReg)
+                currentBranch += IRLdr(temp, FP, Some(off))
+                if (destW != temp.asW) {
+                  t match {
+                    //case ArrayType(BaseType.CharType) => currentBranch += IRStr(reg, X16)
+                    case ArrayType(_) => currentBranch += IRMovReg(destX, temp.asX)
+                    case PairType(_,_) => currentBranch += IRMovReg(destX, temp.asX)
+                    case BaseType.StrType => currentBranch += IRMovReg(destX, temp.asX)
+                    case _ => currentBranch += IRMovReg(destW, temp.asW)
+                  }
+                }
+                freeRegister(temp)
+                t
+              case _ => NullType
+            }
+        //}
+        // compare if the dest and src are the same value or not to reduce redundancy
 
               currentBranch +=
                 IRMov(destW, lower16) +=        
@@ -1534,7 +1691,10 @@ object CodeGen {
         args.zip(paramRegs).foreach { case (arg, reg) =>
           generateExpr(arg, reg) // Move argument values into x8-x15
         }
-        currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, defReturnReg))
+        currentBranch ++= List(
+          IRBl(s"wacc_$name"), 
+          IRMovReg(reg.asW, defReturnReg)
+        )
 
       case RValue.RCall(name, None) =>
         currentBranch ++= List(IRBl(s"wacc_$name"), IRMovReg(reg.asW, defReturnReg))    }

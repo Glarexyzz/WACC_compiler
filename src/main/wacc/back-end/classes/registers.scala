@@ -13,7 +13,7 @@ object Register {
     X0 -> W0, X1 -> W1, X2 -> W2, X3 -> W3, X4 -> W4, X5 -> W5, X6 -> W6, X7 -> W7,
     X8 -> W8, X9 -> W9, X10 -> W10, X11 -> W11, X12 -> W12, X13 -> W13, X14 -> W14, X15 -> W15,
     X16 -> W16, X17 -> W17, X18 -> W18, X19 -> W19, X20 -> W20, X21 -> W21, X22 -> W22,
-    X23 -> W23, X24 -> W24, X25 -> W25, X26 -> W26, X27 -> W27, X28 -> W28, XZR -> WZR
+    X23 -> W23, X24 -> W24, X25 -> W25, X26 -> W26, X27 -> W27, X28 -> W28, XZR -> WZR, SP -> WSP
   )
 
   // Reverse mapping from W-registers to X-registers - I found I needed this for printing arrays 
@@ -94,3 +94,4 @@ case object W28 extends Register
 case object W29 extends Register  // Frame Pointer
 case object W30 extends Register  // Link Register
 case object WZR extends Register
+case object WSP extends Register
