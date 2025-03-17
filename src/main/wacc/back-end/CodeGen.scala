@@ -580,21 +580,21 @@ object CodeGen {
             addVariable(name, t) match {
               case Some(Left(reg)) => 
                 generateRValue(value, reg, Some(t))
-                // 🔍 Debugging: Print variable right after assignment
+                /*// 🔍 Debugging: Print variable right after assignment
                 helpers.getOrElseUpdate(IRLabel("_printi"), printi())
                 currentBranch ++= List(
                   IRMovReg(W0, reg.asW),
                   IRBl("_printi")
-                )
+                )*/
               case Some(Right(off)) => 
                 val temp = getTempRegister().getOrElse(defTempReg)
                 generateRValue(value, temp, Some(t))
                 push(temp, off)
-                // 🔍 Debugging: Print variable after pushing to stack
+                /*// 🔍 Debugging: Print variable after pushing to stack
                 currentBranch ++= List(
                   IRMovReg(W0, temp.asW),
                   IRBl("_printi")
-                )
+                )*/
                 freeRegister(temp)
               case _ =>
               }
@@ -833,7 +833,10 @@ object CodeGen {
 
 
       case ReturnStmt(expr) => 
-        val paramPopInstrs = paramsMap
+        val paramPopInstrs = popFunctionParams(
+          paramsMap.view.filterKeys(!poppedParams.contains(_)).values.map(_._1).toList
+        )
+        /*val paramPopInstrs = paramsMap
           .view.filterKeys(!poppedParams.contains(_)).toMap // Only pop parameters that weren't already popped
           .values
           .map { case (reg, _) =>
@@ -841,14 +844,10 @@ object CodeGen {
               IRCmt(s"pop {$reg}"),
               popReg(reg, XZR)
             )
-          }.toList.flatten
+          }.toList.flatten*/
+
         generateExpr(expr, W0)
-        // 🔍 Debugging instruction: Print X0 before returning
-        helpers.getOrElseUpdate(IRLabel("_printi"), printi())
-        currentBranch ++= List(
-          IRMovReg(W0, X0.asW),
-          IRBl("_printi")  // ✅ Print return value before exiting function
-        )
+
         currentBranch ++= (
           List(
             IRCmt("Function epilogue: reset stack pointer")
@@ -903,15 +902,15 @@ object CodeGen {
           currentBranch += IRJump(condBranch) // jump to condition check
           addBranch()
           enterScope()
-          // 🔍 Debugging: Print i in loop
+          /*// 🔍 Debugging: Print i in loop
           val iReg = getTempRegister().getOrElse(defTempReg)
           helpers.getOrElseUpdate(IRLabel("_printi"), printi())
           currentBranch ++= List(
             IRMovReg(W0, iReg.asW),
             IRBl("_printi")
-          )
+          )*/
           generateStmt(body)
-          freeRegister(iReg)
+          //freeRegister(iReg)
           exitScope()
           addBranch()
           val temp = getTempRegister().getOrElse(defTempReg)
