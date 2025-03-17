@@ -585,7 +585,7 @@ object CodeGen {
                 freeRegister(temp)
               case _ =>
               }
-            }
+            //}
         // }
             
       case AssignStmt(lvalue, rvalue) => 
