@@ -616,7 +616,10 @@ object CodeGen {
       currentBranch +=  IRBl("_printb")
     } else if (exprType == ArrayType(BaseType.IntType)) {
       helpers.getOrElseUpdate(IRLabel("_printp"), printp()) //printp
-      currentBranch +=  IRBl("_printp")
+      currentBranch ++=  List(
+        //IRMovReg(defArrPairReg, dest.asX), // Ensure pointer is correctly in x0
+        IRBl("_printp")
+      )
     } else if (exprType.isInstanceOf[PairType]) {
       helpers.getOrElseUpdate(IRLabel("_printp"), printp())
       currentBranch +=  IRBl("_printp")
@@ -1582,7 +1585,7 @@ object CodeGen {
 
         currentBranch += IRMov(defArrPairReg.asW, arrayMemory) += IRBl("_malloc")
         += IRMovReg(arrPairStrReg, defArrPairReg) += IRAddImmInt(arrPairStrReg, arrPairStrReg, stackOffset)
-        += IRMov(temp, size) += IRStur(temp, arrPairStrReg, -stackOffset)
+        += IRMov(temp, size) += IRStur(temp, arrPairStrReg, -stackOffset) += IRMovReg(defArrPairReg, arrPairStrReg)
         
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
           val elType = generateExpr(element, temp)
