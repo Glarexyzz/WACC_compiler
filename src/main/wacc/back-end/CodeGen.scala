@@ -1277,8 +1277,10 @@ object CodeGen {
     }
   }
 
+  // Checks the bound of an index in an array
   def checkBounds(list: List[Any], i: Int): Boolean = i >= 0 && i < list.length
   
+  // Gets an item from a constant array provided indices are literals or constants
   def getArrayItem(arr: Any, indices: List[Expr]): Option[Any] = indices match {
     case Nil => Some(arr)
     case i :: rest => i match {
@@ -1313,6 +1315,7 @@ object CodeGen {
     }
   }
 
+  // Evaluates constants for better optimisation
   def evalConstants(expr: Expr): Option[Any] = expr match {
     case BoolLiteral(value) => Some(value)
     case IntLiteral(value) => Some(value)
