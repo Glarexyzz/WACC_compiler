@@ -581,21 +581,10 @@ object CodeGen {
             addVariable(name, t) match {
               case Some(Left(reg)) => 
                 generateRValue(value, reg, Some(t))
-                /*// 🔍 Debugging: Print variable right after assignment
-                helpers.getOrElseUpdate(IRLabel("_printi"), printi())
-                currentBranch ++= List(
-                  IRMovReg(W0, reg.asW),
-                  IRBl("_printi")
-                )*/
               case Some(Right(off)) => 
                 val temp = getTempRegister().getOrElse(defTempReg)
                 generateRValue(value, temp, Some(t))
                 push(temp, off)
-                /*// 🔍 Debugging: Print variable after pushing to stack
-                currentBranch ++= List(
-                  IRMovReg(W0, temp.asW),
-                  IRBl("_printi")
-                )*/
                 freeRegister(temp)
               case _ =>
               }
@@ -787,7 +776,6 @@ object CodeGen {
               IRCmt(s"pop/peek {$reg}"),
               IRLdur(reg, SP, defOffset),
               IRMovReg(paramsReg, SP),
-              IRMovReg(X16, reg) // DEBUG: Print pointer before calling _prints
             )
             genAndPrintExpr(expr)
           /*
@@ -906,13 +894,6 @@ object CodeGen {
           currentBranch += IRJump(condBranch) // jump to condition check
           addBranch()
           enterScope()
-          /*// 🔍 Debugging: Print i in loop
-          val iReg = getTempRegister().getOrElse(defTempReg)
-          helpers.getOrElseUpdate(IRLabel("_printi"), printi())
-          currentBranch ++= List(
-            IRMovReg(W0, iReg.asW),
-            IRBl("_printi")
-          )*/
           generateStmt(body)
           //freeRegister(iReg)
           exitScope()
@@ -1516,7 +1497,6 @@ object CodeGen {
         currentBranch += IRMov(defArrPairReg.asW, arrayMemory) += IRBl("_malloc")
         += IRMovReg(arrPairStrReg, defArrPairReg) += IRAddImmInt(arrPairStrReg, arrPairStrReg, stackOffset)
         += IRMov(temp, size) += IRStur(temp, arrPairStrReg, -stackOffset)
-        += IRMovReg(X16, arrPairStrReg) // DEBUG: Print allocated array pointer
         
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
           val elType = generateExpr(element, temp)
@@ -1619,9 +1599,7 @@ object CodeGen {
           generateExpr(arg, reg) // Move argument values into x8-x15
         }
         currentBranch ++= List(
-          IRMovReg(X16, SP), // DEBUG: Check SP before call
           IRBl(s"wacc_$name"), 
-          IRMovReg(X17, SP),  // DEBUG: Check SP after call
           IRMovReg(reg.asW, defReturnReg)
         )
 
