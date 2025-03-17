@@ -277,7 +277,7 @@ object CodeGen {
           val offset = (index + 1) * 16
           List(
             IRCmt(s"pop {$reg1, $reg2}"),
-            IRLdp(reg1, reg2, offset, true) // Pop at offset
+            IRLdp(reg1, reg2, offset, true, true) // Pop at offset
           )
         case (List(reg1), index) =>
           val offset = (index + 1) * 16
@@ -294,7 +294,7 @@ object CodeGen {
           val offset = (index + 1) * 16
           List(
             IRCmt(s"pop {$reg1, $reg2}"),
-            IRLdp(reg1, reg2, offset, true) // Pop at offset
+            IRLdp(reg1, reg2, offset, true, true) // Pop at offset
           )
         case (List(reg1), index) =>
           val offset = (index + 1) * 16
