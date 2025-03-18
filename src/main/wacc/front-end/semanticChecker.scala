@@ -231,6 +231,9 @@ object semanticChecker {
 
   def evaluateExpr(value: Expr): Option[Int] = value match {
     case IntLiteral(n) => Some(n.toInt)
+    case BinaryLiteral(bin) => Some(bin.toInt)  
+    case OctalLiteral(oct) => Some(oct.toInt)
+    case HexaLiteral(hex) => Some(hex.toInt)
     case BoolLiteral(b) => if (b) Some(trueValue) else Some(falseValue)
     case CharLiteral(c) => Some(c.toInt)
     case Identifier(name) => constants.get(name) match {
