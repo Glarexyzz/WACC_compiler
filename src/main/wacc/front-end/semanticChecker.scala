@@ -291,6 +291,9 @@ object semanticChecker {
   def allowedArrayType(t: Type): Boolean = t match {
     case ArrayType(innertype) => allowedArrayType(innertype)
     case BaseType.IntType => true
+    case BaseType.BinType => true
+    case BaseType.OctType => true
+    case BaseType.HexType => true
     case BaseType.BoolType => true
     case _ => false
   }
