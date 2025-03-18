@@ -80,9 +80,19 @@ class SymbolTable {
       if (currentScope.contains(name) && !functionStatus.isDefined) {
         return false // Variable already declared in this scope
       }
+      else if (currentScope.contains(name) && functionStatus.isDefined) {
+        val parentScope = variableScopes(1) // second top
+        if (!parentScope.contains(name)) {
+          // Still add into the symbolTable incase for argument shadowing
+          currentScope(name) = VariableEntry(varType)
+          nVariablesInScope += 1
+          val totalNowAlive = nVariableRegs + nVariablesInScope
+          maxConcurrentVariables = Math.max(maxConcurrentVariables, totalNowAlive)
+          return false
+        }
+      }
       currentScope(name) = VariableEntry(varType)
       nVariablesInScope += 1
-
       val totalNowAlive = nVariableRegs + nVariablesInScope
       //println(s"nVarRegs: $nVariableRegs")
       //println(s"nVarScope: $nVariablesInScope")
@@ -144,6 +154,11 @@ class SymbolTable {
 
   def checkFunctionStatus(): Option[Type] = functionStatus match {
     case Some(n, t) => Some (t)
+    case None => None
+  }
+
+  def getFunctionStatusName(): Option[String] = functionStatus match {
+    case Some(n, t) => Some (n)
     case None => None
   }
   
@@ -212,7 +227,10 @@ object semanticChecker {
     // Add function parameters to the symbol table
     func.paramList.foreach { params =>
       params.foreach { param =>
-        symbolTable.addVariable(param.name, param.t)
+        val params_not_duplicate = symbolTable.addVariable(param.name, param.t)
+        if (!params_not_duplicate) {
+          Some(s"Semantic Error in Declaration: Parameter ${param.name} is already declared")
+        }
         //println("is function's parameter\n")
         symbolTable.nVariablesInScope -= 1
         symbolTable.maxConcurrentVariables -= 1
@@ -371,7 +389,6 @@ object semanticChecker {
       checkRValue(value) match {
         case Left(error) => Some(error)
         case Right(rType) => 
-
           if (isCompatibleTo(rType, t)) {
             //println(s"\nadding $name to the table")
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
@@ -380,8 +397,22 @@ object semanticChecker {
               checkAndAddConstant(t, name, value)
               None
             }
-            else Some(s"Semantic Error in Declaration: Variable $name is already declared")
-           }
+            else {
+              symbolTable.getFunctionStatusName() match {
+                case Some(funcName) =>
+                  val paramList = symbolTable.lookupFunction(funcName) match {
+                    case Some(FunctionEntry(returnType, params)) => params
+                    case _ => List()
+                  }
+                  if (paramList.exists(_.name == name))
+                    None
+                  else
+                    Some(s"Semantic Error in Declaration: Variable $name is already declared")
+                case None =>
+                  Some(s"Semantic Error in Declaration: Variable $name is already declared")
+              }
+            }
+          }
           else Some(s"Semantic Error in Declaration: $rType is not compatible with $t for variable $name")
 
       }
