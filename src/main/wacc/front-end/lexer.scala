@@ -2,7 +2,7 @@ package wacc
 
 import parsley.quick.*
 import parsley.Parsley
-import parsley.token.{Lexer, Basic}
+import parsley.token.{Lexer, Basic, Unicode}
 import parsley.token.descriptions.*
 import parsley.errors.combinator.ErrorMethods
 
@@ -10,8 +10,8 @@ object lexer {
 
     private val desc = LexicalDesc.plain.copy(
         nameDesc = NameDesc.plain.copy(
-            identifierStart = Basic(c => c.isLetter || c == '_'),
-            identifierLetter = Basic(c => c.isLetterOrDigit || c == '_'),
+            identifierStart = Unicode(c => c.toChar.isLetter || c.toChar == '_'),
+            identifierLetter = Unicode(c => c.toChar.isLetterOrDigit || c.toChar == '_'),
         ),
         symbolDesc = SymbolDesc.plain.copy(
             hardKeywords = Set(
@@ -68,18 +68,17 @@ object lexer {
         char('\\')).label("escaped character")
 
     val character: Parsley[Char] = // any ACSII character except '\', ''' and '"' or '\'escapedChar
-        char('\\') *> escapedChar <|>
+        (char('\\') *> escapedChar <|> 
         satisfy(
             c => 
             c != '\\' && 
             c != '\'' &&
             c != '"' && 
             c != '\n' && 
-            c != '\r' &&
-            c >= 0x00.toChar &&
-            c <= 0x7F.toChar
+            c != '\r' 
+        )
         ).label("a valid character enclosed in single quotes")
-            .explain("Characters must be ASCII")
+            .explain("Characters can be ASCII or Unicode")
     
     val charLiter: Parsley[Char] = //lexeme.character.ascii
         (char('\'') *> character <* char('\'') <* 
