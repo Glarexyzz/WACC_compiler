@@ -314,6 +314,18 @@ object semanticChecker {
             if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
               addConstant(name, (BaseType.IntType, n))
             }
+          case BaseType.BinType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              addConstant(name, (BaseType.BinType, n))
+            }
+          case BaseType.OctType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              addConstant(name, (BaseType.OctType, n))
+            }
+          case BaseType.HexType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              addConstant(name, (BaseType.OctType, n))
+            }
           case BaseType.BoolType =>
             if (n == trueValue || n == falseValue) addConstant(name, (BaseType.BoolType, n))
           case BaseType.CharType =>
@@ -337,6 +349,18 @@ object semanticChecker {
       case Some(expr: Expr) => evaluateExpr(expr) match {
         case Some(n) => t match {
           case BaseType.IntType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              unusedVars.add(name)
+            }
+          case BaseType.BinType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              unusedVars.add(name)
+            }
+          case BaseType.OctType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              unusedVars.add(name)
+            }
+          case BaseType.HexType => 
             if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
               unusedVars.add(name)
             }
@@ -428,6 +452,18 @@ object semanticChecker {
     case ReadStmt(lvalue) => lvalue match {
       case LValue.LName(name) => symbolTable.lookup(name) match {
         case Some(VariableEntry(BaseType.IntType)) => 
+          unusedVars.remove(name)
+          removeConstant(name)
+          None
+        case Some(VariableEntry(BaseType.BinType)) => 
+          unusedVars.remove(name)
+          removeConstant(name)
+          None
+        case Some(VariableEntry(BaseType.OctType)) => 
+          unusedVars.remove(name)
+          removeConstant(name)
+          None
+        case Some(VariableEntry(BaseType.HexType)) => 
           unusedVars.remove(name)
           removeConstant(name)
           None
