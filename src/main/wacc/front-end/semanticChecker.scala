@@ -224,27 +224,35 @@ object semanticChecker {
 
     symbolTable.setFunctionStatus(Some(func.name), Some(func.t))
     
+    var paramDupFlag = false
+    var paramDup = ""
+
     // Add function parameters to the symbol table
     func.paramList.foreach { params =>
       params.foreach { param =>
         val params_not_duplicate = symbolTable.addVariable(param.name, param.t)
         if (!params_not_duplicate) {
-          Some(s"Semantic Error in Declaration: Parameter ${param.name} is already declared")
+          paramDupFlag = true
+          paramDup = param.name
         }
-        //println("is function's parameter\n")
         symbolTable.nVariablesInScope -= 1
         symbolTable.maxConcurrentVariables -= 1
       }
     }
-    
-    // Checks the function's body
-    val bodyCheckResult = checkStatement(func.stmt) match {
-      case None => None
-      case Some(error) => Some(s"In function ${func.name},\n$error")
+    if (!paramDupFlag) {
+      // Checks the function's body
+      val bodyCheckResult = checkStatement(func.stmt) match {
+        case None => None
+        case Some(error) => Some(s"In function ${func.name},\n$error")
+      }
+      symbolTable.exitScope()
+      symbolTable.setFunctionStatus(returnType = None)
+      
+      bodyCheckResult
     }
-    symbolTable.exitScope()
-    symbolTable.setFunctionStatus(returnType = None)
-    bodyCheckResult
+    else {
+      Some(s"Semantic Error in Declaration: Parameter $paramDup is already declared")
+    }
   }
 
   def evaluateExpr(value: Expr): Option[Int] = value match {
