@@ -873,16 +873,14 @@ object CodeGen {
         generateStmt(PrintStmt(expr))
         currentBranch += IRBl("_println")
 
-        println(s"availableVariableRegisters: ${availableVariableRegisters.size}")
-
         expr match {
           case Identifier(name) if paramsMap.contains(name) =>
             val paramPopInstrs = popFunctionParams(
               paramsMap.view.values.map(_._1).toList
             )
             currentBranch ++= paramPopInstrs
-          /*
-          case Identifier(name) if (availableVariableRegisters.size == 1) => 
+          
+          case Identifier(name) if (availableVariableRegisters.size == 0) => 
             lookupVariable(name) match {
               case Some((Left(reg), t)) =>
                 currentBranch ++= List(
@@ -896,9 +894,9 @@ object CodeGen {
                   popReg(temp, XZR)
                 )
                 freeRegister(temp)
-              case _ =>
-            }*/
-          case _ =>
+              case _ => None
+            }
+          case _ => None
         }
 
       case ReturnStmt(expr) => 
