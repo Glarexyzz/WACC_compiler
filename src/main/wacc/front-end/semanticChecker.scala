@@ -26,7 +26,6 @@ class SymbolTable {
   def getCurrentFunctionParamsNum(funcName: String): Int = functionTable(funcName).params.length
   
   def enterScope(): Unit = {
-    //println(s"Entering scope: ${getVariableScopes}")
     nVariableRegs += nVariablesInScope  // Carry over total variables seen so far.
     scopeLevel += 1
     val newScope = if (functionStatus.isDefined && variableScopes.nonEmpty) {
@@ -41,21 +40,16 @@ class SymbolTable {
 
   def exitScope(): Unit = {
     if (scopeLevel > 0) {
-      //println(s"Exiting scope: ${getVariableScopes}")
       val exitingScope = variableScopes.pop()
-      //println(s"exitingScope: $exitingScope")
       val parentScope = variableScopes.top
-      //println(s"parentScope: $parentScope")
       var nExitVars = exitingScope.size - parentScope.size
       nVariableRegs += nVariablesInScope  // Carry over total variables seen so far.
-      //println(s"nVarRegs before exiting: $nVariableRegs")
       nVariablesInScope = 0  // The parent scope remove child scope variables
       if (functionStatus.isDefined) {
         functionStatus match {
           case Some(name, t) =>
             val nParams = getCurrentFunctionParamsNum(name)
             nVariableRegs += nParams
-            //println(s"nVarRegs going through parameters: $nVariableRegs")
             if (parentScope.size != 0) {
               nExitVars += nParams
             }
@@ -67,7 +61,6 @@ class SymbolTable {
 
       // When we pop a scope, all its variables "die"
       nVariableRegs -= nExitVars
-      //println(s"nVarRegs after exiting: $nVariableRegs")
       maxConcurrentVariables = Math.max(maxConcurrentVariables, nVariableRegs) // Update max
       scopeLevel -= 1
     }
@@ -75,7 +68,6 @@ class SymbolTable {
   
   def addVariable(name: String, varType: Type): Boolean = {
     if (variableScopes.nonEmpty) {
-      //println(s"variableName: $name, varType: $varType")
       val currentScope = variableScopes.top // Get current scope
       if (currentScope.contains(name) && !functionStatus.isDefined) {
         return false // Variable already declared in this scope
@@ -94,11 +86,7 @@ class SymbolTable {
       currentScope(name) = VariableEntry(varType)
       nVariablesInScope += 1
       val totalNowAlive = nVariableRegs + nVariablesInScope
-      //println(s"nVarRegs: $nVariableRegs")
-      //println(s"nVarScope: $nVariablesInScope")
       maxConcurrentVariables = Math.max(maxConcurrentVariables, totalNowAlive)
-      //println(s"maxVarNum: $maxConcurrentVariables")
-      
       return true
     }
     false // No active scope
@@ -399,7 +387,6 @@ object semanticChecker {
         case Left(error) => Some(error)
         case Right(rType) => 
           if (isCompatibleTo(rType, t)) {
-            //println(s"\nadding $name to the table")
             val can_add_if_no_duplicate = symbolTable.addVariable(name, t)
             if (can_add_if_no_duplicate) {
               checkAndAddUnusedVariable(t, name, value)
