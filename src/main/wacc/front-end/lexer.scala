@@ -18,8 +18,8 @@ object lexer {
                 "if", "begin", "end", "is", "skip", "read", "free", 
                 "return", "exit", "print", "println", "then", "else",
                 "fi", "while", "do", "done", "newpair", "call", "fst",
-                "snd", "int", "bool", "char", "string", "pair", "null",
-                "true", "false"
+                "snd", "int", "bin", "oct", "hex", "bool", "char", "string",
+                 "pair", "null", "true", "false"
             ),
             hardOperators = Set(
                 "!", "-", "len", "ord", "chr", "*", "/", "%", "+",
@@ -44,6 +44,11 @@ object lexer {
     val digit: Parsley[Char] = digit                        // single digit '0'-'9'
     val intSign: Parsley[Char] = (char('+') <|> char('-')).label("sign")    // '+' or '-'
     val intLiter: Parsley[BigInt] = lexeme.signed.decimal32 // intSign with digits
+
+    // Binary, Octal & Hexadecimal Numbers
+    val binaryLiter: Parsley[BigInt] = lexeme.signed.binary32
+    val octalLiter: Parsley[BigInt] = lexeme.signed.octal32
+    val hexaLiter: Parsley[BigInt] = lexeme.signed.hexadecimal32
     
     // Boolean
     val boolLiter: Parsley[Boolean] =                     // 'true' or 'false'

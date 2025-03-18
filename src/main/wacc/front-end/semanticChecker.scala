@@ -231,6 +231,9 @@ object semanticChecker {
 
   def evaluateExpr(value: Expr): Option[Int] = value match {
     case IntLiteral(n) => Some(n.toInt)
+    case BinaryLiteral(bin) => Some(bin.toInt)  
+    case OctalLiteral(oct) => Some(oct.toInt)
+    case HexaLiteral(hex) => Some(hex.toInt)
     case BoolLiteral(b) => if (b) Some(trueValue) else Some(falseValue)
     case CharLiteral(c) => Some(c.toInt)
     case Identifier(name) => constants.get(name) match {
@@ -289,6 +292,9 @@ object semanticChecker {
   def allowedArrayType(t: Type): Boolean = t match {
     case ArrayType(innertype) => allowedArrayType(innertype)
     case BaseType.IntType => true
+    case BaseType.BinType => true
+    case BaseType.OctType => true
+    case BaseType.HexType => true
     case BaseType.BoolType => true
     case _ => false
   }
@@ -308,6 +314,18 @@ object semanticChecker {
           case BaseType.IntType => 
             if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
               addConstant(name, (BaseType.IntType, n))
+            }
+          case BaseType.BinType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              addConstant(name, (BaseType.BinType, n))
+            }
+          case BaseType.OctType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              addConstant(name, (BaseType.OctType, n))
+            }
+          case BaseType.HexType => 
+            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
+              addConstant(name, (BaseType.OctType, n))
             }
           case BaseType.BoolType =>
             if (n == trueValue || n == falseValue) addConstant(name, (BaseType.BoolType, n))
@@ -331,7 +349,7 @@ object semanticChecker {
     extract(value) match {
       case Some(expr: Expr) => evaluateExpr(expr) match {
         case Some(n) => t match {
-          case BaseType.IntType => 
+          case BaseType.IntType | BaseType.BinType | BaseType.OctType | BaseType.HexType => 
             if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
               unusedVars.add(name)
             }
@@ -426,6 +444,18 @@ object semanticChecker {
           unusedVars.remove(name)
           removeConstant(name)
           None
+        case Some(VariableEntry(BaseType.BinType)) => 
+          unusedVars.remove(name)
+          removeConstant(name)
+          None
+        case Some(VariableEntry(BaseType.OctType)) => 
+          unusedVars.remove(name)
+          removeConstant(name)
+          None
+        case Some(VariableEntry(BaseType.HexType)) => 
+          unusedVars.remove(name)
+          removeConstant(name)
+          None
         case Some(VariableEntry(BaseType.CharType)) =>
           unusedVars.remove(name)
           removeConstant(name)
@@ -436,6 +466,9 @@ object semanticChecker {
       case LValue.LPair(pairElem) => 
         checkPairElem(pairElem) match {
           case Right(BaseTElem(BaseType.IntType)) => None
+          case Right(BaseTElem(BaseType.BinType)) => None
+          case Right(BaseTElem(BaseType.OctType)) => None
+          case Right(BaseTElem(BaseType.HexType)) => None
           case Right(BaseTElem(BaseType.CharType)) => None
           case Right(t) => Some(s"Semantic Error in Read: Type of pair $pairElem must be type int or char, but got $t instead")
           case Left(error) => Some(error)
@@ -675,6 +708,9 @@ object semanticChecker {
   
   def typeToPairElemType(t: Type): PairElemType = t match {
     case BaseType.IntType => BaseTElem(BaseType.IntType)
+    case BaseType.BinType => BaseTElem(BaseType.BinType)
+    case BaseType.OctType => BaseTElem(BaseType.OctType)
+    case BaseType.HexType => BaseTElem(BaseType.HexType)
     case BaseType.BoolType => BaseTElem(BaseType.BoolType)
     case BaseType.CharType => BaseTElem(BaseType.CharType)
     case BaseType.StrType => BaseTElem(BaseType.StrType)
@@ -719,6 +755,9 @@ object semanticChecker {
   def checkExprType(expr: Expr, env: SymbolTable, isIfOrWhile: Boolean = false): Either[String, Type] = expr match {
     
     case IntLiteral(_) => Right(BaseType.IntType)
+    case BinaryLiteral(_) => Right(BaseType.BinType)
+    case OctalLiteral(_) => Right(BaseType.OctType)
+    case HexaLiteral(_) => Right(BaseType.HexType)
     case BoolLiteral(_) => Right(BaseType.BoolType)
     case CharLiteral(_) => Right(BaseType.CharType)
     case StrLiteral(_) => Right(BaseType.StrType)
@@ -781,6 +820,12 @@ object semanticChecker {
         case (Right(t1), Right(t2)) =>
           if (isCompatibleTo(BaseType.IntType, t1) && isCompatibleTo(BaseType.IntType, t2)) { 
             Right(BaseType.IntType) 
+          } else if (isCompatibleTo(BaseType.BinType, t1) && isCompatibleTo(BaseType.BinType, t2)) {
+            Right(BaseType.BinType)
+          } else if (isCompatibleTo(BaseType.OctType, t1) && isCompatibleTo(BaseType.OctType, t2)) {
+            Right(BaseType.OctType)
+          } else if (isCompatibleTo(BaseType.HexType, t1) && isCompatibleTo(BaseType.HexType, t2)) {
+            Right(BaseType.HexType)
           } else { 
             Left(s"Semantic Error: $t1 and $t2 are incompatible for arithmetic operation $op") 
           }
@@ -797,6 +842,9 @@ object semanticChecker {
     ).contains(op) =>
       (checkExprType(left, env, isIfOrWhile), checkExprType(right, env, isIfOrWhile)) match {
         case (Right(BaseType.IntType), Right(BaseType.IntType)) => Right(BaseType.BoolType) 
+        case (Right(BaseType.BinType), Right(BaseType.BinType)) => Right(BaseType.BoolType) 
+        case (Right(BaseType.OctType), Right(BaseType.OctType)) => Right(BaseType.BoolType) 
+        case (Right(BaseType.HexType), Right(BaseType.HexType)) => Right(BaseType.BoolType) 
         case (Right(BaseType.CharType), Right(BaseType.CharType)) => Right(BaseType.BoolType) 
         case (Right(t1), Right(t2)) => Left(s"Semantic Error: Types should be int or char, but got $t1 and $t2 instead in operation $op") 
         case (Left(error1), Left(error2)) => Left(s"$error1, $error2")
@@ -843,6 +891,12 @@ object semanticChecker {
         case Right(t) => 
           if (isCompatibleTo(BaseType.IntType, t)) 
             Right(BaseType.IntType)
+          else if (isCompatibleTo(BaseType.BinType, t))
+            Right(BaseType.BinType)
+          else if (isCompatibleTo(BaseType.OctType, t))
+            Right(BaseType.OctType)
+          else if (isCompatibleTo(BaseType.HexType, t))
+            Right(BaseType.HexType)
           else Left(s"Semantic Error: `-` operator requires an integer operand but found $t") 
         case Left(error) => Left(error)
       }
@@ -890,6 +944,9 @@ object semanticChecker {
 
   def nestedCompatibility(t1: Type, t2: Type): Boolean = (t1, t2) match {
     case (BaseType.IntType, BaseType.IntType) => true
+    case (BaseType.BinType, BaseType.BinType) => true
+    case (BaseType.OctType, BaseType.OctType) => true
+    case (BaseType.HexType, BaseType.HexType) => true
     case (BaseType.BoolType, BaseType.BoolType) => true
     case (BaseType.CharType, BaseType.CharType) => true
     case (BaseType.StrType, BaseType.StrType) => true

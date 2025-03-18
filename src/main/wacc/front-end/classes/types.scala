@@ -6,6 +6,9 @@ sealed trait Type
 
 enum BaseType extends Type {
     case IntType
+    case BinType
+    case OctType
+    case HexType
     case BoolType
     case CharType
     case StrType
