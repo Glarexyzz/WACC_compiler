@@ -8,7 +8,10 @@ import parsley.quick.*
 import parsley.errors.ErrorBuilder
 import parsley.errors.combinator.ErrorMethods
 
-import lexer.{fully, intLiter, boolLiter, charLiter, strLiter, pairLiter, ident}
+import lexer.{
+    fully, intLiter, binaryLiter, octalLiter, hexaLiter, boolLiter, charLiter, 
+    strLiter, pairLiter, ident
+}
 
 object parser {
     def parse[Err >: ParserError: ErrorBuilder](prog: String): Either[Err, Any] = {
@@ -73,6 +76,9 @@ object parser {
     // Atom definition
     private lazy val atom: Parsley[Expr] =
         IntLiteral(intLiter).label("integer value") <|>
+        BinaryLiteral(binaryLiter).label("binary value") <|>
+        OctalLiteral(octalLiter).label("octal value") <|>
+        HexaLiteral(hexaLiter).label("hexadecimal value") <|>
         BoolLiteral(boolLiter).label("boolean value") <|>
         CharLiteral(charLiter).label("char literal") <|>
         StrLiteral(strLiter).label("string literal") <|>
