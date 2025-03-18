@@ -7,6 +7,15 @@ trait Expr
 case class IntLiteral(value: BigInt) extends Expr
 object IntLiteral extends generic.ParserBridge1[BigInt, Expr]
 
+case class BinaryLiteral(bvalue: BigInt) extends Expr
+object BinaryLiteral extends generic.ParserBridge1[BigInt, Expr]
+
+case class OctalLiteral(ovalue: BigInt) extends Expr
+object OctalLiteral extends generic.ParserBridge1[BigInt, Expr]
+
+case class HexaLiteral(hvalue: BigInt) extends Expr
+object HexaLiteral extends generic.ParserBridge1[BigInt, Expr]
+
 case class BoolLiteral(value: Boolean) extends Expr
 object BoolLiteral extends generic.ParserBridge1[Boolean, Expr]
 
