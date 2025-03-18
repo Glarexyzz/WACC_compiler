@@ -75,10 +75,10 @@ object parser {
 
     // Atom definition
     private lazy val atom: Parsley[Expr] =
-        IntLiteral(intLiter).label("integer value") <|>
         BinaryLiteral(binaryLiter).label("binary value") <|>
         OctalLiteral(octalLiter).label("octal value") <|>
         HexaLiteral(hexaLiter).label("hexadecimal value") <|>
+        IntLiteral(intLiter).label("integer value") <|>
         BoolLiteral(boolLiter).label("boolean value") <|>
         CharLiteral(charLiter).label("char literal") <|>
         StrLiteral(strLiter).label("string literal") <|>
