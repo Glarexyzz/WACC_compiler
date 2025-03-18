@@ -879,36 +879,15 @@ object CodeGen {
               paramsMap.view.values.map(_._1).toList
             )
             currentBranch ++= paramPopInstrs
-          
-          case Identifier(name) if (availableVariableRegisters.size == 0) => 
-            lookupVariable(name) match {
-              case Some((Left(reg), t)) =>
-                currentBranch ++= List(
-                  IRCmt(s"pop {$reg}"),
-                  popReg(reg, XZR)
-                )
-              case Some((Right(off), t)) =>
-                val temp = getTempRegister().getOrElse(defTempReg)
-                currentBranch ++= List(
-                  IRCmt(s"pop {$temp}"),
-                  popReg(temp, XZR)
-                )
-                freeRegister(temp)
-              case _ => None
-            }
           case _ => None
         }
 
       case ReturnStmt(expr) => 
-        /*val paramPopInstrs = popFunctionParams(
-          paramsMap.view.values.map(_._1).toList
-        )*/
         generateExpr(expr, W0)
         currentBranch ++= (
           List(
             IRCmt("Function epilogue: reset stack pointer"),
             IRMovReg(SP, FP),  // Reset stack pointer before returning
-          //) ++ paramPopInstrs ++ List(
             popReg(FP, LR),
             IRRet()
           )
