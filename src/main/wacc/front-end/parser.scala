@@ -123,6 +123,9 @@ object parser {
     private lazy val baseType: Parsley[BaseType] = 
         choice(
             symbol("int").as(BaseType.IntType),
+            symbol("bin").as(BaseType.BinType),
+            symbol("oct").as(BaseType.OctType),
+            symbol("hex").as(BaseType.HexType),
             symbol("bool").as(BaseType.BoolType),
             symbol("char").as(BaseType.CharType),
             symbol("string").as(BaseType.StrType)

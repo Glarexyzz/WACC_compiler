@@ -18,8 +18,8 @@ object lexer {
                 "if", "begin", "end", "is", "skip", "read", "free", 
                 "return", "exit", "print", "println", "then", "else",
                 "fi", "while", "do", "done", "newpair", "call", "fst",
-                "snd", "int", "bool", "char", "string", "pair", "null",
-                "true", "false"
+                "snd", "int", "bin", "oct", "hex", "bool", "char", "string",
+                 "pair", "null", "true", "false"
             ),
             hardOperators = Set(
                 "!", "-", "len", "ord", "chr", "*", "/", "%", "+",
