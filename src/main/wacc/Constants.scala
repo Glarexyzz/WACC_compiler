@@ -30,7 +30,7 @@ object Constants {
   val pointerSize          = 8    
   val pairMemorySize       = 16      
   val arrayMetadataSize    = 4  
-  val intSize              = 4  
+  val numSize              = 4  
   val charSize             = 1            
   val boolSize             = 1
   val firstIndex           = 0

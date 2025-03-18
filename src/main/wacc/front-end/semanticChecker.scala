@@ -348,19 +348,7 @@ object semanticChecker {
     extract(value) match {
       case Some(expr: Expr) => evaluateExpr(expr) match {
         case Some(n) => t match {
-          case BaseType.IntType => 
-            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
-              unusedVars.add(name)
-            }
-          case BaseType.BinType => 
-            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
-              unusedVars.add(name)
-            }
-          case BaseType.OctType => 
-            if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
-              unusedVars.add(name)
-            }
-          case BaseType.HexType => 
+          case BaseType.IntType | BaseType.BinType | BaseType.OctType | BaseType.HexType => 
             if (n.abs <= max16BitUnsigned || n <= min32BitSigned){
               unusedVars.add(name)
             }

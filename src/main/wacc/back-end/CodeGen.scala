@@ -122,7 +122,10 @@ object CodeGen {
 
   def getStackVarOffset(varType: Type): Option[Int] = {
     val varSize: Option[Int] = varType match {
-      case BaseType.IntType => Some(intSize)
+      case BaseType.IntType => Some(numSize)
+      case BaseType.BinType => Some(numSize)
+      case BaseType.OctType => Some(numSize)
+      case BaseType.HexType => Some(numSize)
       case BaseType.BoolType => Some(boolSize)
       case BaseType.CharType => Some(charSize)
       case _ => None
@@ -602,7 +605,12 @@ object CodeGen {
   def genAndPrintExpr(expr: Expr): Unit = {
     val exprType = generateExpr(expr)
     
-    if (exprType == BaseType.IntType) {
+    if (
+      exprType == BaseType.IntType ||
+      exprType == BaseType.BinType ||
+      exprType == BaseType.OctType ||
+      exprType == BaseType.HexType
+    ) {
     helpers.getOrElseUpdate(IRLabel("_printi"), printi())
       currentBranch +=  IRBl("_printi")
     } else if (exprType == BaseType.CharType) {
@@ -614,10 +622,14 @@ object CodeGen {
     } else if (exprType == BaseType.BoolType) {
       helpers.getOrElseUpdate(IRLabel("_printb"), printb())
       currentBranch +=  IRBl("_printb")
-    } else if (exprType == ArrayType(BaseType.IntType)) {
+    } else if (
+      exprType == ArrayType(BaseType.IntType) ||
+      exprType == ArrayType(BaseType.BinType) ||
+      exprType == ArrayType(BaseType.OctType) ||
+      exprType == ArrayType(BaseType.HexType)
+    ) {
       helpers.getOrElseUpdate(IRLabel("_printp"), printp()) //printp
       currentBranch ++=  List(
-        //IRMovReg(defArrPairReg, dest.asX), // Ensure pointer is correctly in x0
         IRBl("_printp")
       )
     } else if (exprType.isInstanceOf[PairType]) {
@@ -704,10 +716,15 @@ object CodeGen {
                   currentBranch += IRBl("_arrStore1")
                   helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
                   helpers.getOrElseUpdate(IRLabel("_arrStore1"), arrStore1(varReg.asW))
-                } else if (elemType == ArrayType(ArrayType(BaseType.IntType))) {
+                } else if (
+                    elemType == ArrayType(ArrayType(BaseType.IntType)) ||
+                    elemType == ArrayType(ArrayType(BaseType.BinType)) ||
+                    elemType == ArrayType(ArrayType(BaseType.OctType)) ||
+                    elemType == ArrayType(ArrayType(BaseType.HexType))
+                  ) {
                   currentBranch += IRBl("_arrStore8")
                   helpers.getOrElseUpdate(IRLabel("_arrStore8"), arrStore8(varReg.asX))
-                }
+                } 
                 else {
                   currentBranch += IRBl("_arrStore4")
                   helpers.getOrElseUpdate(IRLabel("_arrStore4"), arrStore4(varReg.asW))
@@ -730,7 +747,7 @@ object CodeGen {
               case (Left(regX), t) =>
                 val reg = regX.asW
                 t match {
-                  case BaseType.IntType => 
+                  case BaseType.IntType | BaseType.BinType | BaseType.OctType | BaseType.HexType => 
                     helpers.getOrElseUpdate(IRLabel("_readi"), readi())
                     currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readi"), IRMovReg(reg, tempIOReg))
                   case BaseType.CharType => 
@@ -741,7 +758,7 @@ object CodeGen {
               case (Right(off), t) =>
                 val reg = getTempRegister().getOrElse(defTempReg)
                 t match {
-                  case BaseType.IntType => 
+                  case BaseType.IntType | BaseType.BinType | BaseType.OctType | BaseType.HexType => 
                     helpers.getOrElseUpdate(IRLabel("_readi"), readi())
                     currentBranch ++= List(IRMovReg(tempIOReg, reg), IRBl("_readi"), IRMovReg(reg, tempIOReg))
                   case BaseType.CharType => 
@@ -761,7 +778,7 @@ object CodeGen {
                 nullErrorCheck(reg)
                 currentBranch += IRLdr(defArrPairReg, reg)
                 checkPairType(t, true) match {
-                  case BaseType.IntType =>
+                  case BaseType.IntType | BaseType.BinType | BaseType.OctType | BaseType.HexType =>
                     helpers.getOrElseUpdate(IRLabel("_readi"), readi())
                     currentBranch += IRBl("_readi")
                   case BaseType.CharType =>
@@ -782,7 +799,7 @@ object CodeGen {
                 nullErrorCheck(reg)
                 currentBranch += IRLdr(defArrPairReg, reg, Some(8))
                 checkPairType(t, false) match {
-                  case BaseType.IntType =>
+                  case BaseType.IntType | BaseType.BinType | BaseType.OctType | BaseType.HexType =>
                     helpers.getOrElseUpdate(IRLabel("_readi"), readi())
                     currentBranch += IRBl("_readi")
                   case BaseType.CharType =>
@@ -990,7 +1007,13 @@ object CodeGen {
 
     (expr1, expr2) match {
       case (_, IntLiteral(value)) if valid(value.toInt) => Some((expr1, value.toInt))
+      case (_, BinaryLiteral(value)) if valid(value.toInt) => Some((expr1, value.toInt))
+      case (_, OctalLiteral(value)) if valid(value.toInt) => Some((expr1, value.toInt))
+      case (_, HexaLiteral(value)) if valid(value.toInt) => Some((expr1, value.toInt))
       case (IntLiteral(value), _) if (valid(value.toInt) && isAdd) => Some((expr2, value.toInt))
+      case (BinaryLiteral(value), _) if (valid(value.toInt) && isAdd) => Some((expr2, value.toInt))
+      case (OctalLiteral(value), _) if (valid(value.toInt) && isAdd) => Some((expr2, value.toInt))
+      case (HexaLiteral(value), _) if (valid(value.toInt) && isAdd) => Some((expr2, value.toInt))
       case _ => None
     }
 
@@ -1032,7 +1055,52 @@ object CodeGen {
 
               BaseType.IntType
             }
-            
+
+          case BinaryLiteral(value) =>
+            if (value.abs <= max16BitUnsigned || value <= min32BitSigned) {
+              currentBranch += IRMov(destW, value.toInt)
+              BaseType.IntType
+            } else {
+              val lower16 = (value & lower16Mask).toInt          // Extract lower 16 bits
+              val upper16 = ((value >> upper16Shift) & lower16Mask).toInt  
+
+              currentBranch +=
+                IRMov(destW, lower16) +=        
+                IRMovk(destW, upper16, upper16Shift)   
+
+              BaseType.IntType
+            }
+
+          case OctalLiteral(value) =>
+            if (value.abs <= max16BitUnsigned || value <= min32BitSigned) {
+              currentBranch += IRMov(destW, value.toInt)
+              BaseType.IntType
+            } else {
+              val lower16 = (value & lower16Mask).toInt          // Extract lower 16 bits
+              val upper16 = ((value >> upper16Shift) & lower16Mask).toInt  
+
+              currentBranch +=
+                IRMov(destW, lower16) +=        
+                IRMovk(destW, upper16, upper16Shift)   
+
+              BaseType.IntType
+            }
+
+          case HexaLiteral(value) =>
+            if (value.abs <= max16BitUnsigned || value <= min32BitSigned) {
+              currentBranch += IRMov(destW, value.toInt)
+              BaseType.IntType
+            } else {
+              val lower16 = (value & lower16Mask).toInt          // Extract lower 16 bits
+              val upper16 = ((value >> upper16Shift) & lower16Mask).toInt  
+
+              currentBranch +=
+                IRMov(destW, lower16) +=        
+                IRMovk(destW, upper16, upper16Shift)   
+
+              BaseType.IntType
+            }
+
           case BoolLiteral(value) =>
             currentBranch += IRMov(destW, if (value) trueValue else falseValue)
             BaseType.BoolType
@@ -1342,6 +1410,27 @@ object CodeGen {
           currentBranch += IRJump("_errOutOfBounds")
           None
       }
+      case BinaryLiteral(n) => arr match {
+        case list: List[Any] if checkBounds(list, n.toInt) => getArrayItem(list(n.toInt), rest)
+        case _ => 
+          helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+          currentBranch += IRJump("_errOutOfBounds")
+          None
+      }
+      case OctalLiteral(n) => arr match {
+        case list: List[Any] if checkBounds(list, n.toInt) => getArrayItem(list(n.toInt), rest)
+        case _ => 
+          helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+          currentBranch += IRJump("_errOutOfBounds")
+          None
+      }
+      case HexaLiteral(n) => arr match {
+        case list: List[Any] if checkBounds(list, n.toInt) => getArrayItem(list(n.toInt), rest)
+        case _ => 
+          helpers.getOrElseUpdate(IRLabel("_errOutOfBounds"), errOutOfBounds())
+          currentBranch += IRJump("_errOutOfBounds")
+          None
+      }
       case ArrayElem(name, is) => constants.get(name) match {
         case Some((_, outerlist: List[Any])) => getArrayItem(outerlist, is) match {
           case Some(n) => (arr, n) match {
@@ -1359,11 +1448,17 @@ object CodeGen {
   def evalConstants(expr: Expr): Option[Any] = expr match {
     case BoolLiteral(value) => Some(value)
     case IntLiteral(value) => Some(value)
+    case BinaryLiteral(value) => Some(value)
+    case OctalLiteral(value) => Some(value)
+    case HexaLiteral(value) => Some(value)
     case CharLiteral(value) => Some(value)
     case Identifier(name) => constants.get(name) match {
       case Some((BaseType.BoolType, value: Int)) => Some(value == trueValue)
       case Some((BaseType.CharType, value: Int)) => Some(value.toChar)
       case Some((BaseType.IntType, value: Int)) => Some(value)
+      case Some((BaseType.BinType, value: Int)) => Some(value)
+      case Some((BaseType.OctType, value: Int)) => Some(value)
+      case Some((BaseType.HexType, value: Int)) => Some(value)
       case _ => None
     }
     case UnaryOp(op, innerExpr) => op match {
@@ -1567,11 +1662,11 @@ object CodeGen {
         for ((element, i) <- elementsIR.zipWithIndex) { // iterate over each expr 
           val elType = generateExpr(element, temp)
           elType match {
-            case BaseType.IntType => 
+            case BaseType.IntType | BaseType.BinType | BaseType.OctType | BaseType.HexType => 
               if (i == firstIndex) { // separate case for first element
                 currentBranch += IRStr(temp, arrPairStrReg)
               } else {
-              currentBranch += IRStr(temp, arrPairStrReg, Some(i * intSize)) // Store element
+              currentBranch += IRStr(temp, arrPairStrReg, Some(i * numSize)) // Store element
               }
             case BaseType.CharType => 
               if (i == firstIndex) { 
@@ -1677,7 +1772,10 @@ object CodeGen {
 
   def elementSize(expType: Type): Int = {
     expType match {
-      case BaseType.IntType => intSize // Integers are 4 bytes
+      case BaseType.IntType => numSize // Integers are 4 bytes
+      case BaseType.BinType => numSize // Integers are 4 bytes
+      case BaseType.OctType => numSize // Integers are 4 bytes
+      case BaseType.HexType => numSize // Integers are 4 bytes
       case BaseType.CharType => charSize // Chars are 1 byte
       case BaseType.BoolType => boolSize // Bools are 1 byte
       case BaseType.StrType => pointerSize // Strings are pointers (8 bytes)
