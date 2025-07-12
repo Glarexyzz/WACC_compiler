@@ -1,35 +1,108 @@
-This is the provided git repository for the WACC compilers lab. You should work
-in this repository regularly committing and pushing your work back to GitLab.
+# WACC Compiler
 
-# Provided files/directories
+This repository contains a compiler for the [WACC language](https://teaching.doc.ic.ac.uk/languages/wacc/), developed as part of an academic project. The compiler is written in Scala and supports the full WACC language specification, including parsing, semantic analysis, and code generation.
 
-## src/main
+## Features
 
-The src/main directory is where you code for your compiler should go, and just
-contains a stub hello world file with a simple calculator inside.
+- **Lexer and Parser:** Converts WACC source code into an abstract syntax tree (AST).
+- **Semantic Checker:** Ensures type safety and correct program structure.
+- **Code Generation:** Outputs ARM assembly code from valid WACC programs.
+- **Comprehensive Test Suite:** Includes both valid and invalid WACC programs for testing.
 
-## src/test
-The src/test directory is where you should put the code for your tests, which
-can be ran via `scala-cli test .`. The suggested framework is `scalatest`, the dependency
-for which has already been included.
+## Directory Structure
 
-## project.scala
-The `project.scala` is the definition of your project's build requirements. By default,
-this skeleton has added the latest stable versions of both `scalatest` and `parsley`
-to the build: you should check **regularly** to see if your `parsley` needs updating
-during the course of WACC!
+- **compile**  
+  Script to build and/or run the compiler.
 
-## compile
+- **LICENSE**  
+  Project license file.
 
-The compile script can be edited to change the frontend interface to your WACC
-compiler. You are free to change the language used in this script, but do not
-change its name.
+- **Makefile**  
+  Makefile for building the project.
 
-## Makefile
+- **project.scala**  
+  Scala project configuration.
 
-Your Makefile should be edited so that running 'make' in the root directory
-builds your WACC compiler. Currently running 'make' will call
-`scala --power package . --server=false --jvm system --graalvm-jvm-id graalvm-java21 --native-image --force -o wacc-compiler`, producing a file called
-`wacc-compiler`
-in the root directory of the project. If this doesn't work for whatever reason, there are a few
-different alternatives you can try in the makefile. **Do not use the makefile as you're working, it's for labts!**
+- **wacc.target**  
+  Build artifact/target file.
+
+- **src/**
+  - **main/wacc/**
+    - **back-end/**
+      - **classes/**
+        - `condition.scala` — Condition handling for code generation.
+        - `IR.scala` — Intermediate representation definitions.
+        - `registers.scala` — Register management for code generation.
+      - `CodeGen.scala` — Main code generation logic.
+      - `helpers.scala` — Helper functions for the backend.
+    - **front-end/**
+      - **classes/**
+        - `expr.scala` — Expression AST definitions.
+        - `stmt.scala` — Statement AST definitions.
+        - `types.scala` — Type system definitions.
+      - `errorBuilder.scala` — Error reporting utilities.
+      - `lexer.scala` — Lexical analysis (tokenizer).
+      - `parser.scala` — Syntax analysis (parser).
+      - `semanticChecker.scala` — Semantic analysis.
+    - `Constants.scala` — Language constants and configuration.
+    - `Main.scala` — Compiler entry point.
+  - **test/wacc/**
+    - `backend-tests.scala` — Backend unit tests.
+    - `frontend-tests.scala` — Frontend unit tests.
+    - **invalid_semantics/** — WACC programs with semantic errors.
+    - **invalid_syntax/** — WACC programs with syntax errors.
+    - **valid/** — Valid WACC programs for testing.
+
+## Build & Run Instructions
+
+### Prerequisites
+
+- [Scala](https://www.scala-lang.org/) (version X.Y.Z)
+- [sbt](https://www.scala-sbt.org/) (Scala build tool)
+- ARM toolchain (for assembling and running generated code, if needed)
+
+### Build
+
+To build the project, run:
+
+```sh
+make
+```
+
+Or, if using sbt directly:
+
+```sh
+sbt compile
+```
+
+### Run
+
+To compile a WACC program:
+
+```sh
+./compile path/to/source.wacc
+```
+
+This will generate ARM assembly code as output.
+
+## Testing
+
+Test cases are located in `src/test/wacc/` and are organized into valid and invalid categories. To run the test suite:
+
+```sh
+sbt test
+```
+
+Or use any provided scripts for automated testing.
+
+## Contributing
+
+Contributions are welcome! Please open issues or pull requests for bug fixes or new features.
+
+## License
+
+This project is MIT licensed under the terms of the [LICENSE](LICENSE) file.
+
+---
+
+*Developed as part of the WACC course at Imperial College London.*
